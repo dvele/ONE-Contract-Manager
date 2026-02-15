@@ -417,8 +417,21 @@ export async function generateContract(options: ContractGenerationOptions): Prom
   applyDynamicNumbering(blockTree);
   console.log(`✓ Applied dynamic numbering`);
   
+  // Step 3.5: Build slug-to-number map and resolve XREF cross-references
+  if (currentContractType === 'MASTER_EF') {
+    const slugNumberMap = buildSlugNumberMap(blockTree);
+    resolveXrefVariables(slugNumberMap);
+    console.log(`✓ Resolved XREF cross-references from clause hierarchy`);
+  }
+  
   // Step 4: Build variable map and process
   const variableMap = buildVariableMap(projectData);
+  
+  if (currentContractType === 'MASTER_EF' && Object.keys(resolvedXrefs).length > 0) {
+    for (const [key, value] of Object.entries(resolvedXrefs)) {
+      variableMap[key] = value;
+    }
+  }
   console.log(`✓ Built variable map with ${Object.keys(variableMap).length} variables`);
   
   // Step 4.5: Resolve dynamic table variables (e.g., WHAT_HAPPENS_NEXT_TABLE)
@@ -666,6 +679,116 @@ function assignMasterEFNoNumbers(nodes: BlockNode[]): void {
     if (node.children.length > 0) {
       assignMasterEFNoNumbers(node.children);
     }
+  }
+}
+
+interface SlugNumberEntry {
+  slug: string;
+  number: string;
+  parentNumber: string;
+  level: number;
+}
+
+function cleanDynamicNumber(raw: string): string {
+  return raw.replace(/[)\s]/g, '').replace(/\.+$/, '');
+}
+
+function buildSlugNumberMap(nodes: BlockNode[], parentNumber: string = ''): Map<string, SlugNumberEntry> {
+  const map = new Map<string, SlugNumberEntry>();
+
+  for (const node of nodes) {
+    if (node.isHidden) continue;
+    const slug = node.clause.clause_code || '';
+    const num = cleanDynamicNumber(node.dynamicNumber || '');
+
+    if (slug) {
+      map.set(slug, {
+        slug,
+        number: num,
+        parentNumber,
+        level: node.clause.hierarchy_level ?? 1,
+      });
+    }
+
+    if (node.children.length > 0) {
+      const childMap = buildSlugNumberMap(node.children, num);
+      for (const [k, v] of childMap) {
+        map.set(k, v);
+      }
+    }
+  }
+  return map;
+}
+
+interface XrefSingle {
+  type: 'single';
+  slug: string;
+  format: 'parent' | 'full';
+}
+
+interface XrefRange {
+  type: 'range';
+  startSlug: string;
+  endSlug: string;
+  parentSlug: string;
+}
+
+type XrefDefinition = XrefSingle | XrefRange;
+
+const XREF_DEFINITIONS: Record<string, XrefDefinition> = {
+  XREF_FEES_PAYMENT_SECTION: {
+    type: 'single',
+    slug: 'FEES_PAYMENT_SECTION',
+    format: 'parent',
+  },
+  XREF_ASSIGNMENT_SECTION: {
+    type: 'single',
+    slug: 'ASSIGNMENT_FINANCING',
+    format: 'full',
+  },
+  XREF_BANKABILITY_SUBSECTIONS: {
+    type: 'range',
+    startSlug: 'IRREVOCABLE_PAYMENT',
+    endSlug: 'FINANCING_PARTY_CURE',
+    parentSlug: 'FEES_PAYMENT_SECTION',
+  },
+};
+
+let resolvedXrefs: Record<string, string> = {};
+
+function resolveXrefVariables(slugMap: Map<string, SlugNumberEntry>): void {
+  resolvedXrefs = {};
+
+  for (const [xrefKey, def] of Object.entries(XREF_DEFINITIONS)) {
+    if (def.type === 'single') {
+      const entry = slugMap.get(def.slug);
+      if (!entry) {
+        console.warn(`XREF: Could not find slug "${def.slug}" for ${xrefKey}`);
+        resolvedXrefs[xrefKey] = '[?]';
+        continue;
+      }
+      if (def.format === 'parent') {
+        resolvedXrefs[xrefKey] = entry.number;
+      } else {
+        const fullRef = entry.parentNumber ? `${entry.parentNumber}.${entry.number}` : entry.number;
+        resolvedXrefs[xrefKey] = fullRef;
+      }
+    } else if (def.type === 'range') {
+      const startEntry = slugMap.get(def.startSlug);
+      const endEntry = slugMap.get(def.endSlug);
+      const parentEntry = slugMap.get(def.parentSlug);
+
+      if (!startEntry || !endEntry || !parentEntry) {
+        console.warn(`XREF: Missing slug for range ${xrefKey}`);
+        resolvedXrefs[xrefKey] = '[?]';
+        continue;
+      }
+
+      const parentNum = parentEntry.number;
+      resolvedXrefs[xrefKey] = `${parentNum}.${startEntry.number} through ${parentNum}.${endEntry.number}`;
+    }
+
+    console.log(`  XREF ${xrefKey} → "${resolvedXrefs[xrefKey]}"`);
   }
 }
 

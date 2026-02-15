@@ -82,6 +82,7 @@ The application is built on a modern full-stack architecture.
     - Exhibit E: Limited Warranty
     - Exhibit F: State-Specific Provisions (with [STATE_DISCLOSURE:MASTER_EF_NOTICES])
     - 14 new variables in mapper.ts: BUYER_TYPE, PROJECT_TYPE, PRODUCTION_PRICE, LOGISTICS_PRICE, ONSITE_PRICE, TOTAL_PROJECT_PRICE, AD_FEE, STORAGE_FEE_PER_DAY, STORAGE_FREE_DAYS, CLIENT_PRIMARY_CONTACT, COMPANY_CONTACT, COMPANY_EMAIL, XREF_FEES_PAYMENT_SECTION, XREF_BANKABILITY_SUBSECTIONS
+- **Dynamic XREF Cross-Reference Resolution (Feb 2026)**: XREF tags (XREF_FEES_PAYMENT_SECTION, XREF_BANKABILITY_SUBSECTIONS, XREF_ASSIGNMENT_SECTION) are dynamically resolved from the clause hierarchy after numbering is applied, instead of using hardcoded section numbers. Uses `buildSlugNumberMap()` to traverse the numbered block tree and `resolveXrefVariables()` to compute references. XREF definitions in `XREF_DEFINITIONS` config support single-slug lookups ('parent' or 'full' format) and range references. Mapper.ts provides '[Section Ref]' fallbacks only if dynamic resolution fails.
 - **6-Phase Pricing Enhancement (Feb 2026)**:
     - Phase 1+4: serviceModel bug fix (mapper.ts uses project.serviceModel), additionalSiteWork defaults to $0
     - Phase 2: Shipping breakout - shipping_set_price in home_models, totalShipping tracked separately in pricing engine, projectBudget/contractValue include shipping

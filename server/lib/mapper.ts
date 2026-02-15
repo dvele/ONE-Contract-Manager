@@ -878,10 +878,12 @@ export function mapProjectToVariables(
     COMPANY_CONTACT: 'Dvele Project Manager',
     COMPANY_EMAIL: 'contracts@dvele.com',
     
-    // Cross-reference placeholders (resolved during contract generation)
-    XREF_FEES_PAYMENT_SECTION: '3',
-    XREF_BANKABILITY_SUBSECTIONS: '3.d through 3.i',
-    XREF_ASSIGNMENT_SECTION: '3.h',
+    // Cross-references: dynamically resolved from clause hierarchy during contract generation
+    // (XREF_FEES_PAYMENT_SECTION, XREF_BANKABILITY_SUBSECTIONS, XREF_ASSIGNMENT_SECTION)
+    // Fallback values used only if dynamic resolution fails
+    XREF_FEES_PAYMENT_SECTION: '[Section Ref]',
+    XREF_BANKABILITY_SUBSECTIONS: '[Section Ref]',
+    XREF_ASSIGNMENT_SECTION: '[Section Ref]',
 
     // ===================
     // DYNAMIC HTML TABLES
