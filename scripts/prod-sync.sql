@@ -4687,7 +4687,7 @@ ON CONFLICT (id) DO UPDATE SET
 -- OPTIONAL: Uncomment to delete components that no longer exist in dev
 -- DELETE FROM component_library WHERE id NOT IN (5,6,7,8,9,10,11,12,13,14,15,16,21,22,23,24,25,26,27,28,29,30,31,32,33,34);
 
--- ============ STATE DISCLOSURES (MASTER_EF_NOTICES - CA comprehensive update) ============
+-- ============ STATE DISCLOSURES (MASTER_EF_NOTICES - comprehensive updates) ============
 
 UPDATE state_disclosures SET content = '
 <h4 class="exhibit-clause">CA-1: Factory-Built Housing Notice</h4>
@@ -4712,6 +4712,30 @@ UPDATE state_disclosures SET content = '
 <p class="conspicuous">BY AGREEING TO ARBITRATION, THE PARTIES ARE GIVING UP THE RIGHT TO HAVE THE DISPUTE DECIDED BY A JUDGE OR JURY. THE PARTIES ALSO GIVE UP THE RIGHT TO DISCOVERY AND APPEAL EXCEPT AS PROVIDED BY THE ARBITRATION RULES. IF EITHER PARTY REFUSES TO SUBMIT TO ARBITRATION AFTER AGREEING TO THIS PROVISION, THAT PARTY MAY BE COMPELLED TO ARBITRATE UNDER CALIFORNIA CODE OF CIVIL PROCEDURE SECTION 1281.2.</p>
 ', updated_at = NOW()
 WHERE code = 'MASTER_EF_NOTICES' AND state = 'CA';
+
+UPDATE state_disclosures SET content = '
+<h4 class="exhibit-clause">CO-1: Division of Housing Registration Notice</h4>
+<p class="conspicuous">COLORADO NOTICE: This Agreement involves the sale of a factory-built modular housing unit regulated by the Colorado Division of Housing (DOH) under C.R.S. § 24-32-3301 et seq. and Administrative Rules 8 CCR 1302-14. All plans for the modular home have been submitted to and approved by the DOH prior to manufacturing. The manufacturer, seller, and installer are registered with the State of Colorado and maintain all required bonds and escrow accounts.</p>
+
+<h4 class="exhibit-clause">CO-2: Construction Defect Action Reform Act (CDARA) Notice</h4>
+<p class="conspicuous">IMPORTANT NOTICE REGARDING CONSTRUCTION DEFECT CLAIMS: PURSUANT TO C.R.S. § 13-20-803.5, BEFORE FILING ANY LAWSUIT OR ARBITRATION CLAIM FOR CONSTRUCTION DEFECTS, THE CLAIMANT MUST PROVIDE THE CONSTRUCTION PROFESSIONAL WITH WRITTEN NOTICE OF CLAIM DESCRIBING THE DEFECTS IN REASONABLE DETAIL. THE CONSTRUCTION PROFESSIONAL HAS SEVENTY-FIVE (75) DAYS FROM RECEIPT OF THE NOTICE TO INSPECT THE PROPERTY AND THIRTY (30) DAYS AFTER INSPECTION TO PROVIDE A WRITTEN RESPONSE, WHICH MAY INCLUDE AN OFFER TO REPAIR, SETTLE, OR DENY THE CLAIM. FAILURE TO FOLLOW THESE NOTICE REQUIREMENTS MAY RESULT IN THE CLAIM BEING STAYED OR DISMISSED.</p>
+
+<h4 class="exhibit-clause">CO-3: Right to Cure</h4>
+<p class="exhibit-body">Under the Colorado Construction Defect Action Reform Act (CDARA), the Company has the right to inspect and cure alleged construction defects before any legal action is commenced. The Buyer agrees to provide written notice of any claimed defect and to allow reasonable access for inspection and repair. The Company shall have the opportunity to correct defects in accordance with the CDARA timelines and procedures before the Buyer may pursue further remedies.</p>
+
+<h4 class="exhibit-clause">CO-4: DOH Inspection and Certification</h4>
+<p class="exhibit-body">The modular home units subject to this Agreement are inspected during the manufacturing process by the Colorado Division of Housing or its authorized agents. A certificate of compliance will be issued upon satisfactory completion of manufacturing inspections. Installation of the modular units on the permanent foundation will be inspected and certified by the DOH or local building authority as required by 8 CCR 1302-14. The Buyer has the right to request copies of all inspection certifications.</p>
+
+<h4 class="exhibit-clause">CO-5: Consumer Complaint Rights</h4>
+<p class="exhibit-body">The Buyer has the right to file a formal complaint with the Colorado Division of Housing regarding any manufacturing or installation defects. Complaints must be submitted in writing using the DOH complaint form (emails and telephone calls alone are not sufficient to initiate a formal investigation). The DOH has authority to investigate complaints and require manufacturers and installers to correct verified defects. The DOH represents the interests of the State, not individual consumers, but may order corrective action where warranted. Consumer complaints may be filed at: Colorado Division of Housing, Office of Regulatory Oversight, Building Codes and Standards.</p>
+
+<h4 class="exhibit-clause">CO-6: Seller Property Disclosure</h4>
+<p class="exhibit-body">Pursuant to C.R.S. § 38-35.7, the Company discloses all material facts known to it regarding the property and the modular home that may affect the value, desirability, or safety of the home. The Company warrants that it holds all required State of Colorado registrations and maintains compliance with applicable bonding, escrow, and insurance requirements for factory-built housing sales and installation.</p>
+
+<h4 class="exhibit-clause">CO-7: Arbitration Disclosure</h4>
+<p class="conspicuous">BY AGREEING TO ARBITRATION, THE PARTIES ARE GIVING UP THE RIGHT TO HAVE THE DISPUTE DECIDED BY A JUDGE OR JURY IN A COURT OF LAW. THE PARTIES ALSO GIVE UP THE RIGHT TO DISCOVERY AND APPEAL EXCEPT AS PROVIDED BY THE ARBITRATION RULES. THE ARBITRATION PROVISIONS OF THIS AGREEMENT ARE SUBJECT TO THE COLORADO CONSTRUCTION DEFECT ACTION REFORM ACT NOTICE REQUIREMENTS, WHICH MUST BE SATISFIED BEFORE ARBITRATION MAY COMMENCE.</p>
+', updated_at = NOW()
+WHERE code = 'MASTER_EF_NOTICES' AND state = 'CO';
 
 -- Reset sequences
 SELECT setval('clauses_id_seq', (SELECT COALESCE(MAX(id), 1) FROM clauses));
