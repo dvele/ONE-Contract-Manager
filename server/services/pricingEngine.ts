@@ -36,8 +36,8 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
     throw new Error(`Project with id ${projectId} not found`);
   }
 
-  // Determine service model (CRC or CMOS) - use serviceModel field (canonical), fall back to onSiteSelection
-  const serviceModel: 'CRC' | 'CMOS' = (project.serviceModel === 'CMOS' || project.onSiteSelection === 'CMOS') ? 'CMOS' : 'CRC';
+  // Determine service model (CRC or CMOS) from project.onSiteSelection
+  const serviceModel: 'CRC' | 'CMOS' = (project.onSiteSelection === 'CMOS') ? 'CMOS' : 'CRC';
 
   // Always fetch financials to get additional site work / buffer
   const [financial] = await db

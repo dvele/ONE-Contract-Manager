@@ -70,8 +70,10 @@ export const Step7Pricing: React.FC = () => {
   });
   
   useEffect(() => {
-    if (financialsData?.prelimOnsite !== undefined) {
+    if (financialsData?.prelimOnsite != null) {
       setAdditionalSiteWork(financialsData.prelimOnsite);
+    } else if (financialsData !== undefined) {
+      setAdditionalSiteWork(0);
     }
   }, [financialsData?.prelimOnsite]);
 
@@ -128,7 +130,7 @@ export const Step7Pricing: React.FC = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/projects', draftProjectId, 'pricing-summary'] });
-      updateProjectData({ preliminaryOnsiteCost: additionalSiteWork });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', draftProjectId, 'financials'] });
     }
   });
   

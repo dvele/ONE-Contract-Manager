@@ -1228,7 +1228,6 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
             designFee: pd.designFee ? Math.round(pd.designFee * 100) : null,
             designRevisionRounds: pd.designRevisionRounds || 3,
             prelimOffsite: pd.preliminaryOffsiteCost ? Math.round(pd.preliminaryOffsiteCost * 100) : null,
-            prelimOnsite: pd.deliveryInstallationPrice ? Math.round(pd.deliveryInstallationPrice * 100) : null,
             prelimContractPrice: pd.totalPreliminaryContractPrice ? Math.round(pd.totalPreliminaryContractPrice * 100) : null,
           };
           await apiRequest('POST', `/api/projects/${projectId}/financials`, financialsPayload);
@@ -1803,7 +1802,6 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           designFee: pd.designFee ? Math.round(pd.designFee * 100) : null,
           designRevisionRounds: pd.designRevisionRounds || 3,
           prelimOffsite: pd.preliminaryOffsiteCost ? Math.round(pd.preliminaryOffsiteCost * 100) : null,
-          prelimOnsite: pd.deliveryInstallationPrice ? Math.round(pd.deliveryInstallationPrice * 100) : null,
           prelimContractPrice: pd.totalPreliminaryContractPrice ? Math.round(pd.totalPreliminaryContractPrice * 100) : null,
         };
         await apiRequest('POST', `/api/projects/${projectId}/financials`, financialsPayload);
@@ -2097,7 +2095,6 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         designFee: pd.designFee ? Math.round(pd.designFee * 100) : null,
         designRevisionRounds: pd.designRevisionRounds,
         prelimOffsite: pd.preliminaryOffsiteCost ? Math.round(pd.preliminaryOffsiteCost * 100) : null,
-        prelimOnsite: pd.preliminaryOnsiteCost ? Math.round(pd.preliminaryOnsiteCost * 100) : null,
       };
       
       await apiRequest('POST', `/api/projects/${projectId}/financials`, financialsPayload);
