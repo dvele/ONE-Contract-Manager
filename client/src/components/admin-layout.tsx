@@ -21,7 +21,7 @@ const adminNavItems = [
   { href: "/admin/llcs", label: "LLCs", icon: Building2 },
   { href: "/clause-library", label: "Clause Library", icon: ScrollText },
   { href: "/component-library", label: "Component Library", icon: Blocks },
-  { href: "/admin/exhibits", label: "Exhibits", icon: FileText },
+  { href: "/exhibits", label: "Exhibits", icon: FileText },
   { href: "/admin/state-disclosures", label: "State Disclosures", icon: MapPin },
   { href: "/admin/contract-templates", label: "Contract Templates", icon: FileCheck },
   { href: "/admin/contractor-entities", label: "Contractors", icon: Users },

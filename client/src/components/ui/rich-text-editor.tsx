@@ -334,3 +334,74 @@ function convertHtmlToPlainText(html: string): string {
 }
 
 export default RichTextEditor;
+
+interface HtmlRichTextEditorProps {
+  content: string;
+  onChange: (html: string) => void;
+  className?: string;
+}
+
+export function HtmlRichTextEditor({ content, onChange, className }: HtmlRichTextEditorProps) {
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        bulletList: { keepMarks: true, keepAttributes: false },
+        orderedList: { keepMarks: true, keepAttributes: false },
+      }),
+      Underline,
+    ],
+    content: content || '<p></p>',
+    onUpdate: ({ editor }) => {
+      onChange(editor.getHTML());
+    },
+    editorProps: {
+      attributes: {
+        class: 'prose prose-sm max-w-none min-h-[200px] p-3 focus:outline-none bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 editor-content',
+      },
+    },
+  });
+
+  if (!editor) {
+    return null;
+  }
+
+  return (
+    <div className={cn("border rounded-md bg-background flex flex-col max-h-[70vh]", className)}>
+      <style>{`
+        .editor-content ol { list-style-type: lower-roman !important; margin-left: 1.5rem; padding-left: 0.5rem; }
+        .editor-content ul { list-style-type: lower-alpha !important; margin-left: 1.5rem; padding-left: 0.5rem; }
+        .editor-content ol ol, .editor-content ul ul, .editor-content ol ul, .editor-content ul ol { margin-left: 1.5rem; }
+        .editor-content li { margin-bottom: 0.25rem; }
+        .editor-content li p { margin: 0; }
+      `}</style>
+      <div className="flex items-center gap-1 p-2 border-b bg-muted/30 flex-wrap sticky top-0 z-10">
+        <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBold().run()} className={cn("h-8 w-8 p-0", editor.isActive('bold') && "bg-muted")} data-testid="button-html-bold">
+          <Bold className="h-4 w-4" />
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleItalic().run()} className={cn("h-8 w-8 p-0", editor.isActive('italic') && "bg-muted")} data-testid="button-html-italic">
+          <Italic className="h-4 w-4" />
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleUnderline().run()} className={cn("h-8 w-8 p-0", editor.isActive('underline') && "bg-muted")} data-testid="button-html-underline">
+          <UnderlineIcon className="h-4 w-4" />
+        </Button>
+        <div className="w-px h-6 bg-border mx-1" />
+        <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={cn("h-8 w-8 p-0", editor.isActive('orderedList') && "bg-muted")} data-testid="button-html-ol">
+          <ListOrdered className="h-4 w-4" />
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().toggleBulletList().run()} className={cn("h-8 w-8 p-0", editor.isActive('bulletList') && "bg-muted")} data-testid="button-html-ul">
+          <List className="h-4 w-4" />
+        </Button>
+        <div className="w-px h-6 bg-border mx-1" />
+        <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} className="h-8 w-8 p-0" data-testid="button-html-undo">
+          <Undo className="h-4 w-4" />
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} className="h-8 w-8 p-0" data-testid="button-html-redo">
+          <Redo className="h-4 w-4" />
+        </Button>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        <EditorContent editor={editor} />
+      </div>
+    </div>
+  );
+}

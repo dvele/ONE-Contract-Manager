@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -15,15 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +25,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   FileText,
@@ -43,54 +34,93 @@ import {
   Save,
   X,
   Zap,
-  FileCode,
+  Eye,
+  Code,
+  Search,
+  CheckSquare,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { HtmlRichTextEditor } from "@/components/ui/rich-text-editor";
 
 interface Exhibit {
   id: number;
   letter: string;
   title: string;
   content: string;
-  isDynamic: boolean;
-  disclosureCode: string | null;
-  contractTypes: string[] | null;
-  sortOrder: number;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string | null;
+  is_dynamic: boolean;
+  disclosure_code: string | null;
+  contract_types: string[] | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string | null;
 }
 
 const CONTRACT_TYPES = [
-  { value: "MASTER_EF", label: "Master Purchase Agreement" },
-  { value: "ONE", label: "ONE Agreement (Archived)" },
-  { value: "MANUFACTURING", label: "Manufacturing (Archived)" },
-  { value: "ONSITE", label: "OnSite (Archived)" },
+  { value: "MASTER_EF", label: "Master EF" },
+  { value: "ONE", label: "ONE" },
+  { value: "MANUFACTURING", label: "Manufacturing" },
+  { value: "ONSITE", label: "OnSite" },
 ];
 
 const EXHIBIT_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
+
+const MIN_LIST_WIDTH = 240;
+const MIN_DETAIL_WIDTH = 400;
+
+function highlightVariables(html: string): string {
+  return html
+    .replace(
+      /\{\{(BLOCK_[A-Z_]+)\}\}/g,
+      '<span class="inline-block bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300 px-1.5 py-0.5 rounded text-xs font-mono mx-0.5">{{$1}}</span>'
+    )
+    .replace(
+      /\{\{(TABLE_[A-Z_]+)\}\}/g,
+      '<span class="inline-block bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300 px-1.5 py-0.5 rounded text-xs font-mono mx-0.5">{{$1}}</span>'
+    )
+    .replace(
+      /\{\{([A-Z_]+)\}\}/g,
+      '<span class="inline-block bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 px-1.5 py-0.5 rounded text-xs font-mono mx-0.5">{{$1}}</span>'
+    );
+}
 
 export default function ExhibitsPage() {
   const [selectedExhibit, setSelectedExhibit] = useState<Exhibit | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [editData, setEditData] = useState<Partial<Exhibit>>({});
+  const [editorMode, setEditorMode] = useState<"visual" | "source">("source");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterContractType, setFilterContractType] = useState("ALL");
+  const [deleteTarget, setDeleteTarget] = useState<Exhibit | null>(null);
   const { toast } = useToast();
 
-  const { data: exhibits, isLoading, error } = useQuery<Exhibit[]>({
-    queryKey: ["/api/exhibits"],
+  const [listPanelWidth, setListPanelWidth] = useState(30);
+  const [editorPanelHeight, setEditorPanelHeight] = useState(55);
+  const [isResizing, setIsResizing] = useState(false);
+  const [isVerticalResizing, setIsVerticalResizing] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const rightPaneRef = useRef<HTMLDivElement>(null);
+
+  const { data: exhibits, isLoading } = useQuery<Exhibit[]>({
+    queryKey: ["/api/exhibits", "includeInactive"],
+    queryFn: async () => {
+      const res = await fetch("/api/exhibits?includeInactive=true");
+      if (!res.ok) throw new Error("Failed to fetch exhibits");
+      return res.json();
+    },
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { id: number; updates: Partial<Exhibit> }) => {
-      const response = await apiRequest("PUT", `/api/exhibits/${data.id}`, data.updates);
+    mutationFn: async (data: { id: number; updates: Record<string, any> }) => {
+      const response = await apiRequest("PATCH", `/api/exhibits/${data.id}`, data.updates);
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/exhibits"] });
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/exhibits", "includeInactive"] });
       setIsEditing(false);
-      setSelectedExhibit(null);
+      setSelectedExhibit(updated);
       toast({ title: "Exhibit updated successfully" });
     },
     onError: () => {
@@ -99,13 +129,15 @@ export default function ExhibitsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: Partial<Exhibit>) => {
+    mutationFn: async (data: Record<string, any>) => {
       const response = await apiRequest("POST", "/api/exhibits", data);
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/exhibits"] });
+    onSuccess: (created) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/exhibits", "includeInactive"] });
       setIsCreating(false);
+      setIsEditing(false);
+      setSelectedExhibit(created);
       setEditData({});
       toast({ title: "Exhibit created successfully" });
     },
@@ -116,402 +148,637 @@ export default function ExhibitsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest("DELETE", `/api/exhibits/${id}`);
-      return response.json();
+      await apiRequest("DELETE", `/api/exhibits/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/exhibits"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/exhibits", "includeInactive"] });
       setSelectedExhibit(null);
-      toast({ title: "Exhibit deleted successfully" });
+      setDeleteTarget(null);
+      setIsEditing(false);
+      toast({ title: "Exhibit deactivated" });
     },
     onError: () => {
       toast({ title: "Failed to delete exhibit", variant: "destructive" });
     },
   });
 
-  const handleEdit = (exhibit: Exhibit) => {
-    setSelectedExhibit(exhibit);
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  const handleVerticalMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsVerticalResizing(true);
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isResizing && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const w = rect.width;
+        if (w <= 0) return;
+        const newW = ((e.clientX - rect.left) / w) * 100;
+        const minP = (MIN_LIST_WIDTH / w) * 100;
+        const maxP = 100 - (MIN_DETAIL_WIDTH / w) * 100;
+        if (minP >= maxP) return;
+        const clamped = Math.min(Math.max(newW, minP), maxP);
+        if (isFinite(clamped)) setListPanelWidth(clamped);
+      }
+      if (isVerticalResizing && rightPaneRef.current) {
+        const rect = rightPaneRef.current.getBoundingClientRect();
+        const h = rect.height;
+        if (h <= 0) return;
+        const newH = ((e.clientY - rect.top) / h) * 100;
+        const clamped = Math.min(Math.max(newH, 20), 80);
+        if (isFinite(clamped)) setEditorPanelHeight(clamped);
+      }
+    };
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      setIsVerticalResizing(false);
+    };
+    if (isResizing || isVerticalResizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = isVerticalResizing ? "row-resize" : "col-resize";
+      document.body.style.userSelect = "none";
+    }
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizing, isVerticalResizing]);
+
+  const startEditing = (exhibit: Exhibit) => {
     setEditData({
       letter: exhibit.letter,
       title: exhibit.title,
       content: exhibit.content,
-      isDynamic: exhibit.isDynamic,
-      disclosureCode: exhibit.disclosureCode,
-      contractTypes: exhibit.contractTypes,
-      sortOrder: exhibit.sortOrder,
-      isActive: exhibit.isActive,
+      is_dynamic: exhibit.is_dynamic,
+      disclosure_code: exhibit.disclosure_code,
+      contract_types: exhibit.contract_types,
+      sort_order: exhibit.sort_order,
+      is_active: exhibit.is_active,
     });
     setIsEditing(true);
+    setIsCreating(false);
+    setEditorMode("source");
+  };
+
+  const startCreating = () => {
+    setEditData({
+      letter: "A",
+      title: "",
+      content: "",
+      is_dynamic: false,
+      disclosure_code: null,
+      contract_types: ["MASTER_EF"],
+      sort_order: (exhibits?.length || 0) + 1,
+      is_active: true,
+    });
+    setSelectedExhibit(null);
+    setIsCreating(true);
+    setIsEditing(true);
+    setEditorMode("source");
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setIsCreating(false);
+    setEditData({});
   };
 
   const handleSave = () => {
-    if (selectedExhibit) {
-      updateMutation.mutate({ id: selectedExhibit.id, updates: editData });
-    }
-  };
+    const payload = {
+      letter: editData.letter,
+      title: editData.title,
+      content: editData.content,
+      contractTypes: editData.contract_types,
+      sortOrder: editData.sort_order,
+      isDynamic: editData.is_dynamic,
+      disclosureCode: editData.disclosure_code,
+      isActive: editData.is_active,
+    };
 
-  const handleCreate = () => {
-    createMutation.mutate({
-      letter: editData.letter || "A",
-      title: editData.title || "New Exhibit",
-      content: editData.content || "",
-      isDynamic: editData.isDynamic || false,
-      disclosureCode: editData.disclosureCode || null,
-      contractTypes: editData.contractTypes || ["MASTER_EF"],
-      sortOrder: editData.sortOrder || (exhibits?.length || 0) + 1,
-      isActive: editData.isActive !== false,
-    });
+    if (isCreating) {
+      createMutation.mutate(payload);
+    } else if (selectedExhibit) {
+      updateMutation.mutate({ id: selectedExhibit.id, updates: payload });
+    }
   };
 
   const toggleContractType = (type: string) => {
-    const current = editData.contractTypes || [];
+    const current = editData.contract_types || [];
     if (current.includes(type)) {
-      setEditData({ ...editData, contractTypes: current.filter(t => t !== type) });
+      setEditData({ ...editData, contract_types: current.filter((t) => t !== type) });
     } else {
-      setEditData({ ...editData, contractTypes: [...current, type] });
+      setEditData({ ...editData, contract_types: [...current, type] });
     }
   };
 
+  const filteredExhibits = useMemo(() => {
+    if (!exhibits) return [];
+    return exhibits.filter((ex) => {
+      if (searchTerm) {
+        const s = searchTerm.toLowerCase();
+        if (
+          !ex.letter?.toLowerCase().includes(s) &&
+          !ex.title?.toLowerCase().includes(s)
+        )
+          return false;
+      }
+      if (filterContractType !== "ALL") {
+        if (!ex.contract_types?.includes(filterContractType)) return false;
+      }
+      return true;
+    });
+  }, [exhibits, searchTerm, filterContractType]);
+
+  const previewContent = useMemo(() => {
+    if (isEditing) {
+      return highlightVariables(editData.content || "");
+    }
+    if (selectedExhibit) {
+      return highlightVariables(selectedExhibit.content || "");
+    }
+    return "";
+  }, [isEditing, editData.content, selectedExhibit]);
+
   if (isLoading) {
     return (
-      <div className="p-6 space-y-4">
-        <Skeleton className="h-8 w-48" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map(i => (
-            <Skeleton key={i} className="h-40" />
+      <div className="flex h-full">
+        <div className="w-[30%] border-r p-4 space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-14" />
           ))}
         </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-6">
-        <Card className="border-destructive">
-          <CardContent className="p-6">
-            <p className="text-destructive">Failed to load exhibits. Please try again.</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Exhibit Library</h1>
-          <p className="text-muted-foreground">Manage contract exhibits and attachments</p>
+        <div className="flex-1 p-6">
+          <Skeleton className="h-8 w-48 mb-4" />
+          <Skeleton className="h-64" />
         </div>
-        <Dialog open={isCreating} onOpenChange={setIsCreating}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-create-exhibit" onClick={() => setEditData({})}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Exhibit
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Create New Exhibit</DialogTitle>
-              <DialogDescription>Add a new exhibit to the contract library</DialogDescription>
-            </DialogHeader>
-            <ExhibitForm
-              data={editData}
-              onChange={setEditData}
-              onToggleContractType={toggleContractType}
-            />
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreating(false)}>Cancel</Button>
-              <Button onClick={handleCreate} disabled={createMutation.isPending} data-testid="button-save-new-exhibit">
-                {createMutation.isPending ? "Creating..." : "Create Exhibit"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
+    );
+  }
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {exhibits?.map((exhibit) => (
-          <Card 
-            key={exhibit.id} 
-            className={`hover-elevate cursor-pointer ${!exhibit.isActive ? 'opacity-60' : ''}`}
-            onClick={() => setSelectedExhibit(exhibit)}
-            data-testid={`card-exhibit-${exhibit.id}`}
-          >
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="font-mono text-lg">
-                    {exhibit.letter}
-                  </Badge>
-                  <CardTitle className="text-lg">{exhibit.title}</CardTitle>
-                </div>
-                {exhibit.isDynamic && (
-                  <Badge variant="secondary" className="flex items-center gap-1">
-                    <Zap className="w-3 h-3" />
-                    Dynamic
-                  </Badge>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  {exhibit.content.replace(/<[^>]*>/g, '').substring(0, 150)}...
-                </p>
-                <div className="flex flex-wrap gap-1">
-                  {exhibit.contractTypes?.map(type => (
-                    <Badge key={type} variant="outline" className="text-xs">
-                      {type}
-                    </Badge>
-                  ))}
-                </div>
-                {!exhibit.isActive && (
-                  <Badge variant="destructive" className="text-xs">Inactive</Badge>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {exhibits?.length === 0 && (
-        <Card className="p-12 text-center">
-          <FileCode className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">No Exhibits Found</h3>
-          <p className="text-muted-foreground mb-4">Create your first exhibit to get started.</p>
-          <Button onClick={() => setIsCreating(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Create Exhibit
-          </Button>
-        </Card>
-      )}
-
-      <Dialog open={!!selectedExhibit && !isEditing} onOpenChange={(open) => !open && setSelectedExhibit(null)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          {selectedExhibit && (
-            <>
-              <DialogHeader>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="font-mono text-lg">
-                    {selectedExhibit.letter}
-                  </Badge>
-                  <DialogTitle>{selectedExhibit.title}</DialogTitle>
-                </div>
-                <DialogDescription>
-                  {selectedExhibit.isDynamic ? "Dynamic exhibit with state-specific content" : "Static exhibit"}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-sm text-muted-foreground">Contract Types</Label>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {selectedExhibit.contractTypes?.map(type => (
-                      <Badge key={type} variant="outline">{type}</Badge>
-                    ))}
-                  </div>
-                </div>
-                {selectedExhibit.isDynamic && selectedExhibit.disclosureCode && (
-                  <div>
-                    <Label className="text-sm text-muted-foreground">Disclosure Code</Label>
-                    <p className="font-mono text-sm">{selectedExhibit.disclosureCode}</p>
-                  </div>
-                )}
-                <div>
-                  <Label className="text-sm text-muted-foreground">Content Preview</Label>
-                  <div 
-                    className="mt-1 p-4 bg-muted rounded-md prose prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{ __html: selectedExhibit.content }}
-                  />
-                </div>
-              </div>
-              <DialogFooter className="gap-2">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm" data-testid="button-delete-exhibit">
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Exhibit?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will permanently delete Exhibit {selectedExhibit.letter} - {selectedExhibit.title}. 
-                        This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => deleteMutation.mutate(selectedExhibit.id)}
-                        className="bg-destructive text-destructive-foreground"
-                        data-testid="button-confirm-delete"
-                      >
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-                <Button onClick={() => handleEdit(selectedExhibit)} data-testid="button-edit-exhibit">
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isEditing} onOpenChange={(open) => !open && setIsEditing(false)}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Exhibit {editData.letter}</DialogTitle>
-            <DialogDescription>Update exhibit details and content</DialogDescription>
-          </DialogHeader>
-          <ExhibitForm
-            data={editData}
-            onChange={setEditData}
-            onToggleContractType={toggleContractType}
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditing(false)}>
-              <X className="w-4 h-4 mr-2" />
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={updateMutation.isPending} data-testid="button-save-exhibit">
-              <Save className="w-4 h-4 mr-2" />
-              {updateMutation.isPending ? "Saving..." : "Save Changes"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-function ExhibitForm({
-  data,
-  onChange,
-  onToggleContractType,
-}: {
-  data: Partial<Exhibit>;
-  onChange: (data: Partial<Exhibit>) => void;
-  onToggleContractType: (type: string) => void;
-}) {
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="letter">Exhibit Letter</Label>
-          <Select
-            value={data.letter || "A"}
-            onValueChange={(value) => onChange({ ...data, letter: value })}
-          >
-            <SelectTrigger data-testid="select-exhibit-letter">
-              <SelectValue placeholder="Select letter" />
+    <div className="flex h-full overflow-hidden" ref={containerRef} data-testid="exhibits-page">
+      <div
+        className="flex flex-col border-r min-h-0"
+        style={{ width: `${listPanelWidth}%` }}
+      >
+        <div className="p-3 border-b space-y-2 flex-shrink-0">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold" data-testid="text-page-title">Exhibit Library</h2>
+            <Button size="sm" onClick={startCreating} data-testid="button-create-exhibit">
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              New
+            </Button>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search exhibits..."
+              className="pl-8"
+              data-testid="input-search-exhibits"
+            />
+          </div>
+          <Select value={filterContractType} onValueChange={setFilterContractType}>
+            <SelectTrigger data-testid="select-filter-contract-type">
+              <SelectValue placeholder="Filter by type" />
             </SelectTrigger>
             <SelectContent>
-              {EXHIBIT_LETTERS.map(letter => (
-                <SelectItem key={letter} value={letter}>
-                  Exhibit {letter}
+              <SelectItem value="ALL">All Contract Types</SelectItem>
+              {CONTRACT_TYPES.map((t) => (
+                <SelectItem key={t.value} value={t.value}>
+                  {t.label}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="sortOrder">Sort Order</Label>
-          <Input
-            id="sortOrder"
-            type="number"
-            value={data.sortOrder || 0}
-            onChange={(e) => onChange({ ...data, sortOrder: parseInt(e.target.value) || 0 })}
-            data-testid="input-sort-order"
-          />
-        </div>
+
+        <ScrollArea className="flex-1">
+          <div className="p-2 space-y-1">
+            {filteredExhibits.length === 0 ? (
+              <div className="text-center text-muted-foreground text-sm py-8">
+                No exhibits found
+              </div>
+            ) : (
+              filteredExhibits.map((exhibit) => (
+                <button
+                  key={exhibit.id}
+                  onClick={() => {
+                    if (isEditing && !isCreating) cancelEditing();
+                    setSelectedExhibit(exhibit);
+                    setIsCreating(false);
+                  }}
+                  className={`w-full text-left p-2.5 rounded-md transition-colors ${
+                    selectedExhibit?.id === exhibit.id && !isCreating
+                      ? "bg-accent"
+                      : "hover-elevate"
+                  } ${!exhibit.is_active ? "opacity-50" : ""}`}
+                  data-testid={`button-exhibit-${exhibit.id}`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant="outline"
+                      className="font-mono text-xs flex-shrink-0"
+                    >
+                      {exhibit.letter}
+                    </Badge>
+                    <span className="text-sm font-medium truncate">
+                      {exhibit.title}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 mt-1 flex-wrap">
+                    {exhibit.contract_types?.map((type) => (
+                      <Badge
+                        key={type}
+                        variant="secondary"
+                        className="text-[10px] py-0"
+                      >
+                        {type}
+                      </Badge>
+                    ))}
+                    {exhibit.is_dynamic && (
+                      <Badge variant="secondary" className="text-[10px] py-0">
+                        <Zap className="h-2.5 w-2.5 mr-0.5" />
+                        Dynamic
+                      </Badge>
+                    )}
+                    {!exhibit.is_active && (
+                      <Badge variant="destructive" className="text-[10px] py-0">
+                        Inactive
+                      </Badge>
+                    )}
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </ScrollArea>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="title">Title</Label>
-        <Input
-          id="title"
-          value={data.title || ""}
-          onChange={(e) => onChange({ ...data, title: e.target.value })}
-          placeholder="Exhibit title"
-          data-testid="input-exhibit-title"
-        />
+      <div
+        className="w-2 bg-border hover:bg-primary/20 cursor-col-resize flex items-center justify-center transition-colors flex-shrink-0"
+        onMouseDown={handleMouseDown}
+        data-testid="horizontal-resize-handle"
+      >
+        <div className="h-8 w-0.5 bg-muted-foreground/30 rounded-full" />
       </div>
 
-      <div className="space-y-2">
-        <Label>Contract Types</Label>
-        <div className="flex flex-wrap gap-2">
-          {CONTRACT_TYPES.map(type => (
-            <Badge
-              key={type.value}
-              variant={data.contractTypes?.includes(type.value) ? "default" : "outline"}
-              className="cursor-pointer toggle-elevate"
-              onClick={() => onToggleContractType(type.value)}
-              data-testid={`badge-contract-type-${type.value}`}
+      <div
+        className="flex-1 flex flex-col min-h-0 min-w-0"
+        ref={rightPaneRef}
+      >
+        {selectedExhibit || isCreating ? (
+          <>
+            <div className="p-3 border-b flex-shrink-0">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2 min-w-0">
+                  {isCreating ? (
+                    <h3 className="text-base font-semibold">New Exhibit</h3>
+                  ) : (
+                    <>
+                      <Badge variant="outline" className="font-mono text-base flex-shrink-0">
+                        {selectedExhibit!.letter}
+                      </Badge>
+                      <h3 className="text-base font-semibold truncate">
+                        {selectedExhibit!.title}
+                      </h3>
+                      {selectedExhibit!.is_dynamic && (
+                        <Badge variant="secondary" className="flex-shrink-0">
+                          <Zap className="h-3 w-3 mr-1" />
+                          Dynamic
+                        </Badge>
+                      )}
+                      {!selectedExhibit!.is_active && (
+                        <Badge variant="destructive" className="flex-shrink-0">
+                          Inactive
+                        </Badge>
+                      )}
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {isEditing ? (
+                    <>
+                      <Button variant="ghost" size="sm" onClick={cancelEditing} data-testid="button-cancel-edit">
+                        <X className="h-4 w-4 mr-1" />
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleSave}
+                        disabled={updateMutation.isPending || createMutation.isPending}
+                        data-testid="button-save-exhibit"
+                      >
+                        <Save className="h-4 w-4 mr-1" />
+                        {updateMutation.isPending || createMutation.isPending ? "Saving..." : "Save"}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeleteTarget(selectedExhibit)}
+                        data-testid="button-delete-exhibit"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => startEditing(selectedExhibit!)}
+                        data-testid="button-edit-exhibit"
+                      >
+                        <Edit className="h-4 w-4 mr-1" />
+                        Edit
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+              {!isEditing && selectedExhibit && (
+                <div className="flex items-center gap-1 mt-2 flex-wrap">
+                  {selectedExhibit.contract_types?.map((type) => (
+                    <Badge key={type} variant="outline" className="text-xs">
+                      {type}
+                    </Badge>
+                  ))}
+                  {selectedExhibit.disclosure_code && (
+                    <Badge variant="secondary" className="text-xs font-mono">
+                      {selectedExhibit.disclosure_code}
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 flex flex-col min-h-0">
+              <div
+                className="flex flex-col min-h-0"
+                style={{ height: isEditing ? `${editorPanelHeight}%` : "100%" }}
+              >
+                <div className="p-2 border-b bg-muted/30 flex-shrink-0">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <h3 className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                      {isEditing ? (
+                        <>
+                          <Code className="h-3 w-3" />
+                          Editor
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="h-3 w-3" />
+                          Preview
+                        </>
+                      )}
+                    </h3>
+                    {isEditing && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant={editorMode === "visual" ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setEditorMode("visual")}
+                          data-testid="button-visual-mode"
+                        >
+                          <Eye className="h-3.5 w-3.5 mr-1" />
+                          Visual
+                        </Button>
+                        <Button
+                          variant={editorMode === "source" ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setEditorMode("source")}
+                          data-testid="button-source-mode"
+                        >
+                          <Code className="h-3.5 w-3.5 mr-1" />
+                          Source
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0 overflow-auto">
+                  {isEditing ? (
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Letter</Label>
+                          <Select
+                            value={editData.letter || "A"}
+                            onValueChange={(v) => setEditData({ ...editData, letter: v })}
+                          >
+                            <SelectTrigger data-testid="select-exhibit-letter">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {EXHIBIT_LETTERS.map((l) => (
+                                <SelectItem key={l} value={l}>
+                                  Exhibit {l}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1 col-span-2">
+                          <Label className="text-xs">Title</Label>
+                          <Input
+                            value={editData.title || ""}
+                            onChange={(e) => setEditData({ ...editData, title: e.target.value })}
+                            placeholder="Exhibit title"
+                            data-testid="input-exhibit-title"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Sort Order</Label>
+                          <Input
+                            type="number"
+                            value={editData.sort_order || 0}
+                            onChange={(e) =>
+                              setEditData({ ...editData, sort_order: parseInt(e.target.value) || 0 })
+                            }
+                            data-testid="input-sort-order"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Contract Types</Label>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {CONTRACT_TYPES.map((type) => (
+                              <Badge
+                                key={type.value}
+                                variant={
+                                  editData.contract_types?.includes(type.value) ? "default" : "outline"
+                                }
+                                className="cursor-pointer text-xs toggle-elevate"
+                                onClick={() => toggleContractType(type.value)}
+                                data-testid={`badge-contract-type-${type.value}`}
+                              >
+                                {editData.contract_types?.includes(type.value) && (
+                                  <CheckSquare className="h-3 w-3 mr-1" />
+                                )}
+                                {type.label}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            id="edit-active"
+                            checked={editData.is_active !== false}
+                            onCheckedChange={(v) => setEditData({ ...editData, is_active: v })}
+                            data-testid="switch-is-active"
+                          />
+                          <Label htmlFor="edit-active" className="text-xs">
+                            Active
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            id="edit-dynamic"
+                            checked={editData.is_dynamic || false}
+                            onCheckedChange={(v) => setEditData({ ...editData, is_dynamic: v })}
+                            data-testid="switch-is-dynamic"
+                          />
+                          <Label htmlFor="edit-dynamic" className="text-xs">
+                            Dynamic
+                          </Label>
+                        </div>
+                      </div>
+
+                      {editData.is_dynamic && (
+                        <div className="space-y-1">
+                          <Label className="text-xs">Disclosure Code</Label>
+                          <Input
+                            value={editData.disclosure_code || ""}
+                            onChange={(e) =>
+                              setEditData({ ...editData, disclosure_code: e.target.value || null })
+                            }
+                            placeholder="e.g., WARRANTY_EXCLUSIVITY"
+                            data-testid="input-disclosure-code"
+                          />
+                        </div>
+                      )}
+
+                      <div className="space-y-1">
+                        <Label className="text-xs">Content</Label>
+                        {editorMode === "source" ? (
+                          <>
+                            <Textarea
+                              value={editData.content || ""}
+                              onChange={(e) => setEditData({ ...editData, content: e.target.value })}
+                              placeholder="Enter exhibit content (HTML). Use {{VARIABLE_NAME}} for dynamic values."
+                              className="min-h-[200px] font-mono text-sm"
+                              data-testid="textarea-exhibit-content"
+                            />
+                            <p className="text-[10px] text-muted-foreground">
+                              Supports HTML and variable placeholders like {"{{PRICING_BREAKDOWN_TABLE}}"} or {"{{PROJECT_STATE}}"}
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <HtmlRichTextEditor
+                              content={editData.content || ""}
+                              onChange={(html) => setEditData({ ...editData, content: html })}
+                              className="min-h-[200px]"
+                            />
+                            <p className="text-[10px] text-muted-foreground">
+                              Use Source mode to edit HTML tables and variable tags directly
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-4">
+                      <div
+                        className="prose prose-sm dark:prose-invert max-w-none"
+                        dangerouslySetInnerHTML={{ __html: previewContent }}
+                        data-testid="exhibit-preview"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {isEditing && (
+                <>
+                  <div
+                    className="h-2 bg-border hover:bg-primary/20 cursor-row-resize flex items-center justify-center transition-colors shrink-0"
+                    onMouseDown={handleVerticalMouseDown}
+                    data-testid="vertical-resize-handle"
+                  >
+                    <div className="w-8 h-0.5 bg-muted-foreground/30 rounded-full" />
+                  </div>
+
+                  <div
+                    className="flex flex-col min-h-0"
+                    style={{ height: `${100 - editorPanelHeight}%` }}
+                  >
+                    <div className="p-2 border-b bg-muted/30 flex-shrink-0">
+                      <h3 className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                        <Eye className="h-3 w-3" />
+                        Live Preview
+                      </h3>
+                    </div>
+                    <div className="flex-1 min-h-0 overflow-auto">
+                      <div className="p-4">
+                        <div
+                          className="prose prose-sm dark:prose-invert max-w-none"
+                          dangerouslySetInnerHTML={{ __html: previewContent }}
+                          data-testid="exhibit-live-preview"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-muted-foreground">
+            <div className="text-center">
+              <FileText className="h-12 w-12 mx-auto mb-4 opacity-30" />
+              <p className="text-lg">Select an exhibit</p>
+              <p className="text-sm mt-1">Click on an exhibit from the list to view and edit</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate Exhibit?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will deactivate Exhibit {deleteTarget?.letter} - {deleteTarget?.title}.
+              It will no longer appear in generated contracts but can be reactivated later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              className="bg-destructive text-destructive-foreground"
+              data-testid="button-confirm-delete"
             >
-              {type.label}
-            </Badge>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <Switch
-            id="isActive"
-            checked={data.isActive !== false}
-            onCheckedChange={(checked) => onChange({ ...data, isActive: checked })}
-            data-testid="switch-is-active"
-          />
-          <Label htmlFor="isActive">Active</Label>
-        </div>
-        <div className="flex items-center gap-2">
-          <Switch
-            id="isDynamic"
-            checked={data.isDynamic || false}
-            onCheckedChange={(checked) => onChange({ ...data, isDynamic: checked })}
-            data-testid="switch-is-dynamic"
-          />
-          <Label htmlFor="isDynamic">Dynamic (State-specific)</Label>
-        </div>
-      </div>
-
-      {data.isDynamic && (
-        <div className="space-y-2">
-          <Label htmlFor="disclosureCode">Disclosure Code</Label>
-          <Input
-            id="disclosureCode"
-            value={data.disclosureCode || ""}
-            onChange={(e) => onChange({ ...data, disclosureCode: e.target.value })}
-            placeholder="e.g., WARRANTY_EXCLUSIVITY"
-            data-testid="input-disclosure-code"
-          />
-          <p className="text-xs text-muted-foreground">
-            Used to look up state-specific content from the state_disclosures table
-          </p>
-        </div>
-      )}
-
-      <div className="space-y-2">
-        <Label htmlFor="content">Content (HTML)</Label>
-        <Textarea
-          id="content"
-          value={data.content || ""}
-          onChange={(e) => onChange({ ...data, content: e.target.value })}
-          placeholder="Enter exhibit content (HTML supported). Use {{VARIABLE_NAME}} for dynamic values."
-          className="min-h-[200px] font-mono text-sm"
-          data-testid="textarea-exhibit-content"
-        />
-        <p className="text-xs text-muted-foreground">
-          Supports HTML and variable placeholders like {"{{PRICING_BREAKDOWN_TABLE}}"} or {"{{PROJECT_STATE}}"}
-        </p>
-      </div>
+              Deactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

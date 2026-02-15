@@ -9,17 +9,21 @@ router.use(requireAuth);
 
 router.get("/exhibits", async (req: Request, res: Response) => {
   try {
-    const { contractType } = req.query;
+    const { contractType, includeInactive } = req.query;
     
-    let query = `SELECT * FROM exhibits WHERE organization_id = $1 AND is_active = true`;
+    let query = `SELECT * FROM exhibits WHERE organization_id = $1`;
     const params: any[] = [req.organizationId];
     
-    if (contractType) {
-      query += ` AND contract_types @> ARRAY[$2]::text[]`;
-      params.push(contractType);
+    if (includeInactive !== "true") {
+      query += ` AND is_active = true`;
     }
     
-    query += ` ORDER BY exhibit_code`;
+    if (contractType) {
+      params.push(contractType);
+      query += ` AND contract_types @> ARRAY[$${params.length}]::text[]`;
+    }
+    
+    query += ` ORDER BY sort_order, letter, exhibit_code`;
     
     const result = await pool.query(query, params);
     res.json(result.rows);
@@ -51,13 +55,28 @@ router.get("/exhibits/:id", async (req: Request, res: Response) => {
 
 router.post("/exhibits", async (req: Request, res: Response) => {
   try {
-    const { exhibitCode, name, description, content, contractTypes } = req.body;
+    const { letter, title, content, contractTypes, sortOrder, isDynamic, disclosureCode, isActive } = req.body;
+    
+    const exhibitCode = letter ? `EXHIBIT_${letter}` : req.body.exhibitCode;
+    const name = title || req.body.name;
     
     const result = await pool.query(
-      `INSERT INTO exhibits (organization_id, exhibit_code, name, description, content, contract_types)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO exhibits (organization_id, exhibit_code, name, letter, title, content, contract_types, sort_order, is_dynamic, disclosure_code, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
-      [req.organizationId, exhibitCode, name, description, content, JSON.stringify(contractTypes)]
+      [
+        req.organizationId,
+        exhibitCode || '',
+        name || '',
+        letter || '',
+        title || name || '',
+        content || '',
+        JSON.stringify(contractTypes || []),
+        sortOrder || 0,
+        isDynamic || false,
+        disclosureCode || null,
+        isActive !== false
+      ]
     );
     
     res.status(201).json(result.rows[0]);
@@ -70,20 +89,93 @@ router.post("/exhibits", async (req: Request, res: Response) => {
 router.patch("/exhibits/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { exhibitCode, name, description, content, contractTypes, isActive } = req.body;
+    const { letter, title, content, contractTypes, sortOrder, isDynamic, disclosureCode, isActive } = req.body;
     
+    const exhibitCode = letter ? `EXHIBIT_${letter}` : req.body.exhibitCode;
+    const name = title || req.body.name;
+
+    const setClauses: string[] = [];
+    const params: any[] = [id, req.organizationId];
+    let paramIdx = 3;
+
+    const addField = (col: string, val: any) => {
+      if (val !== undefined) {
+        setClauses.push(`${col} = $${paramIdx}`);
+        params.push(val);
+        paramIdx++;
+      }
+    };
+
+    addField('letter', letter);
+    addField('title', title || name);
+    addField('exhibit_code', exhibitCode);
+    addField('name', name || title);
+    addField('content', content);
+    addField('sort_order', sortOrder);
+    addField('is_dynamic', isDynamic);
+    addField('disclosure_code', disclosureCode);
+    addField('is_active', isActive);
+
+    if (contractTypes !== undefined) {
+      setClauses.push(`contract_types = $${paramIdx}`);
+      params.push(JSON.stringify(contractTypes));
+      paramIdx++;
+    }
+
+    setClauses.push('updated_at = NOW()');
+
+    if (setClauses.length === 1) {
+      const existing = await pool.query(`SELECT * FROM exhibits WHERE id = $1 AND organization_id = $2`, [id, req.organizationId]);
+      if (existing.rows.length === 0) return res.status(404).json({ error: "Exhibit not found" });
+      return res.json(existing.rows[0]);
+    }
+
+    const result = await pool.query(
+      `UPDATE exhibits SET ${setClauses.join(', ')} WHERE id = $1 AND organization_id = $2 RETURNING *`,
+      params
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Exhibit not found" });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error: any) {
+    console.error("Error updating exhibit:", error);
+    res.status(500).json({ error: "Failed to update exhibit" });
+  }
+});
+
+router.put("/exhibits/:id", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { letter, title, content, contractTypes, sortOrder, isDynamic, disclosureCode, isActive } = req.body;
+    
+    const exhibitCode = letter ? `EXHIBIT_${letter}` : req.body.exhibitCode;
+    const name = title || req.body.name;
+
     const result = await pool.query(
       `UPDATE exhibits SET 
-       exhibit_code = COALESCE($3, exhibit_code),
-       name = COALESCE($4, name),
-       description = COALESCE($5, description),
-       content = COALESCE($6, content),
-       contract_types = COALESCE($7, contract_types),
-       is_active = COALESCE($8, is_active),
+       letter = COALESCE($3, letter),
+       title = COALESCE($4, title),
+       exhibit_code = COALESCE($5, exhibit_code),
+       name = COALESCE($6, name),
+       content = COALESCE($7, content),
+       contract_types = COALESCE($8, contract_types),
+       sort_order = COALESCE($9, sort_order),
+       is_dynamic = COALESCE($10, is_dynamic),
+       disclosure_code = $11,
+       is_active = COALESCE($12, is_active),
        updated_at = NOW()
        WHERE id = $1 AND organization_id = $2
        RETURNING *`,
-      [id, req.organizationId, exhibitCode, name, description, content, contractTypes ? JSON.stringify(contractTypes) : null, isActive]
+      [
+        id, req.organizationId,
+        letter, title || name, exhibitCode, name || title,
+        content,
+        contractTypes ? JSON.stringify(contractTypes) : null,
+        sortOrder, isDynamic, disclosureCode ?? null, isActive
+      ]
     );
     
     if (result.rows.length === 0) {
