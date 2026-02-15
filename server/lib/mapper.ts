@@ -7,7 +7,7 @@ import type {
   WarrantyTerm,
   Contractor,
 } from "../../shared/schema";
-import { generatePricingTableHtml, generatePaymentScheduleHtml, generateUnitDetailsHtml, UnitDetail, ContractFilterType, generateExhibitA2TableHtml, generateExhibitA4TableHtml, generateExhibitA5TableHtml, generateExhibitB1TableHtml, type ProjectUnit as TGProjectUnit } from "./tableGenerators";
+import { generatePricingTableHtml, generatePaymentScheduleHtml, generateUnitDetailsHtml, UnitDetail, ContractFilterType, generateExhibitA2TableHtml, generateExhibitA4TableHtml, generateExhibitA5TableHtml, generateExhibitB1TableHtml, generateResponsibilityMatrixHtml, type ResponsibilityMatrixItem, type ProjectUnit as TGProjectUnit } from "./tableGenerators";
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -309,8 +309,9 @@ export const VARIABLE_CATEGORIES = {
     "PRICING_BREAKDOWN_TABLE",
     "PAYMENT_SCHEDULE_TABLE",
     "UNIT_DETAILS_TABLE",
-    "WHAT_HAPPENS_NEXT_TABLE", // Dynamic table from table_definitions
-    "MILESTONE_SCHEDULE_TABLE", // TODO: Generate from milestones data
+    "RESPONSIBILITY_MATRIX_TABLE",
+    "WHAT_HAPPENS_NEXT_TABLE",
+    "MILESTONE_SCHEDULE_TABLE",
     "SIGNATURE_BLOCK_TABLE",
   ],
   conditional: [
@@ -917,6 +918,16 @@ export function mapProjectToVariables(
         squareFootage: u.homeModel?.squareFootage,
         estimatedPrice: (u.basePriceSnapshot || 0) + (u.onsiteEstimateSnapshot || 0),
       })) || null
+    ),
+    RESPONSIBILITY_MATRIX_TABLE: generateResponsibilityMatrixHtml(
+      (() => {
+        try {
+          const raw = projectDetails?.responsibilityMatrix;
+          if (!raw) return null;
+          return JSON.parse(raw) as ResponsibilityMatrixItem[];
+        } catch { return null; }
+      })(),
+      pricingSummary?.serviceModel || project.onSiteSelection || 'CRC'
     ),
     MILESTONE_SCHEDULE_TABLE: "",
     

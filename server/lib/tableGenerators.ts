@@ -8,7 +8,7 @@
  * - ONE: Shows full master budget (all costs)
  */
 
-import { buildStyledTable, TABLE_STYLES } from './tableStyles';
+import { buildStyledTable, TABLE_STYLES, type StyledRow } from './tableStyles';
 
 export type ContractFilterType = 'ONE' | 'MANUFACTURING' | 'ONSITE' | 'MASTER_EF';
 
@@ -471,5 +471,56 @@ export function generateExhibitB1TableHtml(
       { header: 'Third-Party Review', align: 'left' },
     ],
     rows,
+  });
+}
+
+export interface ResponsibilityMatrixItem {
+  id: string;
+  category: string;
+  label: string;
+  assignedTo: 'company' | 'client_gc';
+}
+
+export function generateResponsibilityMatrixHtml(
+  matrixItems: ResponsibilityMatrixItem[] | null,
+  serviceModel?: string
+): string {
+  if (!matrixItems || matrixItems.length === 0) {
+    return '<p style="font-style: italic; color: #666;">Responsibility matrix not configured.</p>';
+  }
+
+  const checkMark = '&#10003;';
+  const categories = new Map<string, ResponsibilityMatrixItem[]>();
+  for (const item of matrixItems) {
+    const cat = item.category || 'General';
+    if (!categories.has(cat)) categories.set(cat, []);
+    categories.get(cat)!.push(item);
+  }
+
+  const rows: StyledRow[] = [];
+  Array.from(categories.entries()).forEach(([category, items]) => {
+    rows.push({
+      cells: [category, '', ''],
+      isBold: true,
+    });
+    for (const item of items) {
+      rows.push({
+        cells: [
+          item.label,
+          item.assignedTo === 'company' ? checkMark : '',
+          item.assignedTo === 'client_gc' ? checkMark : '',
+        ],
+      });
+    }
+  });
+
+  return buildStyledTable({
+    columns: [
+      { header: 'Task / Responsibility', width: '60%', align: 'left' },
+      { header: 'Company', width: '20%', align: 'center' },
+      { header: 'Client / GC', width: '20%', align: 'center' },
+    ],
+    rows,
+    caption: 'Exhibit C.2 — On-Site Responsibility Matrix',
   });
 }

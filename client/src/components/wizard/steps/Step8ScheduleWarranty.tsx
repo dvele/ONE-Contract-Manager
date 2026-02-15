@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Shield, Scale, Calendar, Clock, Info } from 'lucide-react';
+import { ResponsibilityMatrix } from '../ResponsibilityMatrix';
 
 export const Step8ScheduleWarranty: React.FC = () => {
   const { 
@@ -477,17 +478,19 @@ export const Step8ScheduleWarranty: React.FC = () => {
         </CardContent>
       </Card>
       
+      <ResponsibilityMatrix />
+
       <Card className="bg-muted/30">
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium">Contract Variables</p>
               <p className="text-xs text-muted-foreground">
-                This step populates warranty and jurisdiction variables
+                This step populates warranty, jurisdiction, and responsibility matrix variables
               </p>
             </div>
             <Badge variant="secondary" className="text-xs">
-              WARRANTY_FIT_FINISH, WARRANTY_ENVELOPE, WARRANTY_STRUCTURAL, FEDERAL_DISTRICT
+              WARRANTY_FIT_FINISH, WARRANTY_ENVELOPE, WARRANTY_STRUCTURAL, FEDERAL_DISTRICT, RESPONSIBILITY_MATRIX_TABLE
             </Badge>
           </div>
         </CardContent>

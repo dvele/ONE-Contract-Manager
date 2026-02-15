@@ -3,6 +3,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { generateLLCName } from '@/lib/llcUtils';
+import { getDefaultMatrix } from './data/responsibilityDefaults';
 
 // Shell Testing Mode: Set to false when step content components are added
 // When true: skips form validation and allows navigation to all steps without completing forms
@@ -111,6 +112,13 @@ export interface UnitSpec {
   bathrooms: number;
   price: number;
   onsiteEstimate?: number;
+}
+
+export interface ResponsibilityItem {
+  id: string;
+  category: string;
+  label: string;
+  assignedTo: 'company' | 'client_gc';
 }
 
 // Project data interface
@@ -237,6 +245,8 @@ export interface ProjectData {
   // Exhibit D.2 - Production Milestone Target Dates
   productionMidpointDate: string;
   productionCompleteDate: string;
+  // Exhibit C.2 - Responsibility Matrix
+  responsibilityMatrix: ResponsibilityItem[];
 }
 
 // Wizard state interface
@@ -465,6 +475,7 @@ export const initialProjectData: ProjectData = {
   permitSubmittalDate: '',
   productionMidpointDate: '',
   productionCompleteDate: '',
+  responsibilityMatrix: [],
 };
 
 // Test draft data pre-filled through Step 8 for faster testing
@@ -762,6 +773,12 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           loadedData.targetDeliveryDate = details.estimatedDeliveryDate || '';
           loadedData.manufacturingStartDate = details.productionStartDate || '';
           loadedData.projectState = details.governingLawState || '';
+          // Exhibit C.2 Responsibility Matrix
+          if (details.responsibilityMatrix) {
+            try {
+              loadedData.responsibilityMatrix = JSON.parse(details.responsibilityMatrix);
+            } catch { loadedData.responsibilityMatrix = []; }
+          }
           // Exhibit C.4 Interface Deadlines
           if (details.foundationReadyDays != null) loadedData.foundationReadyDays = details.foundationReadyDays;
           if (details.utilityStubbedDays != null) loadedData.utilityStubbedDays = details.utilityStubbedDays;
@@ -813,6 +830,9 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         }
         if (!loadedData.warrantyStructuralMonths) {
           loadedData.warrantyStructuralMonths = 120;
+        }
+        if ((!loadedData.responsibilityMatrix || loadedData.responsibilityMatrix.length === 0) && loadedData.serviceModel) {
+          loadedData.responsibilityMatrix = getDefaultMatrix(loadedData.serviceModel as 'CRC' | 'CMOS');
         }
         if (!loadedData.arbitrationProvider) {
           loadedData.arbitrationProvider = 'JAMS';
@@ -1118,6 +1138,8 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
       onsiteDurationDays: pd.onsiteDurationDays,
       permittingDurationDays: pd.permittingDurationDays,
       estimatedCompletionDate: pd.estimatedCompletionDate,
+      // C.2 Responsibility Matrix
+      responsibilityMatrix: pd.responsibilityMatrix,
       // C.4 Interface Deadlines
       foundationReadyDays: pd.foundationReadyDays,
       utilityStubbedDays: pd.utilityStubbedDays,
@@ -1254,6 +1276,8 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           onsiteDurationDays: pd.onsiteDurationDays || null,
           permittingDurationDays: pd.permittingDurationDays || null,
           estimatedCompletionDate: pd.estimatedCompletionDate || null,
+          // Exhibit C.2 Responsibility Matrix
+          responsibilityMatrix: pd.responsibilityMatrix?.length > 0 ? JSON.stringify(pd.responsibilityMatrix) : null,
           // Exhibit C.4 Interface Deadlines
           foundationReadyDays: pd.foundationReadyDays || null,
           utilityStubbedDays: pd.utilityStubbedDays || null,
@@ -1422,11 +1446,17 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
 
   // Update project data
   const updateProjectData = useCallback((updates: Partial<ProjectData>) => {
-    setWizardState(prev => ({
-      ...prev,
-      projectData: { ...prev.projectData, ...updates },
-      validationErrors: {},
-    }));
+    setWizardState(prev => {
+      const merged = { ...updates };
+      if (merged.serviceModel && merged.serviceModel !== prev.projectData.serviceModel) {
+        merged.responsibilityMatrix = getDefaultMatrix(merged.serviceModel);
+      }
+      return {
+        ...prev,
+        projectData: { ...prev.projectData, ...merged },
+        validationErrors: {},
+      };
+    });
   }, []);
 
   // Update unit
@@ -2101,7 +2131,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
       setGenerationProgress(60);
       
       // Save project details (site/home specs)
-      const projectDetailsPayload = {
+      const projectDetailsPayload: Record<string, any> = {
         projectId,
         deliveryAddress: pd.siteAddress,
         deliveryCity: pd.siteCity,
@@ -2119,6 +2149,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         productionStartDate: pd.manufacturingStartDate,
         governingLawState: pd.projectState || pd.siteState,
         arbitrationLocation: pd.projectCounty ? `${pd.projectCounty}, ${pd.projectState}` : pd.arbitrationProvider,
+        responsibilityMatrix: pd.responsibilityMatrix?.length > 0 ? JSON.stringify(pd.responsibilityMatrix) : null,
       };
       
       await apiRequest('PATCH', `/api/projects/${projectId}/details`, projectDetailsPayload);

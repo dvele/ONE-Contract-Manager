@@ -360,6 +360,9 @@ export const projectDetails = pgTable("project_details", {
   productionMidpointDate: text("production_midpoint_date"),
   productionCompleteDate: text("production_complete_date"),
 
+  // Exhibit C.2 - Responsibility Matrix
+  responsibilityMatrix: text("responsibility_matrix"),
+
   // Legal
   governingLawState: text("governing_law_state"),
   arbitrationLocation: text("arbitration_location"),
