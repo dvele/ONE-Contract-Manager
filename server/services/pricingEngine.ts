@@ -15,6 +15,7 @@ export interface PricingBreakdown {
   totalOffsite: number;
   totalOnsite: number;
   totalCustomizations: number;
+  totalShipping: number;
 }
 
 export interface PricingSummary {
@@ -35,8 +36,8 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
     throw new Error(`Project with id ${projectId} not found`);
   }
 
-  // Determine service model (CRC or CMOS)
-  const serviceModel: 'CRC' | 'CMOS' = (project.onSiteSelection === 'CMOS') ? 'CMOS' : 'CRC';
+  // Determine service model (CRC or CMOS) - use serviceModel field (canonical), fall back to onSiteSelection
+  const serviceModel: 'CRC' | 'CMOS' = (project.serviceModel === 'CMOS' || project.onSiteSelection === 'CMOS') ? 'CMOS' : 'CRC';
 
   // Always fetch financials to get additional site work / buffer
   const [financial] = await db
@@ -57,7 +58,8 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
       hm.name as model_name,
       hm.design_fee,
       hm.offsite_base_price,
-      hm.onsite_est_price
+      hm.onsite_est_price,
+      hm.shipping_set_price
      FROM project_units pu
      LEFT JOIN home_models hm ON pu.model_id = hm.id
      WHERE pu.project_id = $1`,
@@ -71,6 +73,7 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
   let totalOffsite = 0;
   let totalOnsite = 0;
   let totalCustomizations = 0;
+  let totalShipping = 0;
   let unitModelSummary = '';
 
   if (unitCount > 0) {
@@ -78,11 +81,10 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
     const modelCounts: Record<string, number> = {};
 
     for (const unit of units) {
-      // Use home_model prices (design_fee, offsite_base_price, onsite_est_price)
-      totalDesignFee += unit.design_fee || 0;
       totalOffsite += unit.offsite_base_price || 0;
       totalOnsite += unit.onsite_est_price || 0;
       totalCustomizations += unit.customization_total || 0;
+      totalShipping += unit.shipping_set_price || 0;
 
       // Count models for summary
       const modelName = unit.model_name || 'Unknown Model';
@@ -97,7 +99,10 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
     // Add additional site work / buffer from financials
     totalOnsite += additionalSiteWork;
 
-    console.log(`[PricingEngine] Project ${projectId}: Calculated from ${unitCount} units - designFee=${totalDesignFee}, offsite=${totalOffsite}, onsite=${totalOnsite} (includes ${additionalSiteWork} additional site work)`);
+    // Design fee is project-level from financials, not summed from per-model design_fee
+    totalDesignFee = financial?.designFee || 0;
+
+    console.log(`[PricingEngine] Project ${projectId}: Calculated from ${unitCount} units - designFee=${totalDesignFee} (from financials), offsite=${totalOffsite}, shipping=${totalShipping}, onsite=${totalOnsite} (includes ${additionalSiteWork} additional site work)`);
   } else {
     // FALLBACK: No units, use financials table (financial already fetched above)
     const [details] = await db
@@ -117,15 +122,15 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
     console.log(`[PricingEngine] Project ${projectId}: No units found, using financials fallback - designFee=${totalDesignFee}, offsite=${totalOffsite}, onsite=${totalOnsite}`);
   }
 
-  // projectBudget = full cost of the project (design + offsite + onsite)
-  const projectBudget = totalDesignFee + totalOffsite + totalOnsite;
+  // projectBudget = full cost of the project (design + offsite + shipping + onsite)
+  const projectBudget = totalDesignFee + totalOffsite + totalShipping + totalOnsite;
   
   // contractValue = what Dvele charges the client
   // CRC: excludes onsite (client handles their own GC)
   // CMOS: includes everything (Dvele manages onsite)
   const contractValue = serviceModel === 'CRC' 
-    ? totalDesignFee + totalOffsite
-    : totalDesignFee + totalOffsite + totalOnsite;
+    ? totalDesignFee + totalOffsite + totalShipping
+    : totalDesignFee + totalOffsite + totalShipping + totalOnsite;
   
   // grandTotal kept for backwards compatibility
   const grandTotal = projectBudget;
@@ -192,6 +197,7 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
       totalOffsite,
       totalOnsite,
       totalCustomizations,
+      totalShipping,
     },
     grandTotal,
     projectBudget,

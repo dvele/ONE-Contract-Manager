@@ -223,6 +223,20 @@ export interface ProjectData {
   insuranceProvider: string;
   insurancePolicyNumber: string;
   insuranceCoverageAmount: number;
+  // Exhibit C.4 - Interface Deadlines (days before delivery)
+  foundationReadyDays: number;
+  utilityStubbedDays: number;
+  siteAccessReadyDays: number;
+  permitsScheduledDays: number;
+  craneAccessReadyDays: number;
+  // Exhibit D.1 - Design/Pre-Production Milestone Target Dates
+  designKickoffDate: string;
+  schematicDesignDate: string;
+  designDevelopmentDate: string;
+  permitSubmittalDate: string;
+  // Exhibit D.2 - Production Milestone Target Dates
+  productionMidpointDate: string;
+  productionCompleteDate: string;
 }
 
 // Wizard state interface
@@ -440,6 +454,17 @@ export const initialProjectData: ProjectData = {
   insuranceProvider: '',
   insurancePolicyNumber: '',
   insuranceCoverageAmount: 0,
+  foundationReadyDays: 14,
+  utilityStubbedDays: 14,
+  siteAccessReadyDays: 7,
+  permitsScheduledDays: 30,
+  craneAccessReadyDays: 7,
+  designKickoffDate: '',
+  schematicDesignDate: '',
+  designDevelopmentDate: '',
+  permitSubmittalDate: '',
+  productionMidpointDate: '',
+  productionCompleteDate: '',
 };
 
 // Test draft data pre-filled through Step 8 for faster testing
@@ -737,6 +762,19 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           loadedData.targetDeliveryDate = details.estimatedDeliveryDate || '';
           loadedData.manufacturingStartDate = details.productionStartDate || '';
           loadedData.projectState = details.governingLawState || '';
+          // Exhibit C.4 Interface Deadlines
+          if (details.foundationReadyDays != null) loadedData.foundationReadyDays = details.foundationReadyDays;
+          if (details.utilityStubbedDays != null) loadedData.utilityStubbedDays = details.utilityStubbedDays;
+          if (details.siteAccessReadyDays != null) loadedData.siteAccessReadyDays = details.siteAccessReadyDays;
+          if (details.permitsScheduledDays != null) loadedData.permitsScheduledDays = details.permitsScheduledDays;
+          if (details.craneAccessReadyDays != null) loadedData.craneAccessReadyDays = details.craneAccessReadyDays;
+          // Exhibit D.1/D.2 Target Dates
+          loadedData.designKickoffDate = details.designKickoffDate || '';
+          loadedData.schematicDesignDate = details.schematicDesignDate || '';
+          loadedData.designDevelopmentDate = details.designDevelopmentDate || '';
+          loadedData.permitSubmittalDate = details.permitSubmittalDate || '';
+          loadedData.productionMidpointDate = details.productionMidpointDate || '';
+          loadedData.productionCompleteDate = details.productionCompleteDate || '';
         }
         
         // Load schedule durations from project table
@@ -1080,6 +1118,19 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
       onsiteDurationDays: pd.onsiteDurationDays,
       permittingDurationDays: pd.permittingDurationDays,
       estimatedCompletionDate: pd.estimatedCompletionDate,
+      // C.4 Interface Deadlines
+      foundationReadyDays: pd.foundationReadyDays,
+      utilityStubbedDays: pd.utilityStubbedDays,
+      siteAccessReadyDays: pd.siteAccessReadyDays,
+      permitsScheduledDays: pd.permitsScheduledDays,
+      craneAccessReadyDays: pd.craneAccessReadyDays,
+      // D.1/D.2 Target Dates
+      designKickoffDate: pd.designKickoffDate,
+      schematicDesignDate: pd.schematicDesignDate,
+      designDevelopmentDate: pd.designDevelopmentDate,
+      permitSubmittalDate: pd.permitSubmittalDate,
+      productionMidpointDate: pd.productionMidpointDate,
+      productionCompleteDate: pd.productionCompleteDate,
     });
     
     if (currentDataHash === lastSavedDataRef.current) return;
@@ -1204,6 +1255,19 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           onsiteDurationDays: pd.onsiteDurationDays || null,
           permittingDurationDays: pd.permittingDurationDays || null,
           estimatedCompletionDate: pd.estimatedCompletionDate || null,
+          // Exhibit C.4 Interface Deadlines
+          foundationReadyDays: pd.foundationReadyDays || null,
+          utilityStubbedDays: pd.utilityStubbedDays || null,
+          siteAccessReadyDays: pd.siteAccessReadyDays || null,
+          permitsScheduledDays: pd.permitsScheduledDays || null,
+          craneAccessReadyDays: pd.craneAccessReadyDays || null,
+          // Exhibit D.1/D.2 Target Dates
+          designKickoffDate: pd.designKickoffDate || null,
+          schematicDesignDate: pd.schematicDesignDate || null,
+          designDevelopmentDate: pd.designDevelopmentDate || null,
+          permitSubmittalDate: pd.permitSubmittalDate || null,
+          productionMidpointDate: pd.productionMidpointDate || null,
+          productionCompleteDate: pd.productionCompleteDate || null,
         };
         // Add first unit details if available
         if (pd.units && pd.units.length > 0) {

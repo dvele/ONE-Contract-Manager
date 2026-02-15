@@ -23,11 +23,14 @@ interface PricingBreakdown {
   totalOffsite: number;
   totalOnsite: number;
   totalCustomizations: number;
+  totalShipping: number;
 }
 
 interface PricingSummary {
   breakdown: PricingBreakdown;
   grandTotal: number;
+  contractValue: number;
+  serviceModel: string;
   paymentSchedule: PaymentScheduleItem[];
   unitCount: number;
 }
@@ -42,8 +45,10 @@ export const Step7Pricing: React.FC = () => {
   const { projectData } = wizardState;
   const queryClient = useQueryClient();
   
-  const [additionalSiteWork, setAdditionalSiteWork] = useState<number>(projectData.preliminaryOnsiteCost || 0);
+  const [additionalSiteWork, setAdditionalSiteWork] = useState<number>(0);
+  const [designFeeAmount, setDesignFeeAmount] = useState<number>(0);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingDesignFee, setIsSavingDesignFee] = useState(false);
   
   const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -59,7 +64,7 @@ export const Step7Pricing: React.FC = () => {
     enabled: !!draftProjectId,
   });
   
-  const { data: financialsData } = useQuery<{ prelimOnsite?: number }>({
+  const { data: financialsData } = useQuery<{ prelimOnsite?: number; designFee?: number }>({
     queryKey: ['/api/projects', draftProjectId, 'financials'],
     enabled: !!draftProjectId,
   });
@@ -69,6 +74,12 @@ export const Step7Pricing: React.FC = () => {
       setAdditionalSiteWork(financialsData.prelimOnsite);
     }
   }, [financialsData?.prelimOnsite]);
+
+  useEffect(() => {
+    if (financialsData?.designFee !== undefined && financialsData.designFee !== null) {
+      setDesignFeeAmount(financialsData.designFee);
+    }
+  }, [financialsData?.designFee]);
   
   // Sync pricing data to wizard context when loaded
   useEffect(() => {
@@ -84,6 +95,30 @@ export const Step7Pricing: React.FC = () => {
   
   const hasUnits = pricingSummary && pricingSummary.unitCount > 0;
   
+  const saveDesignFeeMutation = useMutation({
+    mutationFn: async (designFee: number) => {
+      if (!draftProjectId) throw new Error('Project not saved yet');
+      return apiRequest('PATCH', `/api/projects/${draftProjectId}/financials`, {
+        designFee
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', draftProjectId, 'pricing-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', draftProjectId, 'financials'] });
+    }
+  });
+
+  const handleSaveDesignFee = async () => {
+    if (!draftProjectId) return;
+    setIsSavingDesignFee(true);
+    try {
+      await saveDesignFeeMutation.mutateAsync(designFeeAmount);
+      await refetch();
+    } finally {
+      setIsSavingDesignFee(false);
+    }
+  };
+
   const savePrelimOnsiteMutation = useMutation({
     mutationFn: async (prelimOnsite: number) => {
       if (!draftProjectId) throw new Error('Project not saved yet');
@@ -182,12 +217,20 @@ export const Step7Pricing: React.FC = () => {
                   <p className="text-xl font-bold" data-testid="text-total-design-fee">
                     {formatCurrency(pricingSummary.breakdown.totalDesignFee)}
                   </p>
+                  {pricingSummary.breakdown.totalDesignFee === 0 && (
+                    <p className="text-xs text-amber-500 mt-1">Set design fee below</p>
+                  )}
                 </div>
                 <div className="p-4 rounded-lg bg-muted/50">
-                  <p className="text-sm text-muted-foreground">Offsite Manufacturing</p>
+                  <p className="text-sm text-muted-foreground">Offsite (Factory + Shipping)</p>
                   <p className="text-xl font-bold" data-testid="text-total-offsite">
-                    {formatCurrency(pricingSummary.breakdown.totalOffsite)}
+                    {formatCurrency(pricingSummary.breakdown.totalOffsite + (pricingSummary.breakdown.totalShipping || 0))}
                   </p>
+                  {(pricingSummary.breakdown.totalShipping || 0) > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Factory: {formatCurrency(pricingSummary.breakdown.totalOffsite)} + Shipping: {formatCurrency(pricingSummary.breakdown.totalShipping)}
+                    </p>
+                  )}
                 </div>
                 <div className="p-4 rounded-lg bg-muted/50">
                   <p className="text-sm text-muted-foreground">Onsite Estimate</p>
@@ -215,6 +258,60 @@ export const Step7Pricing: React.FC = () => {
               <p className="text-sm">Go to Step 1 to add home model units.</p>
             </div>
           )}
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5" />
+            Design Fee
+          </CardTitle>
+          <CardDescription>
+            Total design/pre-production fee for this project (set during sales process)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+            <div className="space-y-2">
+              <Label htmlFor="designFeeInput">Design Fee Amount (in dollars)</Label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="designFeeInput"
+                  type="number"
+                  value={designFeeAmount / 100 || ''}
+                  onChange={(e) => setDesignFeeAmount(Math.round(parseFloat(e.target.value || '0') * 100))}
+                  placeholder="0"
+                  className="pl-9"
+                  min={0}
+                  data-testid="input-design-fee-amount"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This is the project-level design fee used in contract pricing
+              </p>
+            </div>
+            <div>
+              <Button
+                onClick={handleSaveDesignFee}
+                disabled={isSavingDesignFee || !draftProjectId}
+                data-testid="button-save-design-fee"
+              >
+                {isSavingDesignFee ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Save & Recalculate
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
       

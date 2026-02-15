@@ -12,7 +12,8 @@ const selectFields = `
   id, organization_id as "organizationId", name, model_code as "modelCode",
   sq_ft as "sqFt", bedrooms, bathrooms,
   design_fee as "designFee", offsite_base_price as "offsiteBasePrice",
-  onsite_est_price as "onsiteEstPrice", is_active as "isActive",
+  onsite_est_price as "onsiteEstPrice", shipping_set_price as "shippingSetPrice",
+  is_active as "isActive",
   created_at as "createdAt", updated_at as "updatedAt"
 `;
 
@@ -53,13 +54,13 @@ router.get("/home-models/:id", async (req: Request, res: Response) => {
 
 router.post("/home-models", async (req: Request, res: Response) => {
   try {
-    const { name, modelCode, sqFt, bedrooms, bathrooms, designFee, offsiteBasePrice, onsiteEstPrice } = req.body;
+    const { name, modelCode, sqFt, bedrooms, bathrooms, designFee, offsiteBasePrice, onsiteEstPrice, shippingSetPrice } = req.body;
     
     const result = await pool.query(
-      `INSERT INTO home_models (organization_id, name, model_code, sq_ft, bedrooms, bathrooms, design_fee, offsite_base_price, onsite_est_price)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO home_models (organization_id, name, model_code, sq_ft, bedrooms, bathrooms, design_fee, offsite_base_price, onsite_est_price, shipping_set_price)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING ${selectFields}`,
-      [req.organizationId, name, modelCode, sqFt, bedrooms, bathrooms, designFee, offsiteBasePrice, onsiteEstPrice]
+      [req.organizationId, name, modelCode, sqFt, bedrooms, bathrooms, designFee, offsiteBasePrice, onsiteEstPrice, shippingSetPrice]
     );
     
     res.status(201).json(result.rows[0]);
@@ -72,7 +73,7 @@ router.post("/home-models", async (req: Request, res: Response) => {
 router.patch("/home-models/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, modelCode, sqFt, bedrooms, bathrooms, designFee, offsiteBasePrice, onsiteEstPrice, isActive } = req.body;
+    const { name, modelCode, sqFt, bedrooms, bathrooms, designFee, offsiteBasePrice, onsiteEstPrice, shippingSetPrice, isActive } = req.body;
     
     const result = await pool.query(
       `UPDATE home_models SET 
@@ -84,11 +85,12 @@ router.patch("/home-models/:id", async (req: Request, res: Response) => {
        design_fee = COALESCE($8, design_fee),
        offsite_base_price = COALESCE($9, offsite_base_price),
        onsite_est_price = COALESCE($10, onsite_est_price),
-       is_active = COALESCE($11, is_active),
+       shipping_set_price = COALESCE($11, shipping_set_price),
+       is_active = COALESCE($12, is_active),
        updated_at = NOW()
        WHERE id = $1 AND organization_id = $2
        RETURNING ${selectFields}`,
-      [id, req.organizationId, name, modelCode, sqFt, bedrooms, bathrooms, designFee, offsiteBasePrice, onsiteEstPrice, isActive]
+      [id, req.organizationId, name, modelCode, sqFt, bedrooms, bathrooms, designFee, offsiteBasePrice, onsiteEstPrice, shippingSetPrice, isActive]
     );
     
     if (result.rows.length === 0) {

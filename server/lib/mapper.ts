@@ -281,6 +281,17 @@ export const VARIABLE_CATEGORIES = {
     "COMPLETION_DATE",
     "PROJECT_START_DATE",
     "PROJECT_END_DATE",
+    "FOUNDATION_READY_DAYS",
+    "UTILITY_STUBBED_DAYS",
+    "SITE_ACCESS_READY_DAYS",
+    "PERMITS_SCHEDULED_DAYS",
+    "CRANE_ACCESS_READY_DAYS",
+    "DESIGN_KICKOFF_DATE",
+    "SCHEMATIC_DESIGN_DATE",
+    "DESIGN_DEVELOPMENT_DATE",
+    "PERMIT_SUBMITTAL_DATE",
+    "PRODUCTION_MIDPOINT_DATE",
+    "PRODUCTION_COMPLETE_DATE",
   ],
   legal: [
     "GOVERNING_LAW_STATE",
@@ -364,6 +375,19 @@ export function formatDate(dateStr: string | Date | null | undefined): string {
  */
 export function formatDateWritten(dateStr: string | null | undefined): string {
   if (!dateStr) return "";
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+/**
+ * Format a date or return "TBD" if not provided
+ */
+export function formatDateOrTBD(dateStr: string | null | undefined): string {
+  if (!dateStr) return "TBD";
   const date = new Date(dateStr);
   return date.toLocaleDateString("en-US", {
     year: "numeric",
@@ -907,12 +931,12 @@ export function mapProjectToVariables(
     ),
     EXHIBIT_A4_TABLE: generateExhibitA4TableHtml(
       pricingSummary || null,
-      (project as any).serviceModel || 'CRC'
+      pricingSummary?.serviceModel || project.onSiteSelection || 'CRC'
     ),
     EXHIBIT_A5_TABLE: generateExhibitA5TableHtml(
       pricingSummary?.paymentSchedule || null,
       pricingSummary || null,
-      (project as any).serviceModel || 'CRC'
+      pricingSummary?.serviceModel || project.onSiteSelection || 'CRC'
     ),
     EXHIBIT_B1_TABLE: generateExhibitB1TableHtml(
       units?.map(u => ({
@@ -1107,6 +1131,25 @@ export function mapProjectToVariables(
       endDate.setDate(endDate.getDate() + totalDays);
       return formatDate(endDate);
     })(),
+
+    // ===================
+    // EXHIBIT C.4 - INTERFACE DEADLINES
+    // ===================
+    FOUNDATION_READY_DAYS: String(projectDetails?.foundationReadyDays ?? 14),
+    UTILITY_STUBBED_DAYS: String(projectDetails?.utilityStubbedDays ?? 14),
+    SITE_ACCESS_READY_DAYS: String(projectDetails?.siteAccessReadyDays ?? 7),
+    PERMITS_SCHEDULED_DAYS: String(projectDetails?.permitsScheduledDays ?? 30),
+    CRANE_ACCESS_READY_DAYS: String(projectDetails?.craneAccessReadyDays ?? 7),
+
+    // ===================
+    // EXHIBIT D.1/D.2 - TARGET DATES
+    // ===================
+    DESIGN_KICKOFF_DATE: formatDateOrTBD(projectDetails?.designKickoffDate),
+    SCHEMATIC_DESIGN_DATE: formatDateOrTBD(projectDetails?.schematicDesignDate),
+    DESIGN_DEVELOPMENT_DATE: formatDateOrTBD(projectDetails?.designDevelopmentDate),
+    PERMIT_SUBMITTAL_DATE: formatDateOrTBD(projectDetails?.permitSubmittalDate),
+    PRODUCTION_MIDPOINT_DATE: formatDateOrTBD(projectDetails?.productionMidpointDate),
+    PRODUCTION_COMPLETE_DATE: formatDateOrTBD(projectDetails?.productionCompleteDate),
 
     // ===================
     // CONDITIONAL FLAGS (for template logic)

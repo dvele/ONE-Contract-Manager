@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Clock, Info } from 'lucide-react';
+import { Calendar, Clock, Info, AlertTriangle, Target } from 'lucide-react';
 
 export const Step6DatesSchedule: React.FC = () => {
   const { 
@@ -287,17 +287,198 @@ export const Step6DatesSchedule: React.FC = () => {
         </CardContent>
       </Card>
       
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-primary" />
+            Interface Deadlines
+            <Badge variant="outline" className="text-xs">Exhibit C.4</Badge>
+          </CardTitle>
+          <CardDescription>
+            Days before module delivery that each site condition must be ready
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="foundationReadyDays">Foundation Ready (days)</Label>
+              <Input
+                id="foundationReadyDays"
+                type="number"
+                value={projectData.foundationReadyDays || ''}
+                onChange={(e) => updateProjectData({ foundationReadyDays: parseInt(e.target.value) || 0 })}
+                placeholder="14"
+                min={1}
+                max={90}
+                data-testid="input-foundation-ready-days"
+              />
+              <p className="text-xs text-muted-foreground">Default: 14 days</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="utilityStubbedDays">Utilities Stubbed (days)</Label>
+              <Input
+                id="utilityStubbedDays"
+                type="number"
+                value={projectData.utilityStubbedDays || ''}
+                onChange={(e) => updateProjectData({ utilityStubbedDays: parseInt(e.target.value) || 0 })}
+                placeholder="14"
+                min={1}
+                max={90}
+                data-testid="input-utility-stubbed-days"
+              />
+              <p className="text-xs text-muted-foreground">Default: 14 days</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="siteAccessReadyDays">Site Access Ready (days)</Label>
+              <Input
+                id="siteAccessReadyDays"
+                type="number"
+                value={projectData.siteAccessReadyDays || ''}
+                onChange={(e) => updateProjectData({ siteAccessReadyDays: parseInt(e.target.value) || 0 })}
+                placeholder="7"
+                min={1}
+                max={60}
+                data-testid="input-site-access-ready-days"
+              />
+              <p className="text-xs text-muted-foreground">Default: 7 days</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="permitsScheduledDays">Permits Scheduled (days)</Label>
+              <Input
+                id="permitsScheduledDays"
+                type="number"
+                value={projectData.permitsScheduledDays || ''}
+                onChange={(e) => updateProjectData({ permitsScheduledDays: parseInt(e.target.value) || 0 })}
+                placeholder="30"
+                min={1}
+                max={120}
+                data-testid="input-permits-scheduled-days"
+              />
+              <p className="text-xs text-muted-foreground">Default: 30 days</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="craneAccessReadyDays">Crane Access Ready (days)</Label>
+              <Input
+                id="craneAccessReadyDays"
+                type="number"
+                value={projectData.craneAccessReadyDays || ''}
+                onChange={(e) => updateProjectData({ craneAccessReadyDays: parseInt(e.target.value) || 0 })}
+                placeholder="7"
+                min={1}
+                max={60}
+                data-testid="input-crane-access-ready-days"
+              />
+              <p className="text-xs text-muted-foreground">Default: 7 days</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Target className="h-5 w-5 text-primary" />
+            Milestone Target Dates
+            <Badge variant="outline" className="text-xs">Exhibit D.1 / D.2</Badge>
+          </CardTitle>
+          <CardDescription>
+            Target dates for design, permitting, and production milestones (leave blank for TBD)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <p className="text-sm font-medium mb-3">D.1 - Design / Pre-Production</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="designKickoffDate">Design Kickoff</Label>
+                <Input
+                  id="designKickoffDate"
+                  type="date"
+                  value={projectData.designKickoffDate || ''}
+                  onChange={(e) => updateProjectData({ designKickoffDate: e.target.value })}
+                  data-testid="input-design-kickoff-date"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="schematicDesignDate">Schematic Design Complete</Label>
+                <Input
+                  id="schematicDesignDate"
+                  type="date"
+                  value={projectData.schematicDesignDate || ''}
+                  onChange={(e) => updateProjectData({ schematicDesignDate: e.target.value })}
+                  data-testid="input-schematic-design-date"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="designDevelopmentDate">Design Development Complete</Label>
+                <Input
+                  id="designDevelopmentDate"
+                  type="date"
+                  value={projectData.designDevelopmentDate || ''}
+                  onChange={(e) => updateProjectData({ designDevelopmentDate: e.target.value })}
+                  data-testid="input-design-development-date"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="permitSubmittalDate">Permit Submittal</Label>
+                <Input
+                  id="permitSubmittalDate"
+                  type="date"
+                  value={projectData.permitSubmittalDate || ''}
+                  onChange={(e) => updateProjectData({ permitSubmittalDate: e.target.value })}
+                  data-testid="input-permit-submittal-date"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t pt-4">
+            <p className="text-sm font-medium mb-3">D.2 - Production Milestones</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="productionMidpointDate">Production Midpoint</Label>
+                <Input
+                  id="productionMidpointDate"
+                  type="date"
+                  value={projectData.productionMidpointDate || ''}
+                  onChange={(e) => updateProjectData({ productionMidpointDate: e.target.value })}
+                  data-testid="input-production-midpoint-date"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="productionCompleteDate">Production Complete</Label>
+                <Input
+                  id="productionCompleteDate"
+                  type="date"
+                  value={projectData.productionCompleteDate || ''}
+                  onChange={(e) => updateProjectData({ productionCompleteDate: e.target.value })}
+                  data-testid="input-production-complete-date"
+                />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card className="bg-muted/30">
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium">Contract Variables</p>
               <p className="text-xs text-muted-foreground">
-                This step populates 6 contract variables
+                This step populates schedule, deadline, and milestone variables
               </p>
             </div>
             <Badge variant="secondary" className="text-xs">
-              EFFECTIVE_DATE, DESIGN_DAYS, MFG_DAYS, ONSITE_DAYS, COMPLETION_DATE, etc.
+              EFFECTIVE_DATE, DESIGN_DAYS, MFG_DAYS, ONSITE_DAYS, C.4 deadlines, D.1/D.2 dates
             </Badge>
           </div>
         </CardContent>

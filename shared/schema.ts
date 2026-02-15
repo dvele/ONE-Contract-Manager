@@ -46,6 +46,7 @@ export const homeModels = pgTable("home_models", {
   designFee: integer("design_fee"), // cents
   offsiteBasePrice: integer("offsite_base_price"), // cents
   onsiteEstPrice: integer("onsite_est_price"), // cents
+  shippingSetPrice: integer("shipping_set_price"), // cents - offsite delivery/crane setting cost
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at"),
@@ -344,6 +345,21 @@ export const projectDetails = pgTable("project_details", {
   estimatedDeliveryDate: text("estimated_delivery_date"),
   actualDeliveryDate: text("actual_delivery_date"),
   
+  // Exhibit C.4 - Interface Deadlines (days before delivery)
+  foundationReadyDays: integer("foundation_ready_days").default(14),
+  utilityStubbedDays: integer("utility_stubbed_days").default(14),
+  siteAccessReadyDays: integer("site_access_ready_days").default(7),
+  permitsScheduledDays: integer("permits_scheduled_days").default(30),
+  craneAccessReadyDays: integer("crane_access_ready_days").default(7),
+
+  // Exhibit D.1/D.2 - Target Dates
+  designKickoffDate: text("design_kickoff_date"),
+  schematicDesignDate: text("schematic_design_date"),
+  designDevelopmentDate: text("design_development_date"),
+  permitSubmittalDate: text("permit_submittal_date"),
+  productionMidpointDate: text("production_midpoint_date"),
+  productionCompleteDate: text("production_complete_date"),
+
   // Legal
   governingLawState: text("governing_law_state"),
   arbitrationLocation: text("arbitration_location"),

@@ -57,6 +57,7 @@ interface HomeModel {
   design_fee: number;
   offsite_base_price: number;
   onsite_est_price?: number;
+  shipping_set_price?: number;
   is_active: boolean;
 }
 
@@ -71,6 +72,7 @@ const homeModelSchema = z.object({
   designFee: z.coerce.number().min(0, "Design fee must be 0 or more"),
   offsiteBasePrice: z.coerce.number().min(0, "Base price must be 0 or more"),
   onsiteEstPrice: z.coerce.number().optional(),
+  shippingSetPrice: z.coerce.number().optional(),
 });
 
 type HomeModelFormValues = z.infer<typeof homeModelSchema>;
@@ -107,6 +109,7 @@ export default function AdminHomeModels() {
       designFee: 0,
       offsiteBasePrice: 0,
       onsiteEstPrice: 0,
+      shippingSetPrice: 0,
     },
   });
 
@@ -168,6 +171,7 @@ export default function AdminHomeModels() {
       designFee: 0,
       offsiteBasePrice: 0,
       onsiteEstPrice: 0,
+      shippingSetPrice: 0,
     });
     setIsDialogOpen(true);
   };
@@ -185,6 +189,7 @@ export default function AdminHomeModels() {
       designFee: model.design_fee,
       offsiteBasePrice: model.offsite_base_price,
       onsiteEstPrice: model.onsite_est_price || 0,
+      shippingSetPrice: model.shipping_set_price || 0,
     });
     setIsDialogOpen(true);
   };
@@ -382,10 +387,39 @@ export default function AdminHomeModels() {
                   />
                   <FormField
                     control={form.control}
+                    name="shippingSetPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Shipping/Set Price (cents)</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} data-testid="input-shipping-price" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="onsiteEstPrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Onsite Est. Price (cents)</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} data-testid="input-onsite-price" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
                     name="designFee"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Design Fee (cents)</FormLabel>
+                        <FormLabel>Suggested Design Fee (cents)</FormLabel>
                         <FormControl>
                           <Input type="number" {...field} data-testid="input-design-fee" />
                         </FormControl>
