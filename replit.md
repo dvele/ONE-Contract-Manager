@@ -82,6 +82,13 @@ The application is built on a modern full-stack architecture.
     - Exhibit E: Limited Warranty
     - Exhibit F: State-Specific Provisions (with [STATE_DISCLOSURE:MASTER_EF_NOTICES])
     - 14 new variables in mapper.ts: BUYER_TYPE, PROJECT_TYPE, PRODUCTION_PRICE, LOGISTICS_PRICE, ONSITE_PRICE, TOTAL_PROJECT_PRICE, AD_FEE, STORAGE_FEE_PER_DAY, STORAGE_FREE_DAYS, CLIENT_PRIMARY_CONTACT, COMPANY_CONTACT, COMPANY_EMAIL, XREF_FEES_PAYMENT_SECTION, XREF_BANKABILITY_SUBSECTIONS
+- **6-Phase Pricing Enhancement (Feb 2026)**:
+    - Phase 1+4: serviceModel bug fix (mapper.ts uses project.serviceModel), additionalSiteWork defaults to $0
+    - Phase 2: Shipping breakout - shipping_set_price in home_models, totalShipping tracked separately in pricing engine, projectBudget/contractValue include shipping
+    - Phase 3: Design fee uses financials.designFee (project-level) instead of per-model sum, Design Fee input in Step7
+    - Phase 5: Exhibit C.4 Interface Deadlines - 5 fields (foundationReadyDays, utilityStubbedDays, siteAccessReadyDays, permitsScheduledDays, craneAccessReadyDays) with defaults
+    - Phase 6: Exhibit D.1/D.2 Target Dates - 6 date fields (designKickoffDate, schematicDesignDate, designDevelopmentDate, permitSubmittalDate, productionMidpointDate, productionCompleteDate) with formatDateOrTBD helper
+    - 11 new mapper variables: FOUNDATION_READY_DAYS, UTILITY_STUBBED_DAYS, SITE_ACCESS_READY_DAYS, PERMITS_SCHEDULED_DAYS, CRANE_ACCESS_READY_DAYS, DESIGN_KICKOFF_DATE, SCHEMATIC_DESIGN_DATE, DESIGN_DEVELOPMENT_DATE, PERMIT_SUBMITTAL_DATE, PRODUCTION_MIDPOINT_DATE, PRODUCTION_COMPLETE_DATE
 
 ## External Dependencies
 
