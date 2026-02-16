@@ -217,6 +217,27 @@ export const Step1ProjectInfo: React.FC = () => {
           </div>
           
           <div className="space-y-2">
+            <Label htmlFor="buyerType" className="flex items-center gap-2">
+              Buyer Type
+            </Label>
+            <Select
+              value={projectData.buyerType || 'end_customer'}
+              onValueChange={(value) => updateProjectData({ buyerType: value as 'end_customer' | 'developer' })}
+            >
+              <SelectTrigger data-testid="select-buyer-type">
+                <SelectValue placeholder="Select buyer type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="end_customer">End Customer</SelectItem>
+                <SelectItem value="developer">Developer</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Determines contract language for the buyer classification
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="agreementDate" className="flex items-center gap-2">
               Agreement Execution Date <span className="text-red-500">*</span>
             </Label>
@@ -488,7 +509,7 @@ export const Step1ProjectInfo: React.FC = () => {
               </p>
             </div>
             <Badge variant="secondary" className="text-xs">
-              PROJECT_NUMBER, PROJECT_NAME, SITE_ADDRESS, SITE_CITY, SITE_STATE...
+              PROJECT_NUMBER, PROJECT_NAME, BUYER_TYPE, SITE_ADDRESS, SITE_CITY, SITE_STATE...
             </Badge>
           </div>
         </CardContent>
