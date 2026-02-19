@@ -439,35 +439,59 @@ function getMilestoneTrigger(name: string): string {
 }
 
 export function generateExhibitB1TableHtml(
-  units: ProjectUnit[] | null
+  units: UnitDetail[] | null
 ): string {
-  const modelGroups: Record<string, number> = {};
-  if (units && units.length > 0) {
-    for (const u of units) {
-      const name = u.modelName || 'Unknown';
-      modelGroups[name] = (modelGroups[name] || 0) + (u.quantity || 1);
-    }
+  if (!units || units.length === 0) {
+    return '<p style="font-style: italic; color: #666;">No units configured.</p>';
   }
 
-  const rows: { cells: string[]; isBold?: boolean; isTotal?: boolean }[] = [];
-  if (Object.keys(modelGroups).length > 0) {
-    for (const [model, qty] of Object.entries(modelGroups)) {
-      rows.push({
-        cells: ['P-1', '1', model, String(qty), '', '', ''],
-      });
+  const rows: { cells: string[]; isBold?: boolean; isTotal?: boolean }[] = units.map((unit, index) => {
+    const specs: string[] = [];
+    if (unit.bedrooms !== undefined && unit.bedrooms !== null) {
+      specs.push(`${unit.bedrooms} Bed`);
     }
-  } else {
-    rows.push({ cells: ['', '', '', '', '', '', ''] });
-  }
+    if (unit.bathrooms !== undefined && unit.bathrooms !== null) {
+      specs.push(`${unit.bathrooms} Bath`);
+    }
+    if (unit.squareFootage !== undefined && unit.squareFootage !== null) {
+      specs.push(`${unit.squareFootage.toLocaleString()} sqft`);
+    }
+    const specsStr = specs.length > 0 ? specs.join(' / ') : '-';
+
+    return {
+      cells: [
+        unit.unitLabel || `Unit ${index + 1}`,
+        unit.modelName || '-',
+        specsStr,
+        formatCurrency(unit.estimatedPrice),
+        '',
+        '',
+      ],
+    };
+  });
+
+  const totalPrice = units.reduce((sum, u) => sum + (u.estimatedPrice || 0), 0);
+
+  rows.push({
+    cells: [
+      `Total (${units.length} Unit${units.length !== 1 ? 's' : ''})`,
+      '',
+      '',
+      formatCurrency(totalPrice),
+      '',
+      '',
+    ],
+    isBold: true,
+    isTotal: true,
+  });
 
   return buildStyledTable({
     columns: [
-      { header: 'Property ID', align: 'left' },
-      { header: 'Phase', align: 'left' },
+      { header: 'Unit', align: 'left' },
       { header: 'Model', align: 'left' },
-      { header: 'Qty', align: 'center' },
+      { header: 'Specs', align: 'center' },
+      { header: 'Estimated Price', align: 'right' },
       { header: 'Plan Set Version', align: 'left' },
-      { header: 'Date', align: 'left' },
       { header: 'Third-Party Review', align: 'left' },
     ],
     rows,

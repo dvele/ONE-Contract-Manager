@@ -953,7 +953,12 @@ export function mapProjectToVariables(
     ),
     EXHIBIT_B1_TABLE: generateExhibitB1TableHtml(
       units?.map(u => ({
+        unitLabel: u.unitLabel || `Unit ${u.id}`,
         modelName: u.homeModel?.modelName || 'Unknown Model',
+        bedrooms: u.homeModel?.bedrooms,
+        bathrooms: u.homeModel?.bathrooms,
+        squareFootage: u.homeModel?.squareFootage,
+        estimatedPrice: (u.basePriceSnapshot || 0) + (u.onsiteEstimateSnapshot || 0),
       })) || null
     ),
     
