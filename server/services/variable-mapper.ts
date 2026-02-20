@@ -90,6 +90,7 @@ export async function getProjectWithRelations(
         pu.project_id as "projectId",
         pu.model_id as "homeModelId",
         pu.unit_label as "unitLabel",
+        pu.quantity,
         pu.base_price_snapshot as "basePriceSnapshot",
         pu.onsite_estimate_snapshot as "onsiteEstimateSnapshot",
         json_build_object(
@@ -134,6 +135,7 @@ export async function getProjectWithRelations(
     projectId: row.projectId,
     homeModelId: row.homeModelId,
     unitLabel: row.unitLabel,
+    quantity: row.quantity || 1,
     basePriceSnapshot: row.basePriceSnapshot,
     onsiteEstimateSnapshot: row.onsiteEstimateSnapshot,
     homeModel: row.homeModel

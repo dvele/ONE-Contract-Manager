@@ -233,22 +233,29 @@ export function generateUnitDetailsHtml(units: UnitDetail[] | null): string {
       specs.push(`${unit.squareFootage.toLocaleString()} sqft`);
     }
     const specsStr = specs.length > 0 ? specs.join(' / ') : '-';
+    const qty = unit.quantity || 1;
+    const lineTotal = (unit.estimatedPrice || 0) * qty;
 
     return {
       cells: [
         unit.unitLabel || `Unit ${index + 1}`,
         unit.modelName || '-',
+        String(qty),
         specsStr,
         formatCurrency(unit.estimatedPrice),
+        formatCurrency(lineTotal),
       ],
     };
   });
 
-  const totalPrice = units.reduce((sum, u) => sum + (u.estimatedPrice || 0), 0);
+  const totalUnits = units.reduce((sum, u) => sum + (u.quantity || 1), 0);
+  const totalPrice = units.reduce((sum, u) => sum + (u.estimatedPrice || 0) * (u.quantity || 1), 0);
 
   rows.push({
     cells: [
-      `Total (${units.length} Unit${units.length !== 1 ? 's' : ''})`,
+      `Total (${totalUnits} Unit${totalUnits !== 1 ? 's' : ''})`,
+      '',
+      '',
       '',
       '',
       formatCurrency(totalPrice),
@@ -261,8 +268,10 @@ export function generateUnitDetailsHtml(units: UnitDetail[] | null): string {
     columns: [
       { header: 'Unit #', align: 'left' },
       { header: 'Model Name', align: 'left' },
+      { header: 'Qty', align: 'center' },
       { header: 'Specs', align: 'center' },
-      { header: 'Estimated Price', align: 'right' },
+      { header: 'Unit Price', align: 'right' },
+      { header: 'Line Total', align: 'right' },
     ],
     rows,
   });
@@ -475,13 +484,14 @@ export function generateExhibitB1TableHtml(
     };
   });
 
-  const totalPrice = units.reduce((sum, u) => sum + (u.estimatedPrice || 0), 0);
+  const totalUnitsB1 = units.reduce((sum, u) => sum + (u.quantity || 1), 0);
+  const totalPrice = units.reduce((sum, u) => sum + (u.estimatedPrice || 0) * (u.quantity || 1), 0);
 
   rows.push({
     cells: [
       '',
       '',
-      `Total (${units.length} Unit${units.length !== 1 ? 's' : ''})`,
+      `Total (${totalUnitsB1} Unit${totalUnitsB1 !== 1 ? 's' : ''})`,
       '',
       '',
       '',

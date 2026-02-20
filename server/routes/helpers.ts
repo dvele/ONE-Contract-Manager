@@ -60,7 +60,7 @@ export async function getProjectWithRelations(projectId: number): Promise<Projec
   }
 
   const unitsWithModels = await pool.query(
-    `SELECT pu.id, pu.project_id, pu.model_id, pu.unit_label, 
+    `SELECT pu.id, pu.project_id, pu.model_id, pu.unit_label, pu.quantity,
             pu.base_price_snapshot, pu.customization_total,
             hm.id as hm_id, hm.name as hm_name, hm.sq_ft, hm.bedrooms, hm.bathrooms
      FROM project_units pu
@@ -74,6 +74,7 @@ export async function getProjectWithRelations(projectId: number): Promise<Projec
     projectId: row.project_id,
     homeModelId: row.model_id,
     unitLabel: row.unit_label || '',
+    quantity: row.quantity || 1,
     basePriceSnapshot: row.base_price_snapshot || 0,
     onsiteEstimateSnapshot: row.customization_total || 0,
     homeModel: row.hm_id ? {

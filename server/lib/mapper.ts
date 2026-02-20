@@ -40,6 +40,7 @@ export interface ProjectUnit {
   projectId: number;
   homeModelId: number;
   unitLabel: string;
+  quantity: number;
   basePriceSnapshot: number;
   onsiteEstimateSnapshot: number;
   homeModel?: {
@@ -601,7 +602,8 @@ function buildUnitModelList(units?: ProjectUnit[]): string {
   return units.map(unit => {
     const modelName = unit.homeModel?.modelName || 'Unknown Model';
     const label = unit.unitLabel || '';
-    return `1x ${modelName}${label ? ` (${label})` : ''}`;
+    const qty = unit.quantity || 1;
+    return `${qty}x ${modelName}${label ? ` (${label})` : ''}`;
   }).join(', ');
 }
 
@@ -917,6 +919,7 @@ export function mapProjectToVariables(
         bathrooms: u.homeModel?.bathrooms,
         squareFootage: u.homeModel?.squareFootage,
         estimatedPrice: (u.basePriceSnapshot || 0) + (u.onsiteEstimateSnapshot || 0),
+        quantity: u.quantity || 1,
       })) || null
     ),
     RESPONSIBILITY_MATRIX_TABLE: generateResponsibilityMatrixHtml(
@@ -959,6 +962,7 @@ export function mapProjectToVariables(
         bathrooms: u.homeModel?.bathrooms,
         squareFootage: u.homeModel?.squareFootage,
         estimatedPrice: (u.basePriceSnapshot || 0) + (u.onsiteEstimateSnapshot || 0),
+        quantity: u.quantity || 1,
       })) || null
     ),
     

@@ -52,6 +52,7 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
   const unitsResult = await pool.query(
     `SELECT 
       pu.id as unit_id,
+      pu.quantity,
       pu.base_price_snapshot,
       pu.customization_total,
       hm.id as model_id,
@@ -67,7 +68,7 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
   );
 
   const units = unitsResult.rows;
-  const unitCount = units.length;
+  const unitCount = units.reduce((sum: number, u: any) => sum + (u.quantity || 1), 0);
 
   let totalDesignFee = 0;
   let totalOffsite = 0;
@@ -76,22 +77,20 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
   let totalShipping = 0;
   let unitModelSummary = '';
 
-  if (unitCount > 0) {
-    // Calculate pricing by summing across all units
+  if (units.length > 0) {
     const modelCounts: Record<string, number> = {};
 
     for (const unit of units) {
-      totalOffsite += unit.offsite_base_price || 0;
-      totalOnsite += unit.onsite_est_price || 0;
-      totalCustomizations += unit.customization_total || 0;
-      totalShipping += unit.shipping_set_price || 0;
+      const qty = unit.quantity || 1;
+      totalOffsite += (unit.offsite_base_price || 0) * qty;
+      totalOnsite += (unit.onsite_est_price || 0) * qty;
+      totalCustomizations += (unit.customization_total || 0) * qty;
+      totalShipping += (unit.shipping_set_price || 0) * qty;
 
-      // Count models for summary
       const modelName = unit.model_name || 'Unknown Model';
-      modelCounts[modelName] = (modelCounts[modelName] || 0) + 1;
+      modelCounts[modelName] = (modelCounts[modelName] || 0) + qty;
     }
 
-    // Build unit model summary like "2x Carmel, 1x Trinity"
     unitModelSummary = Object.entries(modelCounts)
       .map(([name, count]) => `${count}x ${name}`)
       .join(', ');
@@ -102,7 +101,7 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
     // Design fee is project-level from financials, not summed from per-model design_fee
     totalDesignFee = financial?.designFee || 0;
 
-    console.log(`[PricingEngine] Project ${projectId}: Calculated from ${unitCount} units - designFee=${totalDesignFee} (from financials), offsite=${totalOffsite}, shipping=${totalShipping}, onsite=${totalOnsite} (includes ${additionalSiteWork} additional site work)`);
+    console.log(`[PricingEngine] Project ${projectId}: Calculated from ${units.length} line items (${unitCount} total units) - designFee=${totalDesignFee} (from financials), offsite=${totalOffsite}, shipping=${totalShipping}, onsite=${totalOnsite} (includes ${additionalSiteWork} additional site work)`);
   } else {
     // FALLBACK: No units, use financials table (financial already fetched above)
     const [details] = await db

@@ -702,7 +702,8 @@ router.get('/projects/:projectId/units', async (req, res) => {
     const projectId = parseInt(req.params.projectId);
     const result = await pool.query(
       `SELECT pu.id, pu.project_id as "projectId", pu.model_id as "modelId", 
-              pu.unit_label as "unitLabel", pu.base_price_snapshot as "basePriceSnapshot",
+              pu.unit_label as "unitLabel", pu.quantity,
+              pu.base_price_snapshot as "basePriceSnapshot",
               pu.customization_total as "customizationTotal",
               json_build_object(
                 'id', hm.id,
@@ -731,7 +732,7 @@ router.get('/projects/:projectId/units', async (req, res) => {
 router.post('/projects/:projectId/units', async (req, res) => {
   try {
     const projectId = parseInt(req.params.projectId);
-    const { modelId } = req.body;
+    const { modelId, quantity } = req.body;
     
     const modelResult = await pool.query(
       `SELECT * FROM home_models WHERE id = $1`,
@@ -752,10 +753,10 @@ router.post('/projects/:projectId/units', async (req, res) => {
     const unitLabel = `Unit ${String.fromCharCode(64 + unitCount)}`;
     
     const insertResult = await pool.query(
-      `INSERT INTO project_units (project_id, model_id, unit_label, base_price_snapshot, organization_id)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO project_units (project_id, model_id, unit_label, quantity, base_price_snapshot, organization_id)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [projectId, modelId, unitLabel, model.offsite_base_price, req.organizationId]
+      [projectId, modelId, unitLabel, quantity || 1, model.offsite_base_price, req.organizationId]
     );
     
     const newUnit = insertResult.rows[0];
@@ -764,6 +765,7 @@ router.post('/projects/:projectId/units', async (req, res) => {
       projectId: newUnit.project_id,
       modelId: newUnit.model_id,
       unitLabel: newUnit.unit_label,
+      quantity: newUnit.quantity,
       basePriceSnapshot: newUnit.base_price_snapshot,
       customizationTotal: newUnit.customization_total,
       model: {

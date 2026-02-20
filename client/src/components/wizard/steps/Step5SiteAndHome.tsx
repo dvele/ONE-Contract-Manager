@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
 import { Home, Plus, Trash2, AlertTriangle, Package } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 
@@ -27,6 +28,7 @@ interface ProjectUnit {
   projectId: number;
   modelId: number;
   unitLabel: string;
+  quantity: number;
   basePriceSnapshot: number;
   customizationTotal: number;
   model: HomeModel;
@@ -75,15 +77,26 @@ export const Step5SiteAndHome: React.FC = () => {
     },
   });
 
-  useEffect(() => {
-    if (projectUnits.length !== projectData.totalUnits) {
-      updateProjectData({ totalUnits: projectUnits.length || 1 });
-    }
-    setDbUnitsCount(projectUnits.length);
-  }, [projectUnits.length]);
+  const updateQuantityMutation = useMutation({
+    mutationFn: async ({ unitId, quantity }: { unitId: number; quantity: number }) => {
+      return apiRequest('PATCH', `/api/project-units/${unitId}`, { quantity });
+    },
+    onSuccess: () => {
+      refetchUnits();
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', draftProjectId, 'pricing-summary'] });
+    },
+  });
 
   useEffect(() => {
-    const totalPrice = projectUnits.reduce((sum, unit) => sum + unit.basePriceSnapshot, 0);
+    const totalUnitCount = projectUnits.reduce((sum, unit) => sum + (unit.quantity || 1), 0);
+    if (totalUnitCount !== projectData.totalUnits) {
+      updateProjectData({ totalUnits: totalUnitCount || 1 });
+    }
+    setDbUnitsCount(totalUnitCount);
+  }, [projectUnits]);
+
+  useEffect(() => {
+    const totalPrice = projectUnits.reduce((sum, unit) => sum + unit.basePriceSnapshot * (unit.quantity || 1), 0);
     if (totalPrice !== projectData.preliminaryOffsiteCost) {
       updateProjectData({ preliminaryOffsiteCost: totalPrice / 100 });
     }
@@ -106,6 +119,13 @@ export const Step5SiteAndHome: React.FC = () => {
 
   const handleDeleteUnit = (unitId: number) => {
     deleteUnitMutation.mutate(unitId);
+  };
+
+  const handleQuantityChange = (unitId: number, value: string) => {
+    const qty = parseInt(value);
+    if (!isNaN(qty) && qty >= 1 && qty <= 999) {
+      updateQuantityMutation.mutate({ unitId, quantity: qty });
+    }
   };
   
   return (
@@ -184,31 +204,56 @@ export const Step5SiteAndHome: React.FC = () => {
                               {unit.model.bedrooms}BR / {unit.model.bathrooms}BA / {unit.model.sqFt.toLocaleString()} sqft
                             </Badge>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteUnit(unit.id)}
-                            disabled={deleteUnitMutation.isPending}
-                            data-testid={`button-delete-unit-${unit.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
+                              <Label htmlFor={`qty-${unit.id}`} className="text-xs text-muted-foreground whitespace-nowrap">Qty:</Label>
+                              <Input
+                                id={`qty-${unit.id}`}
+                                type="number"
+                                min={1}
+                                max={999}
+                                value={unit.quantity || 1}
+                                onChange={(e) => handleQuantityChange(unit.id, e.target.value)}
+                                className="w-16 h-8 text-center text-sm"
+                                data-testid={`input-quantity-${unit.id}`}
+                              />
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteUnit(unit.id)}
+                              disabled={deleteUnitMutation.isPending}
+                              data-testid={`button-delete-unit-${unit.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
                         </div>
                         <div className="flex items-center justify-between text-sm pt-2 border-t mt-2">
                           <div className="space-y-1">
                             <div className="flex justify-between gap-8">
-                              <span className="text-muted-foreground">Offsite (Manufacturing):</span>
+                              <span className="text-muted-foreground">Unit Price (Offsite):</span>
                               <span className="font-mono">{formatCurrency(unit.basePriceSnapshot)}</span>
                             </div>
                             <div className="flex justify-between gap-8">
-                              <span className="text-muted-foreground">Est. Onsite Work:</span>
+                              <span className="text-muted-foreground">Unit Price (Est. Onsite):</span>
                               <span className="font-mono text-muted-foreground">{formatCurrency(unit.model.onsiteEstPrice)}</span>
                             </div>
+                            {(unit.quantity || 1) > 1 && (
+                              <div className="flex justify-between gap-8 pt-1 border-t">
+                                <span className="text-muted-foreground font-medium">x{unit.quantity} Subtotal:</span>
+                                <span className="font-mono font-medium">
+                                  {formatCurrency((unit.basePriceSnapshot + unit.model.onsiteEstPrice) * (unit.quantity || 1))}
+                                </span>
+                              </div>
+                            )}
                           </div>
                           <div className="text-right">
-                            <span className="text-xs text-muted-foreground block">Total Unit Value</span>
+                            <span className="text-xs text-muted-foreground block">
+                              {(unit.quantity || 1) > 1 ? `Total (x${unit.quantity})` : 'Total Unit Value'}
+                            </span>
                             <span className="font-mono font-semibold text-primary" data-testid={`text-unit-total-${unit.id}`}>
-                              {formatCurrency(unit.basePriceSnapshot + unit.model.onsiteEstPrice)}
+                              {formatCurrency((unit.basePriceSnapshot + unit.model.onsiteEstPrice) * (unit.quantity || 1))}
                             </span>
                           </div>
                         </div>
@@ -222,19 +267,20 @@ export const Step5SiteAndHome: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <Label className="text-muted-foreground">Total Units:</Label>
                   <Badge variant="secondary" data-testid="badge-total-units">
-                    {projectUnits.length}
+                    {projectUnits.reduce((sum, u) => sum + (u.quantity || 1), 0)}
+                    {projectUnits.length > 1 && ` (${projectUnits.length} line items)`}
                   </Badge>
                 </div>
                 {projectUnits.length > 0 && (
                   <div className="text-right space-y-1">
                     <div className="text-sm text-muted-foreground">
-                      Offsite (Manufacturing): {formatCurrency(projectUnits.reduce((sum, u) => sum + u.basePriceSnapshot, 0))}
+                      Offsite (Manufacturing): {formatCurrency(projectUnits.reduce((sum, u) => sum + u.basePriceSnapshot * (u.quantity || 1), 0))}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Est. Onsite: {formatCurrency(projectUnits.reduce((sum, u) => sum + u.model.onsiteEstPrice, 0))}
+                      Est. Onsite: {formatCurrency(projectUnits.reduce((sum, u) => sum + u.model.onsiteEstPrice * (u.quantity || 1), 0))}
                     </div>
                     <div className="text-lg font-semibold text-primary" data-testid="text-grand-total">
-                      Grand Total: {formatCurrency(projectUnits.reduce((sum, u) => sum + u.basePriceSnapshot + u.model.onsiteEstPrice, 0))}
+                      Grand Total: {formatCurrency(projectUnits.reduce((sum, u) => sum + (u.basePriceSnapshot + u.model.onsiteEstPrice) * (u.quantity || 1), 0))}
                     </div>
                   </div>
                 )}

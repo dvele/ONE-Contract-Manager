@@ -10,6 +10,7 @@ router.use(requireAuth);
 const selectFields = `
   pu.id, pu.organization_id as "organizationId", pu.project_id as "projectId",
   pu.model_id as "modelId", pu.unit_label as "unitLabel",
+  pu.quantity,
   pu.base_price_snapshot as "basePriceSnapshot",
   pu.customization_total as "customizationTotal",
   pu.notes, pu.created_at as "createdAt",
@@ -67,6 +68,7 @@ router.get("/project-units/:id", async (req: Request, res: Response) => {
 const returningFields = `
   id, organization_id as "organizationId", project_id as "projectId",
   model_id as "modelId", unit_label as "unitLabel",
+  quantity,
   base_price_snapshot as "basePriceSnapshot",
   customization_total as "customizationTotal",
   notes, created_at as "createdAt"
@@ -74,13 +76,13 @@ const returningFields = `
 
 router.post("/project-units", async (req: Request, res: Response) => {
   try {
-    const { projectId, modelId, unitLabel, basePriceSnapshot, customizationTotal, notes } = req.body;
+    const { projectId, modelId, unitLabel, quantity, basePriceSnapshot, customizationTotal, notes } = req.body;
     
     const result = await pool.query(
-      `INSERT INTO project_units (organization_id, project_id, model_id, unit_label, base_price_snapshot, customization_total, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO project_units (organization_id, project_id, model_id, unit_label, quantity, base_price_snapshot, customization_total, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING ${returningFields}`,
-      [req.organizationId, projectId, modelId, unitLabel, basePriceSnapshot, customizationTotal, notes]
+      [req.organizationId, projectId, modelId, unitLabel, quantity || 1, basePriceSnapshot, customizationTotal, notes]
     );
     
     res.status(201).json(result.rows[0]);
@@ -93,18 +95,19 @@ router.post("/project-units", async (req: Request, res: Response) => {
 router.patch("/project-units/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { modelId, unitLabel, basePriceSnapshot, customizationTotal, notes } = req.body;
+    const { modelId, unitLabel, quantity, basePriceSnapshot, customizationTotal, notes } = req.body;
     
     const result = await pool.query(
       `UPDATE project_units SET 
        model_id = COALESCE($3, model_id),
        unit_label = COALESCE($4, unit_label),
-       base_price_snapshot = COALESCE($5, base_price_snapshot),
-       customization_total = COALESCE($6, customization_total),
-       notes = COALESCE($7, notes)
+       quantity = COALESCE($5, quantity),
+       base_price_snapshot = COALESCE($6, base_price_snapshot),
+       customization_total = COALESCE($7, customization_total),
+       notes = COALESCE($8, notes)
        WHERE id = $1 AND organization_id = $2
        RETURNING ${returningFields}`,
-      [id, req.organizationId, modelId, unitLabel, basePriceSnapshot, customizationTotal, notes]
+      [id, req.organizationId, modelId, unitLabel, quantity, basePriceSnapshot, customizationTotal, notes]
     );
     
     if (result.rows.length === 0) {
