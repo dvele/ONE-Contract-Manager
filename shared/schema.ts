@@ -67,6 +67,7 @@ export const projectUnits = pgTable("project_units", {
   modelId: integer("model_id")
     .references(() => homeModels.id),
   unitLabel: text("unit_label"), // "Unit A", "Main Home", etc.
+  quantity: integer("quantity").default(1).notNull(),
   basePriceSnapshot: integer("base_price_snapshot"), // cents - locked price
   customizationTotal: integer("customization_total").default(0), // cents
   notes: text("notes"),
