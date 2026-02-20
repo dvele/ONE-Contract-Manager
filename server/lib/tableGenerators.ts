@@ -489,9 +489,9 @@ export function generateExhibitB1TableHtml(
     cells: [
       '',
       '',
-      `Total (${totalUnitsB1} Unit${totalUnitsB1 !== 1 ? 's' : ''})`,
       '',
-      '',
+      'Total',
+      String(totalUnitsB1),
       '',
       '',
       '',
