@@ -476,7 +476,6 @@ export function generateExhibitB1TableHtml(
         unit.modelName || '-',
         String(unit.quantity || 1),
         specsStr,
-        formatCurrency(unit.estimatedPrice),
         '',
         '',
         '',
@@ -485,7 +484,6 @@ export function generateExhibitB1TableHtml(
   });
 
   const totalUnitsB1 = units.reduce((sum, u) => sum + (u.quantity || 1), 0);
-  const totalPrice = units.reduce((sum, u) => sum + (u.estimatedPrice || 0) * (u.quantity || 1), 0);
 
   rows.push({
     cells: [
@@ -495,7 +493,6 @@ export function generateExhibitB1TableHtml(
       '',
       '',
       '',
-      formatCurrency(totalPrice),
       '',
       '',
       '',
@@ -512,7 +509,6 @@ export function generateExhibitB1TableHtml(
       { header: 'Model', align: 'left' },
       { header: 'Qty', align: 'center' },
       { header: 'Specs', align: 'center' },
-      { header: 'Estimated Price', align: 'right' },
       { header: 'Plan Set Version', align: 'left' },
       { header: 'Date', align: 'left' },
       { header: 'Third-Party Review', align: 'left' },

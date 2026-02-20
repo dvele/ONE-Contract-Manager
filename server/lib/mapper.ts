@@ -937,6 +937,7 @@ export function mapProjectToVariables(
     EXHIBIT_A2_TABLE: generateExhibitA2TableHtml(
       units?.map(u => ({
         modelName: u.homeModel?.modelName || 'Unknown Model',
+        quantity: u.quantity || 1,
       })) || null,
       buildFullAddress(
         projectDetails?.deliveryAddress,
@@ -961,7 +962,7 @@ export function mapProjectToVariables(
         bedrooms: u.homeModel?.bedrooms,
         bathrooms: u.homeModel?.bathrooms,
         squareFootage: u.homeModel?.squareFootage,
-        estimatedPrice: (u.basePriceSnapshot || 0) + (u.onsiteEstimateSnapshot || 0),
+        estimatedPrice: 0,
         quantity: u.quantity || 1,
       })) || null
     ),
