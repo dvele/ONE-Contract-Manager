@@ -209,6 +209,7 @@ export interface UnitDetail {
   bathrooms?: number;
   squareFootage?: number;
   estimatedPrice: number;
+  quantity?: number;
 }
 
 /**
@@ -460,10 +461,14 @@ export function generateExhibitB1TableHtml(
 
     return {
       cells: [
+        `P-${index + 1}`,
+        '1',
         unit.unitLabel || `Unit ${index + 1}`,
         unit.modelName || '-',
+        String(unit.quantity || 1),
         specsStr,
         formatCurrency(unit.estimatedPrice),
+        '',
         '',
         '',
       ],
@@ -474,10 +479,14 @@ export function generateExhibitB1TableHtml(
 
   rows.push({
     cells: [
+      '',
+      '',
       `Total (${units.length} Unit${units.length !== 1 ? 's' : ''})`,
       '',
       '',
+      '',
       formatCurrency(totalPrice),
+      '',
       '',
       '',
     ],
@@ -487,11 +496,15 @@ export function generateExhibitB1TableHtml(
 
   return buildStyledTable({
     columns: [
+      { header: 'Property ID', align: 'left' },
+      { header: 'Phase', align: 'left' },
       { header: 'Unit', align: 'left' },
       { header: 'Model', align: 'left' },
+      { header: 'Qty', align: 'center' },
       { header: 'Specs', align: 'center' },
       { header: 'Estimated Price', align: 'right' },
       { header: 'Plan Set Version', align: 'left' },
+      { header: 'Date', align: 'left' },
       { header: 'Third-Party Review', align: 'left' },
     ],
     rows,
