@@ -398,26 +398,6 @@ export function formatDateOrTBD(dateStr: string | null | undefined): string {
   });
 }
 
-function buildSignatureBlock(companyName: string, clientName: string, clientTitle: string): string {
-  return `
-<div style="margin-top: 40px;">
-  <p><strong>COMPANY:</strong></p>
-  <p>${companyName}</p>
-  <p style="margin-top: 20px;">Signature: ___________________________</p>
-  <p>Name (Print): ________________________</p>
-  <p>Title: _______________________________</p>
-  <p>Date: ________________________________</p>
-  <br/>
-  <p><strong>CLIENT:</strong></p>
-  <p>${clientName}</p>
-  <p style="margin-top: 20px;">Signature: ___________________________</p>
-  <p>Name (Print): ________________________</p>
-  <p>Title: ${clientTitle ? clientTitle + ' ' : ''}_______________</p>
-  <p>Date: ________________________________</p>
-</div>
-  `.trim();
-}
-
 /**
  * Format a number with commas: 1234567 -> "1,234,567"
  */
