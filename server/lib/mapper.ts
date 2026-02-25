@@ -8,6 +8,7 @@ import type {
   Contractor,
 } from "../../shared/schema";
 import { generatePricingTableHtml, generatePaymentScheduleHtml, generateUnitDetailsHtml, UnitDetail, ContractFilterType, generateExhibitA2TableHtml, generateExhibitA4TableHtml, generateExhibitA5TableHtml, generateExhibitB1TableHtml, generateResponsibilityMatrixHtml, type ResponsibilityMatrixItem, type ProjectUnit as TGProjectUnit } from "./tableGenerators";
+import { buildSignatureBlock as buildStyledSignatureBlock } from "./tableStyles";
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -314,6 +315,7 @@ export const VARIABLE_CATEGORIES = {
     "WHAT_HAPPENS_NEXT_TABLE",
     "MILESTONE_SCHEDULE_TABLE",
     "SIGNATURE_BLOCK_TABLE",
+    "EXHIBIT_A_SIGNATURE_TABLE",
   ],
   conditional: [
     "IS_CRC",
@@ -499,27 +501,56 @@ export function getFederalDistrict(state: string): string {
   return districts[state] || '';
 }
 
-/**
- * Build signature block HTML for contracts
- */
-export function buildSignatureBlock(companyName: string, clientName: string, clientTitle: string): string {
+function buildMapperSignatureBlock(companyName: string, clientName: string, clientTitle: string): string {
+  return buildStyledSignatureBlock({
+    leftTitle: 'COMPANY:',
+    rightTitle: 'CLIENT:',
+    companyName,
+    clientName,
+    clientTitle: clientTitle || undefined,
+    compact: true,
+  });
+}
+
+function buildExhibitASignatureBlock(companyName: string, clientName: string): string {
+  const lineStyle = 'border-bottom: 1px solid #000; margin-bottom: 4pt; height: 20pt;';
+  const labelStyle = 'font-size: 9pt; color: #666; margin-bottom: 2pt;';
+
+  function sigColumn(title: string): string {
+    return `
+      <td style="width: 47%; border: none; vertical-align: top; padding: 8pt;">
+        <div style="font-weight: bold; color: #1a73e8; margin-bottom: 8pt;">${title}</div>
+        <div style="font-weight: bold; margin-bottom: 16pt;">${companyName}</div>
+        <div style="${lineStyle}"></div>
+        <div style="${labelStyle}">Signature</div>
+        <div style="margin-top: 12pt; ${lineStyle}"></div>
+        <div style="${labelStyle}">Name (Print)</div>
+        <div style="margin-top: 12pt; ${lineStyle}"></div>
+        <div style="${labelStyle}">Title</div>
+        <div style="margin-top: 12pt; ${lineStyle}"></div>
+        <div style="${labelStyle}">Date</div>
+        <div style="margin-top: 20pt; font-weight: bold; margin-bottom: 16pt;">${clientName}</div>
+        <div style="${lineStyle}"></div>
+        <div style="${labelStyle}">Signature</div>
+        <div style="margin-top: 12pt; ${lineStyle}"></div>
+        <div style="${labelStyle}">Name (Print)</div>
+        <div style="margin-top: 12pt; ${lineStyle}"></div>
+        <div style="${labelStyle}">Title</div>
+        <div style="margin-top: 12pt; ${lineStyle}"></div>
+        <div style="${labelStyle}">Date</div>
+      </td>`;
+  }
+
   return `
-<div style="margin-top: 40px;">
-  <p><strong>COMPANY:</strong></p>
-  <p>${companyName}</p>
-  <p style="margin-top: 20px;">Signature: ___________________________</p>
-  <p>Name (Print): ________________________</p>
-  <p>Title: _______________________________</p>
-  <p>Date: ________________________________</p>
-  <br/>
-  <p><strong>CLIENT:</strong></p>
-  <p>${clientName}</p>
-  <p style="margin-top: 20px;">Signature: ___________________________</p>
-  <p>Name (Print): ________________________</p>
-  <p>Title: ${clientTitle || ''}_______________</p>
-  <p>Date: ________________________________</p>
-</div>
-  `.trim();
+    <div style="margin-top: 20pt; page-break-inside: avoid;">
+      <table style="width: 100%; border-collapse: collapse; border: none; font-size: 10pt; font-family: Arial, sans-serif;">
+        <tr>
+          ${sigColumn('Accepted and agreed:')}
+          <td style="width: 6%; border: none;"></td>
+          ${sigColumn('Post Design Approval (Greenlight):')}
+        </tr>
+      </table>
+    </div>`;
 }
 
 // =============================================================================
@@ -969,12 +1000,19 @@ export function mapProjectToVariables(
     
     WHAT_HAPPENS_NEXT_TABLE: '{{TABLE_WHAT_HAPPENS_NEXT}}',
 
-    SIGNATURE_BLOCK_TABLE: buildSignatureBlock(
+    SIGNATURE_BLOCK_TABLE: buildMapperSignatureBlock(
       childLlc?.legalName || "Dvele, Inc.",
       client
         ? (client.legalName || `${client.firstName || ''} ${client.lastName || ''}`.trim())
         : '',
       client?.entityType || ''
+    ),
+
+    EXHIBIT_A_SIGNATURE_TABLE: buildExhibitASignatureBlock(
+      childLlc?.legalName || "Dvele, Inc.",
+      client
+        ? (client.legalName || `${client.firstName || ''} ${client.lastName || ''}`.trim())
+        : '[CLIENT NAME]'
     ),
 
     // ===================
