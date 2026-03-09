@@ -54,3 +54,15 @@ The application employs a modern full-stack architecture with a focus on modular
 - **wouter**: Small routing library for React.
 - **react-hook-form**: Performant, flexible, and extensible forms with easy-to-use validation.
 - **zod**: TypeScript-first schema declaration and validation library.
+
+## Documentation
+
+- **README.md**: Comprehensive project documentation covering setup, architecture, API reference, database schema, frontend routes, and deployment instructions.
+- **.env.example**: Template for environment variables with descriptions. Copy to `.env` and configure for local development.
+- **.gitignore**: Configured to exclude `.env`, `generated_contracts/`, `node_modules/`, `dist/`, and SQLite databases.
+
+## Recent Changes
+
+- **Signature Blocks**: Both Section 14 (`SIGNATURE_BLOCK_TABLE`) and Exhibit A (`EXHIBIT_A_SIGNATURE_TABLE`) signature blocks are now dynamically generated using actual company (child LLC) and client names, styled consistently with all other contract tables.
+- **Exhibit B.1 Table**: Removed Estimated Price column (not a financial table). Total row now shows unit count in the Qty column with "Total" label in the Model column.
+- **Quantity Support**: `project_units.quantity` column, pricing engine multiplies by quantity, A.2/B.1/Unit Details tables all quantity-aware.
