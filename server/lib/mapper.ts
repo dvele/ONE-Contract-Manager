@@ -7,14 +7,27 @@ import type {
   WarrantyTerm,
   Contractor,
 } from "../../shared/schema";
-import { generatePricingTableHtml, generatePaymentScheduleHtml, generateUnitDetailsHtml, UnitDetail, ContractFilterType, generateExhibitA2TableHtml, generateExhibitA4TableHtml, generateExhibitA5TableHtml, generateExhibitB1TableHtml, generateResponsibilityMatrixHtml, type ResponsibilityMatrixItem, type ProjectUnit as TGProjectUnit } from "./tableGenerators";
+import {
+  generatePricingTableHtml,
+  generatePaymentScheduleHtml,
+  generateUnitDetailsHtml,
+  UnitDetail,
+  ContractFilterType,
+  generateExhibitA2TableHtml,
+  generateExhibitA4TableHtml,
+  generateExhibitA5TableHtml,
+  generateExhibitB1TableHtml,
+  generateResponsibilityMatrixHtml,
+  type ResponsibilityMatrixItem,
+  type ProjectUnit as TGProjectUnit,
+} from "./tableGenerators";
 import { buildSignatureBlock as buildStyledSignatureBlock } from "./tableStyles";
 
 // =============================================================================
 // TYPE DEFINITIONS
 // =============================================================================
 
-// ChildLlc type - compatible with both old SQLite and new PostgreSQL llcs table
+// ChildLlc type - compatible with PostgreSQL llcs table
 export interface ChildLlc {
   id: number;
   projectId: number | null;
@@ -303,10 +316,7 @@ export const VARIABLE_CATEGORIES = {
     "COUNTY",
     "CANCELLATION_FEE_PERCENT",
   ],
-  insurance: [
-    "GL_INSURANCE_LIMIT",
-    "GL_AGGREGATE_LIMIT",
-  ],
+  insurance: ["GL_INSURANCE_LIMIT", "GL_AGGREGATE_LIMIT"],
   tables: [
     "PRICING_BREAKDOWN_TABLE",
     "PAYMENT_SCHEDULE_TABLE",
@@ -342,7 +352,9 @@ export const SUPPORTED_VARIABLES = ALL_VARIABLES;
 /**
  * Convert cents to dollars and format as currency: 123456 -> "$1,234.56"
  */
-export function formatCentsAsCurrency(cents: number | null | undefined): string {
+export function formatCentsAsCurrency(
+  cents: number | null | undefined
+): string {
   if (cents == null) return "";
   const dollars = cents / 100;
   return new Intl.NumberFormat("en-US", {
@@ -356,7 +368,9 @@ export function formatCentsAsCurrency(cents: number | null | undefined): string 
 /**
  * Convert cents to dollars (numeric): 123456 -> 1234.56
  */
-export function centsToDollars(cents: number | null | undefined): number | null {
+export function centsToDollars(
+  cents: number | null | undefined
+): number | null {
   if (cents == null) return null;
   return cents / 100;
 }
@@ -424,7 +438,9 @@ export function formatCurrency(dollars: number | null | undefined): string {
 /**
  * Convert months to years (for display): 24 -> 2, 120 -> 10
  */
-export function monthsToYears(months: number | null | undefined): number | null {
+export function monthsToYears(
+  months: number | null | undefined
+): number | null {
   if (months == null) return null;
   return months / 12;
 }
@@ -460,24 +476,24 @@ export function formatPercent(value: number | null | undefined): string {
  */
 export function getStateCodeReference(state: string): string {
   const stateCodes: Record<string, string> = {
-    'CA': 'Cal. Civ. Code § 1797',
-    'California': 'Cal. Civ. Code § 1797',
-    'TX': 'Tex. Prop. Code § 401',
-    'Texas': 'Tex. Prop. Code § 401',
-    'AZ': 'Ariz. Rev. Stat. § 32-1101',
-    'Arizona': 'Ariz. Rev. Stat. § 32-1101',
-    'MT': 'Mont. Code Ann. § 30-2-313',
-    'Montana': 'Mont. Code Ann. § 30-2-313',
-    'CO': 'Colo. Rev. Stat. § 5-1-101',
-    'Colorado': 'Colo. Rev. Stat. § 5-1-101',
-    'NV': 'Nev. Rev. Stat. § 113',
-    'WA': 'Wash. Rev. Code § 64.50',
-    'NM': 'N.M. Stat. § 47-8-1',
-    'UT': 'Utah Code § 57-1-1',
-    'ID': 'Idaho Code § 54-4501',
-    'OR': 'Or. Rev. Stat. § 701.005',
+    CA: "Cal. Civ. Code § 1797",
+    California: "Cal. Civ. Code § 1797",
+    TX: "Tex. Prop. Code § 401",
+    Texas: "Tex. Prop. Code § 401",
+    AZ: "Ariz. Rev. Stat. § 32-1101",
+    Arizona: "Ariz. Rev. Stat. § 32-1101",
+    MT: "Mont. Code Ann. § 30-2-313",
+    Montana: "Mont. Code Ann. § 30-2-313",
+    CO: "Colo. Rev. Stat. § 5-1-101",
+    Colorado: "Colo. Rev. Stat. § 5-1-101",
+    NV: "Nev. Rev. Stat. § 113",
+    WA: "Wash. Rev. Code § 64.50",
+    NM: "N.M. Stat. § 47-8-1",
+    UT: "Utah Code § 57-1-1",
+    ID: "Idaho Code § 54-4501",
+    OR: "Or. Rev. Stat. § 701.005",
   };
-  return stateCodes[state] || '';
+  return stateCodes[state] || "";
 }
 
 /**
@@ -485,26 +501,30 @@ export function getStateCodeReference(state: string): string {
  */
 export function getFederalDistrict(state: string): string {
   const districts: Record<string, string> = {
-    'CA': 'Southern District of California',
-    'California': 'Southern District of California',
-    'TX': 'Western District of Texas',
-    'AZ': 'District of Arizona',
-    'MT': 'District of Montana',
-    'CO': 'District of Colorado',
-    'NV': 'District of Nevada',
-    'WA': 'Western District of Washington',
-    'NM': 'District of New Mexico',
-    'UT': 'District of Utah',
-    'ID': 'District of Idaho',
-    'OR': 'District of Oregon',
+    CA: "Southern District of California",
+    California: "Southern District of California",
+    TX: "Western District of Texas",
+    AZ: "District of Arizona",
+    MT: "District of Montana",
+    CO: "District of Colorado",
+    NV: "District of Nevada",
+    WA: "Western District of Washington",
+    NM: "District of New Mexico",
+    UT: "District of Utah",
+    ID: "District of Idaho",
+    OR: "District of Oregon",
   };
-  return districts[state] || '';
+  return districts[state] || "";
 }
 
-function buildMapperSignatureBlock(companyName: string, clientName: string, clientTitle: string): string {
+function buildMapperSignatureBlock(
+  companyName: string,
+  clientName: string,
+  clientTitle: string
+): string {
   return buildStyledSignatureBlock({
-    leftTitle: 'COMPANY:',
-    rightTitle: 'CLIENT:',
+    leftTitle: "COMPANY:",
+    rightTitle: "CLIENT:",
     companyName,
     clientName,
     clientTitle: clientTitle || undefined,
@@ -512,9 +532,13 @@ function buildMapperSignatureBlock(companyName: string, clientName: string, clie
   });
 }
 
-function buildExhibitASignatureBlock(companyName: string, clientName: string): string {
-  const lineStyle = 'border-bottom: 1px solid #000; margin-bottom: 4pt; height: 20pt;';
-  const labelStyle = 'font-size: 9pt; color: #666; margin-bottom: 2pt;';
+function buildExhibitASignatureBlock(
+  companyName: string,
+  clientName: string
+): string {
+  const lineStyle =
+    "border-bottom: 1px solid #000; margin-bottom: 4pt; height: 20pt;";
+  const labelStyle = "font-size: 9pt; color: #666; margin-bottom: 2pt;";
 
   function sigColumn(title: string): string {
     return `
@@ -545,9 +569,9 @@ function buildExhibitASignatureBlock(companyName: string, clientName: string): s
     <div style="margin-top: 20pt; page-break-inside: avoid;">
       <table style="width: 100%; border-collapse: collapse; border: none; font-size: 10pt; font-family: Arial, sans-serif;">
         <tr>
-          ${sigColumn('Accepted and agreed:')}
+          ${sigColumn("Accepted and agreed:")}
           <td style="width: 6%; border: none;"></td>
-          ${sigColumn('Post Design Approval (Greenlight):')}
+          ${sigColumn("Post Design Approval (Greenlight):")}
         </tr>
       </table>
     </div>`;
@@ -570,23 +594,27 @@ function getMilestoneVariables(
   prefix: string
 ): MilestoneVariables {
   const vars: MilestoneVariables = {};
-  
+
   // Filter milestones by type and sort by number
   const typeMilestones = milestones
-    .filter(m => m.milestoneType === type)
+    .filter((m) => m.milestoneType === type)
     .sort((a, b) => a.milestoneNumber - b.milestoneNumber);
-  
+
   // Generate variables for up to 6 milestones
   for (let i = 1; i <= 6; i++) {
-    const milestone = typeMilestones.find(m => m.milestoneNumber === i);
+    const milestone = typeMilestones.find((m) => m.milestoneNumber === i);
     vars[`${prefix}_MILESTONE_${i}_NAME`] = milestone?.name || "";
-    vars[`${prefix}_MILESTONE_${i}_PERCENT`] = milestone?.percentage ? formatPercent(milestone.percentage) : "";
-    vars[`${prefix}_MILESTONE_${i}_AMOUNT`] = formatCentsAsCurrency(milestone?.amount);
+    vars[`${prefix}_MILESTONE_${i}_PERCENT`] = milestone?.percentage
+      ? formatPercent(milestone.percentage)
+      : "";
+    vars[`${prefix}_MILESTONE_${i}_AMOUNT`] = formatCentsAsCurrency(
+      milestone?.amount
+    );
     vars[`${prefix}_MILESTONE_${i}_DUE_UPON`] = milestone?.dueUpon || "";
     vars[`${prefix}_MILESTONE_${i}_TARGET_DATE`] = milestone?.targetDate || "";
     vars[`${prefix}_MILESTONE_${i}_STATUS`] = milestone?.status || "";
   }
-  
+
   return vars;
 }
 
@@ -604,8 +632,13 @@ export interface PricingSummaryForMapper {
   grandTotal: number;
   projectBudget: number;
   contractValue: number;
-  serviceModel: 'CRC' | 'CMOS';
-  paymentSchedule: { name: string; percentage: number; amount: number; phase: string }[];
+  serviceModel: "CRC" | "CMOS";
+  paymentSchedule: {
+    name: string;
+    percentage: number;
+    amount: number;
+    phase: string;
+  }[];
   unitCount: number;
   unitModelSummary: string;
 }
@@ -617,7 +650,7 @@ export interface PricingSummaryForMapper {
 /**
  * Maps a project with all its relations to contract template variables.
  * Returns an object with all variables that can be used with docxtemplater.
- * 
+ *
  * @param data - Project data with all relations
  * @param pricingSummary - Optional pricing engine output for accurate financial variables
  */
@@ -629,30 +662,58 @@ function buildUnitModelList(units?: ProjectUnit[]): string {
   if (!units || units.length === 0) {
     return "No units selected";
   }
-  
-  return units.map(unit => {
-    const modelName = unit.homeModel?.modelName || 'Unknown Model';
-    const label = unit.unitLabel || '';
-    const qty = unit.quantity || 1;
-    return `${qty}x ${modelName}${label ? ` (${label})` : ''}`;
-  }).join(', ');
+
+  return units
+    .map((unit) => {
+      const modelName = unit.homeModel?.modelName || "Unknown Model";
+      const label = unit.unitLabel || "";
+      const qty = unit.quantity || 1;
+      return `${qty}x ${modelName}${label ? ` (${label})` : ""}`;
+    })
+    .join(", ");
 }
 
 export function mapProjectToVariables(
-  data: ProjectWithRelations, 
+  data: ProjectWithRelations,
   pricingSummary?: PricingSummaryForMapper,
-  contractType: ContractFilterType = 'MASTER_EF'
+  contractType: ContractFilterType = "MASTER_EF"
 ): ContractVariables {
-  const { project, client, childLlc, projectDetails, financials, milestones, warrantyTerms, contractors, units } = data;
+  const {
+    project,
+    client,
+    childLlc,
+    projectDetails,
+    financials,
+    milestones,
+    warrantyTerms,
+    contractors,
+    units,
+  } = data;
 
   // Find specific contractors by type
-  const manufacturer = contractors.find(c => c.contractorType === "manufacturer");
-  const onsiteContractor = contractors.find(c => c.contractorType === "onsite_general");
+  const manufacturer = contractors.find(
+    (c) => c.contractorType === "manufacturer"
+  );
+  const onsiteContractor = contractors.find(
+    (c) => c.contractorType === "onsite_general"
+  );
 
   // Build milestone variables
-  const clientMilestones = getMilestoneVariables(milestones, "client", "CLIENT");
-  const mfgMilestones = getMilestoneVariables(milestones, "manufacturing", "MFG");
-  const onsiteMilestones = getMilestoneVariables(milestones, "onsite", "ONSITE");
+  const clientMilestones = getMilestoneVariables(
+    milestones,
+    "client",
+    "CLIENT"
+  );
+  const mfgMilestones = getMilestoneVariables(
+    milestones,
+    "manufacturing",
+    "MFG"
+  );
+  const onsiteMilestones = getMilestoneVariables(
+    milestones,
+    "onsite",
+    "ONSITE"
+  );
 
   // Build the variables object
   const variables: ContractVariables = {
@@ -663,9 +724,9 @@ export function mapProjectToVariables(
     PROJECT_NAME: project.name,
     PROJECT_STATUS: project.status,
     PROJECT_STATE: project.state || "",
-    PROJECT_STATE_CODE: getStateCodeReference(project.state || ''),
+    PROJECT_STATE_CODE: getStateCodeReference(project.state || ""),
     PROJECT_COUNTY: (projectDetails as any)?.county || "",
-    PROJECT_FEDERAL_DISTRICT: getFederalDistrict(project.state || ''),
+    PROJECT_FEDERAL_DISTRICT: getFederalDistrict(project.state || ""),
     LIEN_LAW_STATE: project.state || "",
     ON_SITE_SELECTION: project.onSiteSelection || "CRC",
 
@@ -703,7 +764,9 @@ export function mapProjectToVariables(
     CHILD_LLC_ENTITY_TYPE: childLlc?.entityType || "LLC",
     CHILD_LLC_EIN: childLlc?.ein || "",
     CHILD_LLC_FORMATION_DATE: childLlc?.formationDate || "",
-    CHILD_LLC_FORMATION_DATE_WRITTEN: formatDateWritten(childLlc?.formationDate),
+    CHILD_LLC_FORMATION_DATE_WRITTEN: formatDateWritten(
+      childLlc?.formationDate
+    ),
     CHILD_LLC_REGISTERED_AGENT: childLlc?.registeredAgent || "",
     CHILD_LLC_REGISTERED_AGENT_ADDRESS: childLlc?.registeredAgentAddress || "",
     CHILD_LLC_ADDRESS: childLlc?.address || "",
@@ -762,10 +825,14 @@ export function mapProjectToVariables(
     // HOME
     // ===================
     // HOME_MODEL: single model name from projectDetails (unchanged)
-    HOME_MODEL: pricingSummary?.unitModelSummary || projectDetails?.homeModel || "",
+    HOME_MODEL:
+      pricingSummary?.unitModelSummary || projectDetails?.homeModel || "",
     // UNIT_MODEL_LIST: formatted list from real project units
-    UNIT_MODEL_LIST: pricingSummary?.unitModelSummary || buildUnitModelList(units),
-    HOME_SQ_FT: projectDetails?.homeSqFt ? formatNumber(projectDetails.homeSqFt) : "",
+    UNIT_MODEL_LIST:
+      pricingSummary?.unitModelSummary || buildUnitModelList(units),
+    HOME_SQ_FT: projectDetails?.homeSqFt
+      ? formatNumber(projectDetails.homeSqFt)
+      : "",
     HOME_SQ_FT_RAW: projectDetails?.homeSqFt || "",
     HOME_BEDROOMS: projectDetails?.homeBedrooms || "",
     HOME_BATHROOMS: projectDetails?.homeBathrooms || "",
@@ -787,99 +854,138 @@ export function mapProjectToVariables(
     // DATES
     // ===================
     AGREEMENT_EXECUTION_DATE: projectDetails?.agreementExecutionDate || "",
-    AGREEMENT_EXECUTION_DATE_WRITTEN: formatDateWritten(projectDetails?.agreementExecutionDate),
+    AGREEMENT_EXECUTION_DATE_WRITTEN: formatDateWritten(
+      projectDetails?.agreementExecutionDate
+    ),
     DESIGN_START_DATE: projectDetails?.designStartDate || "",
-    DESIGN_START_DATE_WRITTEN: formatDateWritten(projectDetails?.designStartDate),
+    DESIGN_START_DATE_WRITTEN: formatDateWritten(
+      projectDetails?.designStartDate
+    ),
     DESIGN_COMPLETE_DATE: projectDetails?.designCompleteDate || "",
-    DESIGN_COMPLETE_DATE_WRITTEN: formatDateWritten(projectDetails?.designCompleteDate),
+    DESIGN_COMPLETE_DATE_WRITTEN: formatDateWritten(
+      projectDetails?.designCompleteDate
+    ),
     GREEN_LIGHT_DATE: projectDetails?.greenLightDate || "",
     GREEN_LIGHT_DATE_WRITTEN: formatDateWritten(projectDetails?.greenLightDate),
     PRODUCTION_START_DATE: projectDetails?.productionStartDate || "",
-    PRODUCTION_START_DATE_WRITTEN: formatDateWritten(projectDetails?.productionStartDate),
+    PRODUCTION_START_DATE_WRITTEN: formatDateWritten(
+      projectDetails?.productionStartDate
+    ),
     ESTIMATED_DELIVERY_DATE: projectDetails?.estimatedDeliveryDate || "",
-    ESTIMATED_DELIVERY_DATE_WRITTEN: formatDateWritten(projectDetails?.estimatedDeliveryDate),
+    ESTIMATED_DELIVERY_DATE_WRITTEN: formatDateWritten(
+      projectDetails?.estimatedDeliveryDate
+    ),
     ACTUAL_DELIVERY_DATE: projectDetails?.actualDeliveryDate || "",
-    ACTUAL_DELIVERY_DATE_WRITTEN: formatDateWritten(projectDetails?.actualDeliveryDate),
+    ACTUAL_DELIVERY_DATE_WRITTEN: formatDateWritten(
+      projectDetails?.actualDeliveryDate
+    ),
 
     // ===================
     // PRICING (stored in cents, output as dollars)
     // Priority: pricingSummary > financials for dynamic pricing
     // ===================
-    DESIGN_FEE: pricingSummary 
-      ? pricingSummary.breakdown.totalDesignFee / 100 
+    DESIGN_FEE: pricingSummary
+      ? pricingSummary.breakdown.totalDesignFee / 100
       : centsToDollars(financials?.designFee),
-    DESIGN_FEE_WRITTEN: pricingSummary 
+    DESIGN_FEE_WRITTEN: pricingSummary
       ? formatCurrency(pricingSummary.breakdown.totalDesignFee / 100)
       : formatCentsAsCurrency(financials?.designFee),
     DESIGN_REVISION_ROUNDS: financials?.designRevisionRounds || 3,
-    DESIGN_REVISION_COST_OVERAGE: centsToDollars(financials?.designRevisionCostOverage),
-    DESIGN_REVISION_COST_OVERAGE_WRITTEN: formatCentsAsCurrency(financials?.designRevisionCostOverage),
-    
+    DESIGN_REVISION_COST_OVERAGE: centsToDollars(
+      financials?.designRevisionCostOverage
+    ),
+    DESIGN_REVISION_COST_OVERAGE_WRITTEN: formatCentsAsCurrency(
+      financials?.designRevisionCostOverage
+    ),
+
     PRELIM_OFFSITE: centsToDollars(financials?.prelimOffsite),
     PRELIM_OFFSITE_WRITTEN: formatCentsAsCurrency(financials?.prelimOffsite),
     PRELIM_ONSITE: centsToDollars(financials?.prelimOnsite),
     PRELIM_ONSITE_WRITTEN: formatCentsAsCurrency(financials?.prelimOnsite),
     PRELIM_CONTRACT_PRICE: centsToDollars(financials?.prelimContractPrice),
-    PRELIM_CONTRACT_PRICE_WRITTEN: formatCentsAsCurrency(financials?.prelimContractPrice),
-    
+    PRELIM_CONTRACT_PRICE_WRITTEN: formatCentsAsCurrency(
+      financials?.prelimContractPrice
+    ),
+
     HOME_BASE_PRICE: centsToDollars(financials?.homeBasePrice),
     HOME_BASE_PRICE_WRITTEN: formatCentsAsCurrency(financials?.homeBasePrice),
     HOME_CUSTOMIZATIONS: centsToDollars(financials?.homeCustomizations),
-    HOME_CUSTOMIZATIONS_WRITTEN: formatCentsAsCurrency(financials?.homeCustomizations),
+    HOME_CUSTOMIZATIONS_WRITTEN: formatCentsAsCurrency(
+      financials?.homeCustomizations
+    ),
     FINAL_OFFSITE: centsToDollars(financials?.finalOffsite),
     FINAL_OFFSITE_WRITTEN: formatCentsAsCurrency(financials?.finalOffsite),
     REFINED_ONSITE: centsToDollars(financials?.refinedOnsite),
     REFINED_ONSITE_WRITTEN: formatCentsAsCurrency(financials?.refinedOnsite),
     FINAL_CONTRACT_PRICE: centsToDollars(financials?.finalContractPrice),
-    FINAL_CONTRACT_PRICE_WRITTEN: formatCentsAsCurrency(financials?.finalContractPrice),
-    
+    FINAL_CONTRACT_PRICE_WRITTEN: formatCentsAsCurrency(
+      financials?.finalContractPrice
+    ),
+
     // Reimbursable Expenses
-    ADMIN_FEE_PERCENT: (financials as any)?.adminFeePercent ? `${(financials as any).adminFeePercent}` : "15",
-    
+    ADMIN_FEE_PERCENT: (financials as any)?.adminFeePercent
+      ? `${(financials as any).adminFeePercent}`
+      : "15",
+
     INFLATION_TRIGGER_DATE: financials?.inflationTriggerDate || "",
-    INFLATION_TRIGGER_DATE_WRITTEN: formatDateWritten(financials?.inflationTriggerDate),
-    INFLATION_ADJUSTMENT_PERCENT: financials?.inflationAdjustmentPercent ? `${financials.inflationAdjustmentPercent}%` : "5%",
-    MATERIAL_INCREASE_THRESHOLD: financials?.materialIncreaseThreshold ? `${financials.materialIncreaseThreshold}%` : "10%",
-    
+    INFLATION_TRIGGER_DATE_WRITTEN: formatDateWritten(
+      financials?.inflationTriggerDate
+    ),
+    INFLATION_ADJUSTMENT_PERCENT: financials?.inflationAdjustmentPercent
+      ? `${financials.inflationAdjustmentPercent}%`
+      : "5%",
+    MATERIAL_INCREASE_THRESHOLD: financials?.materialIncreaseThreshold
+      ? `${financials.materialIncreaseThreshold}%`
+      : "10%",
+
     // Price Lock
     PRICE_IS_LOCKED: financials?.isLocked || false,
-    PRICE_LOCKED_AT: financials?.lockedAt ? formatDate(financials.lockedAt) : "",
-    PRICE_LOCKED_AT_WRITTEN: financials?.lockedAt ? formatDateWritten(financials.lockedAt) : "",
+    PRICE_LOCKED_AT: financials?.lockedAt
+      ? formatDate(financials.lockedAt)
+      : "",
+    PRICE_LOCKED_AT_WRITTEN: financials?.lockedAt
+      ? formatDateWritten(financials.lockedAt)
+      : "",
     PRICE_LOCKED_BY: financials?.lockedBy || "",
-    
+
     // ===================
     // PRICING ENGINE TOTALS (computed from selected units)
     // ===================
     // Total Project Budget = Design + Offsite + Onsite (full cost of the project)
-    TOTAL_PROJECT_BUDGET: pricingSummary ? pricingSummary.projectBudget / 100 : centsToDollars(financials?.prelimContractPrice),
-    TOTAL_PROJECT_BUDGET_WRITTEN: pricingSummary 
+    TOTAL_PROJECT_BUDGET: pricingSummary
+      ? pricingSummary.projectBudget / 100
+      : centsToDollars(financials?.prelimContractPrice),
+    TOTAL_PROJECT_BUDGET_WRITTEN: pricingSummary
       ? formatCurrency(pricingSummary.projectBudget / 100)
       : formatCentsAsCurrency(financials?.prelimContractPrice),
-    
+
     // Total Contract Price = What Dvele charges the client
     // CRC: Design + Offsite (excludes onsite - client handles their own GC)
     // CMOS: Design + Offsite + Onsite (Dvele manages everything)
-    TOTAL_CONTRACT_PRICE: pricingSummary ? pricingSummary.contractValue / 100 : centsToDollars(financials?.prelimContractPrice),
-    TOTAL_CONTRACT_PRICE_WRITTEN: pricingSummary 
+    TOTAL_CONTRACT_PRICE: pricingSummary
+      ? pricingSummary.contractValue / 100
+      : centsToDollars(financials?.prelimContractPrice),
+    TOTAL_CONTRACT_PRICE_WRITTEN: pricingSummary
       ? formatCurrency(pricingSummary.contractValue / 100)
       : formatCentsAsCurrency(financials?.prelimContractPrice),
-    
+
     // Service model used for pricing
-    PRICING_SERVICE_MODEL: pricingSummary?.serviceModel || project.onSiteSelection || "CRC",
+    PRICING_SERVICE_MODEL:
+      pricingSummary?.serviceModel || project.onSiteSelection || "CRC",
 
     // Offsite Manufacturing Cost (from pricing engine or financials)
-    OFFSITE_MANUFACTURING_COST: pricingSummary 
-      ? pricingSummary.breakdown.totalOffsite / 100 
+    OFFSITE_MANUFACTURING_COST: pricingSummary
+      ? pricingSummary.breakdown.totalOffsite / 100
       : centsToDollars(financials?.prelimOffsite),
-    OFFSITE_MANUFACTURING_COST_WRITTEN: pricingSummary 
+    OFFSITE_MANUFACTURING_COST_WRITTEN: pricingSummary
       ? formatCurrency(pricingSummary.breakdown.totalOffsite / 100)
       : formatCentsAsCurrency(financials?.prelimOffsite),
 
     // Onsite Construction Cost (for CMOS - from pricing engine or financials)
-    ONSITE_CONSTRUCTION_COST: pricingSummary 
-      ? pricingSummary.breakdown.totalOnsite / 100 
+    ONSITE_CONSTRUCTION_COST: pricingSummary
+      ? pricingSummary.breakdown.totalOnsite / 100
       : centsToDollars(financials?.prelimOnsite),
-    ONSITE_CONSTRUCTION_COST_WRITTEN: pricingSummary 
+    ONSITE_CONSTRUCTION_COST_WRITTEN: pricingSummary
       ? formatCurrency(pricingSummary.breakdown.totalOnsite / 100)
       : formatCentsAsCurrency(financials?.prelimOnsite),
 
@@ -887,69 +993,78 @@ export function mapProjectToVariables(
     // MASTER_EF SPECIFIC VARIABLES
     // =========================
     // Buyer and project classification
-    BUYER_TYPE: project.buyerType === 'developer' ? 'Developer' : 'End Customer',
-    PROJECT_TYPE: (units?.length || 1) === 1 ? 'Single' : 'Multiple',
-    
+    BUYER_TYPE:
+      project.buyerType === "developer" ? "Developer" : "End Customer",
+    PROJECT_TYPE: (units?.length || 1) === 1 ? "Single" : "Multiple",
+
     // Pricing aliases for MASTER_EF naming convention
-    PRODUCTION_PRICE: pricingSummary 
+    PRODUCTION_PRICE: pricingSummary
       ? formatCurrency(pricingSummary.breakdown.totalOffsite / 100)
       : formatCentsAsCurrency(financials?.prelimOffsite),
     LOGISTICS_PRICE: formatCurrency(0), // Placeholder - logistics portion TBD
-    ONSITE_PRICE: pricingSummary 
+    ONSITE_PRICE: pricingSummary
       ? formatCurrency(pricingSummary.breakdown.totalOnsite / 100)
       : formatCentsAsCurrency(financials?.prelimOnsite),
-    TOTAL_PROJECT_PRICE: pricingSummary 
+    TOTAL_PROJECT_PRICE: pricingSummary
       ? formatCurrency(pricingSummary.contractValue / 100)
       : formatCentsAsCurrency(financials?.prelimContractPrice),
-    
+
     // Admin and storage fees
-    AD_FEE: project.adminFeePercent ? `${project.adminFeePercent}%` : 'none',
+    AD_FEE: project.adminFeePercent ? `${project.adminFeePercent}%` : "none",
     STORAGE_FEE_PER_DAY: formatCurrency((project.storageFeePerDay || 0) / 100),
     STORAGE_FREE_DAYS: String(project.storageFreedays || 14),
-    
+
     // Contact information
-    CLIENT_PRIMARY_CONTACT: client?.trusteeName || client?.legalName?.split(' ')[0] || '[Contact Name]',
-    COMPANY_CONTACT: 'Dvele Project Manager',
-    COMPANY_EMAIL: 'contracts@dvele.com',
-    
+    CLIENT_PRIMARY_CONTACT:
+      client?.trusteeName ||
+      client?.legalName?.split(" ")[0] ||
+      "[Contact Name]",
+    COMPANY_CONTACT: "Dvele Project Manager",
+    COMPANY_EMAIL: "contracts@dvele.com",
+
     // Cross-references: dynamically resolved from clause hierarchy during contract generation
     // (XREF_FEES_PAYMENT_SECTION, XREF_BANKABILITY_SUBSECTIONS, XREF_ASSIGNMENT_SECTION)
     // Fallback values used only if dynamic resolution fails
-    XREF_FEES_PAYMENT_SECTION: '[Section Ref]',
-    XREF_BANKABILITY_SUBSECTIONS: '[Section Ref]',
-    XREF_ASSIGNMENT_SECTION: '[Section Ref]',
+    XREF_FEES_PAYMENT_SECTION: "[Section Ref]",
+    XREF_BANKABILITY_SUBSECTIONS: "[Section Ref]",
+    XREF_ASSIGNMENT_SECTION: "[Section Ref]",
 
     // ===================
     // DYNAMIC HTML TABLES
     // ===================
     // Debug logging for payment schedule
-    ...((() => {
-      console.log('📊 Mapping Payment Schedule:', {
+    ...(() => {
+      console.log("📊 Mapping Payment Schedule:", {
         hasPricingSummary: !!pricingSummary,
         paymentScheduleLength: pricingSummary?.paymentSchedule?.length || 0,
-        paymentSchedule: pricingSummary?.paymentSchedule || null
+        paymentSchedule: pricingSummary?.paymentSchedule || null,
       });
       return {};
-    })()),
-    PRICING_BREAKDOWN_TABLE: generatePricingTableHtml(pricingSummary || null, contractType),
+    })(),
+    PRICING_BREAKDOWN_TABLE: generatePricingTableHtml(
+      pricingSummary || null,
+      contractType
+    ),
     PAYMENT_SCHEDULE_TABLE: generatePaymentScheduleHtml(
-      pricingSummary?.paymentSchedule || null, 
+      pricingSummary?.paymentSchedule || null,
       contractType,
       // Pass filtered contract total for accurate milestone amounts
-      contractType === 'MANUFACTURING' 
-        ? (pricingSummary?.breakdown.totalDesignFee || 0) + (pricingSummary?.breakdown.totalOffsite || 0)
-        : contractType === 'ONSITE'
-          ? (pricingSummary?.breakdown.totalOnsite || 0)
+      contractType === "MANUFACTURING"
+        ? (pricingSummary?.breakdown.totalDesignFee || 0) +
+            (pricingSummary?.breakdown.totalOffsite || 0)
+        : contractType === "ONSITE"
+          ? pricingSummary?.breakdown.totalOnsite || 0
           : undefined
     ),
     UNIT_DETAILS_TABLE: generateUnitDetailsHtml(
-      units?.map(u => ({
+      units?.map((u) => ({
         unitLabel: u.unitLabel || `Unit ${u.id}`,
-        modelName: u.homeModel?.modelName || 'Unknown Model',
+        modelName: u.homeModel?.modelName || "Unknown Model",
         bedrooms: u.homeModel?.bedrooms,
         bathrooms: u.homeModel?.bathrooms,
         squareFootage: u.homeModel?.squareFootage,
-        estimatedPrice: (u.basePriceSnapshot || 0) + (u.onsiteEstimateSnapshot || 0),
+        estimatedPrice:
+          (u.basePriceSnapshot || 0) + (u.onsiteEstimateSnapshot || 0),
         quantity: u.quantity || 1,
       })) || null
     ),
@@ -959,15 +1074,17 @@ export function mapProjectToVariables(
           const raw = projectDetails?.responsibilityMatrix;
           if (!raw) return null;
           return JSON.parse(raw) as ResponsibilityMatrixItem[];
-        } catch { return null; }
+        } catch {
+          return null;
+        }
       })(),
-      pricingSummary?.serviceModel || project.onSiteSelection || 'CRC'
+      pricingSummary?.serviceModel || project.onSiteSelection || "CRC"
     ),
     MILESTONE_SCHEDULE_TABLE: "",
-    
+
     EXHIBIT_A2_TABLE: generateExhibitA2TableHtml(
-      units?.map(u => ({
-        modelName: u.homeModel?.modelName || 'Unknown Model',
+      units?.map((u) => ({
+        modelName: u.homeModel?.modelName || "Unknown Model",
         quantity: u.quantity || 1,
       })) || null,
       buildFullAddress(
@@ -979,17 +1096,17 @@ export function mapProjectToVariables(
     ),
     EXHIBIT_A4_TABLE: generateExhibitA4TableHtml(
       pricingSummary || null,
-      pricingSummary?.serviceModel || project.onSiteSelection || 'CRC'
+      pricingSummary?.serviceModel || project.onSiteSelection || "CRC"
     ),
     EXHIBIT_A5_TABLE: generateExhibitA5TableHtml(
       pricingSummary?.paymentSchedule || null,
       pricingSummary || null,
-      pricingSummary?.serviceModel || project.onSiteSelection || 'CRC'
+      pricingSummary?.serviceModel || project.onSiteSelection || "CRC"
     ),
     EXHIBIT_B1_TABLE: generateExhibitB1TableHtml(
-      units?.map(u => ({
+      units?.map((u) => ({
         unitLabel: u.unitLabel || `Unit ${u.id}`,
-        modelName: u.homeModel?.modelName || 'Unknown Model',
+        modelName: u.homeModel?.modelName || "Unknown Model",
         bedrooms: u.homeModel?.bedrooms,
         bathrooms: u.homeModel?.bathrooms,
         squareFootage: u.homeModel?.squareFootage,
@@ -997,22 +1114,24 @@ export function mapProjectToVariables(
         quantity: u.quantity || 1,
       })) || null
     ),
-    
-    WHAT_HAPPENS_NEXT_TABLE: '{{TABLE_WHAT_HAPPENS_NEXT}}',
+
+    WHAT_HAPPENS_NEXT_TABLE: "{{TABLE_WHAT_HAPPENS_NEXT}}",
 
     SIGNATURE_BLOCK_TABLE: buildMapperSignatureBlock(
       childLlc?.legalName || "Dvele, Inc.",
       client
-        ? (client.legalName || `${client.firstName || ''} ${client.lastName || ''}`.trim())
-        : '',
-      client?.entityType || ''
+        ? client.legalName ||
+            `${client.firstName || ""} ${client.lastName || ""}`.trim()
+        : "",
+      client?.entityType || ""
     ),
 
     EXHIBIT_A_SIGNATURE_TABLE: buildExhibitASignatureBlock(
       childLlc?.legalName || "Dvele, Inc.",
       client
-        ? (client.legalName || `${client.firstName || ''} ${client.lastName || ''}`.trim())
-        : '[CLIENT NAME]'
+        ? client.legalName ||
+            `${client.firstName || ""} ${client.lastName || ""}`.trim()
+        : "[CLIENT NAME]"
     ),
 
     // ===================
@@ -1026,36 +1145,50 @@ export function mapProjectToVariables(
     // WARRANTY (stored in months, provide both months and years)
     // ===================
     DVELE_FIT_FINISH_MONTHS: warrantyTerms?.dveleFitFinishMonths || 12,
-    DVELE_FIT_FINISH_YEARS: monthsToYears(warrantyTerms?.dveleFitFinishMonths) || 1,
+    DVELE_FIT_FINISH_YEARS:
+      monthsToYears(warrantyTerms?.dveleFitFinishMonths) || 1,
     DVELE_STRUCTURAL_MONTHS: warrantyTerms?.dveleStructuralMonths || 120,
-    DVELE_STRUCTURAL_YEARS: monthsToYears(warrantyTerms?.dveleStructuralMonths) || 10,
+    DVELE_STRUCTURAL_YEARS:
+      monthsToYears(warrantyTerms?.dveleStructuralMonths) || 10,
     DVELE_SYSTEMS_MONTHS: warrantyTerms?.dveleSystemsMonths || 24,
     DVELE_SYSTEMS_YEARS: monthsToYears(warrantyTerms?.dveleSystemsMonths) || 2,
-    DVELE_BUILDING_ENVELOPE_MONTHS: warrantyTerms?.dveleBuildingEnvelopeMonths || 60,
-    DVELE_BUILDING_ENVELOPE_YEARS: monthsToYears(warrantyTerms?.dveleBuildingEnvelopeMonths) || 5,
-    
+    DVELE_BUILDING_ENVELOPE_MONTHS:
+      warrantyTerms?.dveleBuildingEnvelopeMonths || 60,
+    DVELE_BUILDING_ENVELOPE_YEARS:
+      monthsToYears(warrantyTerms?.dveleBuildingEnvelopeMonths) || 5,
+
     ONSITE_FIT_FINISH_MONTHS: warrantyTerms?.onsiteFitFinishMonths || 12,
-    ONSITE_FIT_FINISH_YEARS: monthsToYears(warrantyTerms?.onsiteFitFinishMonths) || 1,
+    ONSITE_FIT_FINISH_YEARS:
+      monthsToYears(warrantyTerms?.onsiteFitFinishMonths) || 1,
     ONSITE_STRUCTURAL_MONTHS: warrantyTerms?.onsiteStructuralMonths || 120,
-    ONSITE_STRUCTURAL_YEARS: monthsToYears(warrantyTerms?.onsiteStructuralMonths) || 10,
+    ONSITE_STRUCTURAL_YEARS:
+      monthsToYears(warrantyTerms?.onsiteStructuralMonths) || 10,
     ONSITE_SYSTEMS_MONTHS: warrantyTerms?.onsiteSystemsMonths || 24,
-    ONSITE_SYSTEMS_YEARS: monthsToYears(warrantyTerms?.onsiteSystemsMonths) || 2,
-    
+    ONSITE_SYSTEMS_YEARS:
+      monthsToYears(warrantyTerms?.onsiteSystemsMonths) || 2,
+
     CLIENT_FIT_FINISH_MONTHS: warrantyTerms?.clientFitFinishMonths || 12,
-    CLIENT_FIT_FINISH_YEARS: monthsToYears(warrantyTerms?.clientFitFinishMonths) || 1,
+    CLIENT_FIT_FINISH_YEARS:
+      monthsToYears(warrantyTerms?.clientFitFinishMonths) || 1,
     CLIENT_STRUCTURAL_MONTHS: warrantyTerms?.clientStructuralMonths || 120,
-    CLIENT_STRUCTURAL_YEARS: monthsToYears(warrantyTerms?.clientStructuralMonths) || 10,
-    CLIENT_BUILDING_ENVELOPE_MONTHS: warrantyTerms?.clientBuildingEnvelopeMonths || 60,
-    CLIENT_BUILDING_ENVELOPE_YEARS: monthsToYears(warrantyTerms?.clientBuildingEnvelopeMonths) || 5,
-    
+    CLIENT_STRUCTURAL_YEARS:
+      monthsToYears(warrantyTerms?.clientStructuralMonths) || 10,
+    CLIENT_BUILDING_ENVELOPE_MONTHS:
+      warrantyTerms?.clientBuildingEnvelopeMonths || 60,
+    CLIENT_BUILDING_ENVELOPE_YEARS:
+      monthsToYears(warrantyTerms?.clientBuildingEnvelopeMonths) || 5,
+
     WARRANTY_START_DATE: warrantyTerms?.warrantyStartDate || "",
-    WARRANTY_START_DATE_WRITTEN: formatDateWritten(warrantyTerms?.warrantyStartDate),
+    WARRANTY_START_DATE_WRITTEN: formatDateWritten(
+      warrantyTerms?.warrantyStartDate
+    ),
     CUSTOM_WARRANTY_TERMS: warrantyTerms?.customWarrantyTerms || "",
 
     // ===================
     // MANUFACTURER
     // ===================
-    MANUFACTURER_LEGAL_NAME: manufacturer?.legalName || "Dvele Manufacturing, LLC",
+    MANUFACTURER_LEGAL_NAME:
+      manufacturer?.legalName || "Dvele Manufacturing, LLC",
     MANUFACTURER_STATE: manufacturer?.state || "California",
     MANUFACTURER_ENTITY_TYPE: manufacturer?.entityType || "LLC",
     MANUFACTURER_ADDRESS: manufacturer?.address || "",
@@ -1072,7 +1205,9 @@ export function mapProjectToVariables(
     MANUFACTURER_CONTACT_EMAIL: manufacturer?.contactEmail || "",
     MANUFACTURER_CONTACT_PHONE: manufacturer?.contactPhone || "",
     MANUFACTURER_BOND_AMOUNT: formatCentsAsCurrency(manufacturer?.bondAmount),
-    MANUFACTURER_INSURANCE_AMOUNT: formatCentsAsCurrency(manufacturer?.insuranceAmount),
+    MANUFACTURER_INSURANCE_AMOUNT: formatCentsAsCurrency(
+      manufacturer?.insuranceAmount
+    ),
     MANUFACTURER_INSURANCE_EXPIRATION: manufacturer?.insuranceExpiration || "",
 
     // ===================
@@ -1090,34 +1225,57 @@ export function mapProjectToVariables(
     ),
     ONSITE_CONTRACTOR_LICENSE_NUMBER: onsiteContractor?.licenseNumber || "",
     ONSITE_CONTRACTOR_LICENSE_STATE: onsiteContractor?.licenseState || "",
-    ONSITE_CONTRACTOR_LICENSE_EXPIRATION: onsiteContractor?.licenseExpiration || "",
+    ONSITE_CONTRACTOR_LICENSE_EXPIRATION:
+      onsiteContractor?.licenseExpiration || "",
     ONSITE_CONTRACTOR_CONTACT_NAME: onsiteContractor?.contactName || "",
     ONSITE_CONTRACTOR_CONTACT_EMAIL: onsiteContractor?.contactEmail || "",
     ONSITE_CONTRACTOR_CONTACT_PHONE: onsiteContractor?.contactPhone || "",
-    ONSITE_CONTRACTOR_BOND_AMOUNT: formatCentsAsCurrency(onsiteContractor?.bondAmount),
-    ONSITE_CONTRACTOR_INSURANCE_AMOUNT: formatCentsAsCurrency(onsiteContractor?.insuranceAmount),
-    ONSITE_CONTRACTOR_INSURANCE_EXPIRATION: onsiteContractor?.insuranceExpiration || "",
-    ONSITE_CONTRACTOR_INSURANCE_CARRIER: onsiteContractor?.insuranceCarrier || "",
+    ONSITE_CONTRACTOR_BOND_AMOUNT: formatCentsAsCurrency(
+      onsiteContractor?.bondAmount
+    ),
+    ONSITE_CONTRACTOR_INSURANCE_AMOUNT: formatCentsAsCurrency(
+      onsiteContractor?.insuranceAmount
+    ),
+    ONSITE_CONTRACTOR_INSURANCE_EXPIRATION:
+      onsiteContractor?.insuranceExpiration || "",
+    ONSITE_CONTRACTOR_INSURANCE_CARRIER:
+      onsiteContractor?.insuranceCarrier || "",
 
     // ===================
     // LIQUIDATED DAMAGES
     // ===================
-    LIQUIDATED_DAMAGES_PER_DAY: centsToDollars(financials?.liquidatedDamagesPerDay),
-    LIQUIDATED_DAMAGES_PER_DAY_WRITTEN: formatCentsAsCurrency(financials?.liquidatedDamagesPerDay),
+    LIQUIDATED_DAMAGES_PER_DAY: centsToDollars(
+      financials?.liquidatedDamagesPerDay
+    ),
+    LIQUIDATED_DAMAGES_PER_DAY_WRITTEN: formatCentsAsCurrency(
+      financials?.liquidatedDamagesPerDay
+    ),
     LIQUIDATED_DAMAGES_CAP: centsToDollars(financials?.liquidatedDamagesCap),
-    LIQUIDATED_DAMAGES_CAP_WRITTEN: formatCentsAsCurrency(financials?.liquidatedDamagesCap),
-    ONSITE_LIQUIDATED_DAMAGES_PER_DAY: centsToDollars(financials?.onsiteLiquidatedDamagesPerDay),
-    ONSITE_LIQUIDATED_DAMAGES_PER_DAY_WRITTEN: formatCentsAsCurrency(financials?.onsiteLiquidatedDamagesPerDay),
-    ONSITE_LIQUIDATED_DAMAGES_CAP: centsToDollars(financials?.onsiteLiquidatedDamagesCap),
-    ONSITE_LIQUIDATED_DAMAGES_CAP_WRITTEN: formatCentsAsCurrency(financials?.onsiteLiquidatedDamagesCap),
+    LIQUIDATED_DAMAGES_CAP_WRITTEN: formatCentsAsCurrency(
+      financials?.liquidatedDamagesCap
+    ),
+    ONSITE_LIQUIDATED_DAMAGES_PER_DAY: centsToDollars(
+      financials?.onsiteLiquidatedDamagesPerDay
+    ),
+    ONSITE_LIQUIDATED_DAMAGES_PER_DAY_WRITTEN: formatCentsAsCurrency(
+      financials?.onsiteLiquidatedDamagesPerDay
+    ),
+    ONSITE_LIQUIDATED_DAMAGES_CAP: centsToDollars(
+      financials?.onsiteLiquidatedDamagesCap
+    ),
+    ONSITE_LIQUIDATED_DAMAGES_CAP_WRITTEN: formatCentsAsCurrency(
+      financials?.onsiteLiquidatedDamagesCap
+    ),
 
     // ===================
     // LEGAL
     // ===================
-    GOVERNING_LAW_STATE: projectDetails?.governingLawState || project.state || "California",
+    GOVERNING_LAW_STATE:
+      projectDetails?.governingLawState || project.state || "California",
     ARBITRATION_LOCATION: projectDetails?.arbitrationLocation || "",
     ARBITRATION_PROVIDER: "JAMS",
-    STATE_OF_FORMATION: projectDetails?.governingLawState || project.state || "California",
+    STATE_OF_FORMATION:
+      projectDetails?.governingLawState || project.state || "California",
     COUNTY: projectDetails?.deliveryCounty || "",
     CANCELLATION_FEE_PERCENT: "15",
 
@@ -1147,13 +1305,14 @@ export function mapProjectToVariables(
         return formatDate(new Date(project.estimatedDeliveryDate));
       }
       // Calculate: start date + cumulative durations through delivery
-      const startDate = projectDetails?.agreementExecutionDate 
-        ? new Date(projectDetails.agreementExecutionDate) 
+      const startDate = projectDetails?.agreementExecutionDate
+        ? new Date(projectDetails.agreementExecutionDate)
         : new Date();
-      const totalDays = (project.designDuration || 0) + 
-                        (project.permittingDuration || 0) + 
-                        (project.productionDuration || 0) + 
-                        (project.deliveryDuration || 0);
+      const totalDays =
+        (project.designDuration || 0) +
+        (project.permittingDuration || 0) +
+        (project.productionDuration || 0) +
+        (project.deliveryDuration || 0);
       if (totalDays === 0) return "";
       const deliveryDate = new Date(startDate);
       deliveryDate.setDate(deliveryDate.getDate() + totalDays);
@@ -1164,35 +1323,37 @@ export function mapProjectToVariables(
         return formatDate(new Date(project.estimatedCompletionDate));
       }
       // Calculate: start date + all durations (through completion)
-      const startDate = projectDetails?.agreementExecutionDate 
-        ? new Date(projectDetails.agreementExecutionDate) 
+      const startDate = projectDetails?.agreementExecutionDate
+        ? new Date(projectDetails.agreementExecutionDate)
         : new Date();
-      const totalDays = (project.designDuration || 0) + 
-                        (project.permittingDuration || 0) + 
-                        (project.productionDuration || 0) + 
-                        (project.deliveryDuration || 0) + 
-                        (project.completionDuration || 0);
+      const totalDays =
+        (project.designDuration || 0) +
+        (project.permittingDuration || 0) +
+        (project.productionDuration || 0) +
+        (project.deliveryDuration || 0) +
+        (project.completionDuration || 0);
       if (totalDays === 0) return "";
       const completionDate = new Date(startDate);
       completionDate.setDate(completionDate.getDate() + totalDays);
       return formatDate(completionDate);
     })(),
-    PROJECT_START_DATE: projectDetails?.agreementExecutionDate 
-      ? formatDate(new Date(projectDetails.agreementExecutionDate)) 
+    PROJECT_START_DATE: projectDetails?.agreementExecutionDate
+      ? formatDate(new Date(projectDetails.agreementExecutionDate))
       : formatDate(new Date()),
     PROJECT_END_DATE: (() => {
       if (project.estimatedCompletionDate) {
         return formatDate(new Date(project.estimatedCompletionDate));
       }
       // Same as COMPLETION_DATE
-      const startDate = projectDetails?.agreementExecutionDate 
-        ? new Date(projectDetails.agreementExecutionDate) 
+      const startDate = projectDetails?.agreementExecutionDate
+        ? new Date(projectDetails.agreementExecutionDate)
         : new Date();
-      const totalDays = (project.designDuration || 0) + 
-                        (project.permittingDuration || 0) + 
-                        (project.productionDuration || 0) + 
-                        (project.deliveryDuration || 0) + 
-                        (project.completionDuration || 0);
+      const totalDays =
+        (project.designDuration || 0) +
+        (project.permittingDuration || 0) +
+        (project.productionDuration || 0) +
+        (project.deliveryDuration || 0) +
+        (project.completionDuration || 0);
       if (totalDays === 0) return "";
       const endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + totalDays);
@@ -1213,10 +1374,16 @@ export function mapProjectToVariables(
     // ===================
     DESIGN_KICKOFF_DATE: formatDateOrTBD(projectDetails?.designKickoffDate),
     SCHEMATIC_DESIGN_DATE: formatDateOrTBD(projectDetails?.schematicDesignDate),
-    DESIGN_DEVELOPMENT_DATE: formatDateOrTBD(projectDetails?.designDevelopmentDate),
+    DESIGN_DEVELOPMENT_DATE: formatDateOrTBD(
+      projectDetails?.designDevelopmentDate
+    ),
     PERMIT_SUBMITTAL_DATE: formatDateOrTBD(projectDetails?.permitSubmittalDate),
-    PRODUCTION_MIDPOINT_DATE: formatDateOrTBD(projectDetails?.productionMidpointDate),
-    PRODUCTION_COMPLETE_DATE: formatDateOrTBD(projectDetails?.productionCompleteDate),
+    PRODUCTION_MIDPOINT_DATE: formatDateOrTBD(
+      projectDetails?.productionMidpointDate
+    ),
+    PRODUCTION_COMPLETE_DATE: formatDateOrTBD(
+      projectDetails?.productionCompleteDate
+    ),
 
     // ===================
     // CONDITIONAL FLAGS (for template logic)
@@ -1233,19 +1400,21 @@ export function mapProjectToVariables(
     // CLAUSE VARIABLE ALIASES
     // These match the exact variable names used in clauses
     // ===================
-    ON_SITE_SERVICES_SELECTION: project.onSiteSelection === "CRC" 
-      ? "Client-Retained Contractor" 
-      : project.onSiteSelection === "CMOS" 
-        ? "Company-Managed On-Site Services" 
-        : project.onSiteSelection || "CRC",
-    
+    ON_SITE_SERVICES_SELECTION:
+      project.onSiteSelection === "CRC"
+        ? "Client-Retained Contractor"
+        : project.onSiteSelection === "CMOS"
+          ? "Company-Managed On-Site Services"
+          : project.onSiteSelection || "CRC",
+
     // Alias for DOCX variable naming
-    VAR_ON_SITE_SELECTION_NAME: project.onSiteSelection === "CRC" 
-      ? "Client-Retained Contractor" 
-      : project.onSiteSelection === "CMOS" 
-        ? "Company-Managed On-Site Services" 
-        : "Not Selected",
-    
+    VAR_ON_SITE_SELECTION_NAME:
+      project.onSiteSelection === "CRC"
+        ? "Client-Retained Contractor"
+        : project.onSiteSelection === "CMOS"
+          ? "Company-Managed On-Site Services"
+          : "Not Selected",
+
     // TODO: Add on-site line-item breakdown fields to financials table
     // These variables appear in CMOS Exhibit A Phase 2 on-site pricing section
     SHIPPING_PRELIMINARY_PRICE: "",
@@ -1253,47 +1422,68 @@ export function mapProjectToVariables(
     SITE_PREP_PRELIMINARY_PRICE: "",
     UTILITIES_PRELIMINARY_PRICE: "",
     COMPLETION_PRELIMINARY_PRICE: "",
-    
+
     // Pricing aliases to match clause variable names
-    PRELIMINARY_CONTRACT_PRICE: formatCentsAsCurrency(financials?.prelimContractPrice),
+    PRELIMINARY_CONTRACT_PRICE: formatCentsAsCurrency(
+      financials?.prelimContractPrice
+    ),
     PRELIMINARY_OFFSITE_PRICE: formatCentsAsCurrency(financials?.prelimOffsite),
     PRELIMINARY_ONSITE_PRICE: formatCentsAsCurrency(financials?.prelimOnsite),
-    PRELIMINARY_TOTAL_PRICE: formatCentsAsCurrency(financials?.prelimContractPrice),
-    
+    PRELIMINARY_TOTAL_PRICE: formatCentsAsCurrency(
+      financials?.prelimContractPrice
+    ),
+
     // Child LLC aliases (clauses use DVELE_PARTNERS_XYZ format)
-    DVELE_PARTNERS_XYZ: childLlc?.legalName?.replace(/ LLC$/, '').replace(/, LLC$/, '') || "Dvele Partners",
+    DVELE_PARTNERS_XYZ:
+      childLlc?.legalName?.replace(/ LLC$/, "").replace(/, LLC$/, "") ||
+      "Dvele Partners",
     DVELE_PARTNERS_XYZ_LEGAL_NAME: childLlc?.legalName || "",
     DVELE_PARTNERS_XYZ_STATE: childLlc?.formationState || "Delaware",
     DVELE_PARTNERS_XYZ_ENTITY_TYPE: "limited liability company",
     DP_X: childLlc?.legalName || "",
     DP_X_STATE: childLlc?.formationState || "Delaware",
-    
+
     // Contract price alias
-    CONTRACT_PRICE: formatCentsAsCurrency(financials?.prelimContractPrice || financials?.finalContractPrice),
-    
+    CONTRACT_PRICE: formatCentsAsCurrency(
+      financials?.prelimContractPrice || financials?.finalContractPrice
+    ),
+
     // Effective date alias
     EFFECTIVE_DATE: projectDetails?.agreementExecutionDate || "",
-    
+
     // Client signer info - use existing fields
     CLIENT_FULL_NAME: client?.legalName || "",
     CLIENT_TITLE: client?.trusteeTitle || "",
-    
+
     // Milestone percent aliases - get from milestones array
-    MILESTONE_1_PERCENT: milestones.find(m => m.milestoneNumber === 1)?.percentage?.toString() || "20",
-    MILESTONE_2_PERCENT: milestones.find(m => m.milestoneNumber === 2)?.percentage?.toString() || "20",
-    MILESTONE_3_PERCENT: milestones.find(m => m.milestoneNumber === 3)?.percentage?.toString() || "20",
-    MILESTONE_4_PERCENT: milestones.find(m => m.milestoneNumber === 4)?.percentage?.toString() || "20",
-    MILESTONE_5_PERCENT: milestones.find(m => m.milestoneNumber === 5)?.percentage?.toString() || "15",
+    MILESTONE_1_PERCENT:
+      milestones.find((m) => m.milestoneNumber === 1)?.percentage?.toString() ||
+      "20",
+    MILESTONE_2_PERCENT:
+      milestones.find((m) => m.milestoneNumber === 2)?.percentage?.toString() ||
+      "20",
+    MILESTONE_3_PERCENT:
+      milestones.find((m) => m.milestoneNumber === 3)?.percentage?.toString() ||
+      "20",
+    MILESTONE_4_PERCENT:
+      milestones.find((m) => m.milestoneNumber === 4)?.percentage?.toString() ||
+      "20",
+    MILESTONE_5_PERCENT:
+      milestones.find((m) => m.milestoneNumber === 5)?.percentage?.toString() ||
+      "15",
     RETAINAGE_PERCENT: "5",
     RETAINAGE_DAYS: "60",
-    
+
     // Home model alias
     HOME_MODEL_1: projectDetails?.homeModel || "",
-    
+
     // Warranty aliases to match clause naming (use correct property names)
-    DVELE_FIT_FINISH_WARRANTY: warrantyTerms?.dveleFitFinishMonths?.toString() || "24",
-    DVELE_ENVELOPE_WARRANTY: warrantyTerms?.dveleBuildingEnvelopeMonths?.toString() || "60",
-    DVELE_STRUCTURAL_WARRANTY: warrantyTerms?.dveleStructuralMonths?.toString() || "120",
+    DVELE_FIT_FINISH_WARRANTY:
+      warrantyTerms?.dveleFitFinishMonths?.toString() || "24",
+    DVELE_ENVELOPE_WARRANTY:
+      warrantyTerms?.dveleBuildingEnvelopeMonths?.toString() || "60",
+    DVELE_STRUCTURAL_WARRANTY:
+      warrantyTerms?.dveleStructuralMonths?.toString() || "120",
   };
 
   return variables;
@@ -1330,33 +1520,33 @@ export function validateVariablesForContract(
 
   // Contract-type specific requirements
   if (contractType === "one_agreement") {
-    const oneAgreementRequired = [
-      "CLIENT_FULL_ADDRESS",
-      "ON_SITE_SELECTION",
-    ];
+    const oneAgreementRequired = ["CLIENT_FULL_ADDRESS", "ON_SITE_SELECTION"];
     for (const varName of oneAgreementRequired) {
       if (!variables[varName]) {
         missing.push(varName);
       }
     }
-    
+
     // Check if we have pricing
     if (!variables.FINAL_CONTRACT_PRICE && !variables.PRELIM_CONTRACT_PRICE) {
       warnings.push("No contract price set (neither final nor preliminary)");
     }
-    
+
     // Check for child LLC if needed
     if (!variables.HAS_CHILD_LLC) {
-      warnings.push("No Child LLC configured - contract will use client directly");
+      warnings.push(
+        "No Child LLC configured - contract will use client directly"
+      );
     }
   }
 
   if (contractType === "manufacturing_sub") {
-    if (!variables.MANUFACTURER_LEGAL_NAME) missing.push("MANUFACTURER_LEGAL_NAME");
+    if (!variables.MANUFACTURER_LEGAL_NAME)
+      missing.push("MANUFACTURER_LEGAL_NAME");
     if (!variables.FINAL_OFFSITE && !variables.PRELIM_OFFSITE) {
       warnings.push("No off-site price set");
     }
-    
+
     // Check for manufacturing milestones
     if (!variables.MFG_MILESTONE_1_NAME) {
       warnings.push("No manufacturing milestones configured");
@@ -1365,14 +1555,17 @@ export function validateVariablesForContract(
 
   if (contractType === "onsite_sub") {
     if (variables.IS_CMOS) {
-      if (!variables.ONSITE_CONTRACTOR_LEGAL_NAME) missing.push("ONSITE_CONTRACTOR_LEGAL_NAME");
-      if (!variables.ONSITE_CONTRACTOR_LICENSE_NUMBER) warnings.push("ONSITE_CONTRACTOR_LICENSE_NUMBER not set");
-      if (!variables.ONSITE_CONTRACTOR_BOND_AMOUNT) warnings.push("ONSITE_CONTRACTOR_BOND_AMOUNT not set");
+      if (!variables.ONSITE_CONTRACTOR_LEGAL_NAME)
+        missing.push("ONSITE_CONTRACTOR_LEGAL_NAME");
+      if (!variables.ONSITE_CONTRACTOR_LICENSE_NUMBER)
+        warnings.push("ONSITE_CONTRACTOR_LICENSE_NUMBER not set");
+      if (!variables.ONSITE_CONTRACTOR_BOND_AMOUNT)
+        warnings.push("ONSITE_CONTRACTOR_BOND_AMOUNT not set");
     } else {
       // CRC mode - no onsite sub needed
       warnings.push("Project is CRC - on-site subcontract may not be needed");
     }
-    
+
     // Check for onsite milestones
     if (!variables.ONSITE_MILESTONE_1_NAME) {
       warnings.push("No on-site milestones configured");
@@ -1405,7 +1598,7 @@ export function extractTemplateVariables(templateContent: string): string[] {
  * Returns variables in template that aren't in our mapper.
  */
 export function findUnmappedVariables(templateVariables: string[]): string[] {
-  return templateVariables.filter(v => !ALL_VARIABLES.includes(v));
+  return templateVariables.filter((v) => !ALL_VARIABLES.includes(v));
 }
 
 /**
@@ -1423,6 +1616,9 @@ export function getVariableCoverage(templateVariables: string[]): {
     total: templateVariables.length,
     mapped,
     unmapped,
-    coverage: templateVariables.length > 0 ? Math.round((mapped / templateVariables.length) * 100) : 100,
+    coverage:
+      templateVariables.length > 0
+        ? Math.round((mapped / templateVariables.length) * 100)
+        : 100,
   };
 }
