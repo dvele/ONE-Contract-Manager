@@ -2970,4 +2970,58 @@ router.post("/resolve-clause-tables", async (req, res) => {
   }
 });
 
+// Scrap a draft — deletes draft contracts for a project.
+// If the project itself is in Draft status (no generated contracts), also deletes the project and its data.
+router.delete("/projects/:projectId/draft", async (req, res) => {
+  const { projectId } = req.params;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    // Delete contract_clauses for draft contracts belonging to this project
+    await client.query(
+      `DELETE FROM contract_clauses
+       WHERE contract_id IN (
+         SELECT id FROM contracts WHERE project_id = $1 AND status = 'Draft'
+       )`,
+      [projectId]
+    );
+
+    // Delete the draft contracts
+    const deleteResult = await client.query(
+      `DELETE FROM contracts WHERE project_id = $1 AND status = 'Draft'`,
+      [projectId]
+    );
+
+    // Check if the project itself is a draft (was never fully generated)
+    const projectResult = await client.query(
+      `SELECT status FROM projects WHERE id = $1`,
+      [projectId]
+    );
+
+    let projectDeleted = false;
+    if (projectResult.rows[0]?.status === "Draft") {
+      // Delete all child records before deleting the project
+      await client.query(`DELETE FROM project_units WHERE project_id = $1`, [projectId]);
+      await client.query(`DELETE FROM clients WHERE project_id = $1`, [projectId]);
+      await client.query(`DELETE FROM project_details WHERE project_id = $1`, [projectId]);
+      await client.query(`DELETE FROM financials WHERE project_id = $1`, [projectId]);
+      await client.query(`DELETE FROM milestones WHERE project_id = $1`, [projectId]);
+      await client.query(`DELETE FROM warranty_terms WHERE project_id = $1`, [projectId]);
+      await client.query(`DELETE FROM contractors WHERE project_id = $1`, [projectId]);
+      await client.query(`DELETE FROM projects WHERE id = $1`, [projectId]);
+      projectDeleted = true;
+    }
+
+    await client.query("COMMIT");
+    res.json({ success: true, contractsDeleted: deleteResult.rowCount, projectDeleted });
+  } catch (error: any) {
+    await client.query("ROLLBACK");
+    console.error("Failed to scrap draft:", error);
+    res.status(500).json({ error: "Failed to scrap draft" });
+  } finally {
+    client.release();
+  }
+});
+
 export default router;

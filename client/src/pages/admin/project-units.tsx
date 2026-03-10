@@ -11,17 +11,19 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Eye } from "lucide-react";
+import { ExternalLink } from "lucide-react";
+import { Link } from "wouter";
 
 interface ProjectUnit {
   id: number;
-  project_id: number;
-  model_id: number;
-  unit_label: string;
-  base_price_snapshot?: number;
-  customization_total?: number;
-  model_name?: string;
-  model_code?: string;
+  projectId: number;
+  modelId: number;
+  unitLabel: string;
+  basePriceSnapshot?: number;
+  customizationTotal?: number;
+  modelName?: string;
+  modelCode?: string;
+  projectName?: string;
 }
 
 function formatCurrency(cents: number | undefined): string {
@@ -64,6 +66,7 @@ export default function AdminProjectUnits() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Project</TableHead>
                   <TableHead>Unit Label</TableHead>
                   <TableHead>Model</TableHead>
                   <TableHead>Code</TableHead>
@@ -75,24 +78,32 @@ export default function AdminProjectUnits() {
               <TableBody>
                 {projectUnits?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                       No project units found. Units are created during contract generation.
                     </TableCell>
                   </TableRow>
                 ) : (
                   projectUnits?.map((unit) => (
                     <TableRow key={unit.id} data-testid={`row-unit-${unit.id}`}>
-                      <TableCell className="font-medium">{unit.unit_label}</TableCell>
-                      <TableCell>{unit.model_name || "-"}</TableCell>
-                      <TableCell className="text-muted-foreground">{unit.model_code || "-"}</TableCell>
+                      <TableCell>
+                        {unit.projectName ? (
+                          <Link href={`/generate-contracts?projectId=${unit.projectId}`} className="flex items-center gap-1 text-primary hover:underline">
+                            {unit.projectName}
+                            <ExternalLink className="h-3 w-3" />
+                          </Link>
+                        ) : "-"}
+                      </TableCell>
+                      <TableCell className="font-medium">{unit.unitLabel}</TableCell>
+                      <TableCell>{unit.modelName || "-"}</TableCell>
+                      <TableCell className="text-muted-foreground">{unit.modelCode || "-"}</TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(unit.base_price_snapshot)}
+                        {formatCurrency(unit.basePriceSnapshot)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(unit.customization_total)}
+                        {formatCurrency(unit.customizationTotal)}
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        {formatCurrency((unit.base_price_snapshot || 0) + (unit.customization_total || 0))}
+                        {formatCurrency((unit.basePriceSnapshot || 0) + (unit.customizationTotal || 0))}
                       </TableCell>
                     </TableRow>
                   ))

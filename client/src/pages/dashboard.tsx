@@ -328,14 +328,14 @@ export default function Dashboard() {
             <CardTitle className="text-lg font-semibold">Quick Start</CardTitle>
             <CardDescription>Get started with contracts and LLCs</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-3 flex-col flex">
             <Link href="/generate-contracts">
               <Button className="w-full" data-testid="button-create-contract">
                 <FileText className="h-4 w-4 mr-2" />
                 Create New Contract
               </Button>
             </Link>
-            <Link href="/llc-admin">
+            <Link href="/admin/llcs">
               <Button variant="outline" className="w-full" data-testid="button-manage-llcs">
                 <Building2 className="h-4 w-4 mr-2" />
                 Manage LLCs

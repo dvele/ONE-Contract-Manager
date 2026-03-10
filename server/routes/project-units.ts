@@ -14,7 +14,8 @@ const selectFields = `
   pu.base_price_snapshot as "basePriceSnapshot",
   pu.customization_total as "customizationTotal",
   pu.notes, pu.created_at as "createdAt",
-  hm.name as "modelName", hm.model_code as "modelCode"
+  hm.name as "modelName", hm.model_code as "modelCode",
+  p.name as "projectName"
 `;
 
 router.get("/project-units", async (req: Request, res: Response) => {
@@ -25,6 +26,7 @@ router.get("/project-units", async (req: Request, res: Response) => {
       SELECT ${selectFields}
       FROM project_units pu
       LEFT JOIN home_models hm ON pu.model_id = hm.id
+      LEFT JOIN projects p ON pu.project_id = p.id
       WHERE pu.organization_id = $1`;
     const params: any[] = [req.organizationId];
     

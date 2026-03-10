@@ -114,7 +114,7 @@ const complianceColors: Record<string, string> = {
   filed: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
 };
 
-const US_STATES = [
+export const US_STATES = [
   "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", 
   "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho",
   "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana",

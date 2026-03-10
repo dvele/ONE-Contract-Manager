@@ -48,17 +48,17 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 interface HomeModel {
   id: number;
   name: string;
-  model_code: string;
+  modelCode: string;
   description?: string;
-  sq_ft: number;
+  sqFt: number;
   bedrooms: number;
   bathrooms: number;
   stories?: number;
-  design_fee: number;
-  offsite_base_price: number;
-  onsite_est_price?: number;
-  shipping_set_price?: number;
-  is_active: boolean;
+  designFee: number;
+  offsiteBasePrice: number;
+  onsiteEstPrice?: number;
+  shippingSetPrice?: number;
+  isActive: boolean;
 }
 
 const homeModelSchema = z.object({
@@ -180,16 +180,16 @@ export default function AdminHomeModels() {
     setEditingModel(model);
     form.reset({
       name: model.name,
-      modelCode: model.model_code,
+      modelCode: model.modelCode,
       description: model.description || "",
-      sqFt: model.sq_ft,
+      sqFt: model.sqFt,
       bedrooms: model.bedrooms,
       bathrooms: model.bathrooms,
       stories: model.stories || 1,
-      designFee: model.design_fee,
-      offsiteBasePrice: model.offsite_base_price,
-      onsiteEstPrice: model.onsite_est_price || 0,
-      shippingSetPrice: model.shipping_set_price || 0,
+      designFee: model.designFee,
+      offsiteBasePrice: model.offsiteBasePrice,
+      onsiteEstPrice: model.onsiteEstPrice || 0,
+      shippingSetPrice: model.shippingSetPrice || 0,
     });
     setIsDialogOpen(true);
   };
@@ -251,12 +251,12 @@ export default function AdminHomeModels() {
                   homeModels?.map((model) => (
                     <TableRow key={model.id} data-testid={`row-model-${model.id}`}>
                       <TableCell className="font-medium">{model.name}</TableCell>
-                      <TableCell className="text-muted-foreground">{model.model_code}</TableCell>
+                      <TableCell className="text-muted-foreground">{model.modelCode}</TableCell>
                       <TableCell className="text-center">{model.bedrooms}</TableCell>
                       <TableCell className="text-center">{model.bathrooms}</TableCell>
-                      <TableCell className="text-right">{model.sq_ft.toLocaleString()}</TableCell>
+                      <TableCell className="text-right">{model.sqFt?.toLocaleString()}</TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(model.offsite_base_price)}
+                        {formatCurrency(model.offsiteBasePrice)}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">

@@ -39,6 +39,7 @@ export default function AdminGeneral() {
                 <Input
                   id="org-name"
                   defaultValue="Dvele"
+                  disabled
                   data-testid="input-org-name"
                 />
               </div>
@@ -56,6 +57,7 @@ export default function AdminGeneral() {
               <Label htmlFor="default-state">Default State of Formation</Label>
               <Input
                 id="default-state"
+                disabled
                 defaultValue="Delaware"
                 data-testid="input-default-state"
               />
@@ -63,11 +65,11 @@ export default function AdminGeneral() {
           </CardContent>
         </Card>
 
-        <div className="flex justify-end">
+        {/* <div className="flex justify-end">
           <Button data-testid="button-save-settings">
             Save Changes
           </Button>
-        </div>
+        </div> */}
       </div>
     </AdminLayout>
   );

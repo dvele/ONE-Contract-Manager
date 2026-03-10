@@ -10,8 +10,6 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import AgreementsNew from "@/pages/agreements-new";
-import LLCAdmin from "@/pages/llc-admin";
-import LLCDetail from "@/pages/llc-detail";
 import Settings from "@/pages/settings";
 import ClauseLibrary from "@/pages/clause-library";
 import Contracts from "@/pages/contracts";
@@ -51,8 +49,6 @@ function Router() {
       <Route path="/contracts/:id/edit" component={ContractDetail} />
       <Route path="/templates" component={Templates} />
       <Route path="/templates-upload" component={TemplatesUpload} />
-      <Route path="/llc-admin" component={LLCAdmin} />
-      <Route path="/llc-admin/:id" component={LLCDetail} />
       <Route path="/variable-mappings" component={VariableMappings} />
       <Route path="/settings" component={Settings} />
       <Route path="/admin" component={AdminGeneral} />

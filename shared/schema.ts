@@ -83,7 +83,7 @@ export const llcs = pgTable("llcs", {
   organizationId: integer("organization_id")
     .references(() => organizations.id)
     .notNull(),
-  name: text("name").notNull(),
+  name: text("name").notNull().unique(),
   projectName: text("project_name"),
   projectAddress: text("project_address"),
   status: text("status").default("forming"), // forming, active, closed

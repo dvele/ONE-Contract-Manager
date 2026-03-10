@@ -1,4 +1,4 @@
-import puppeteer from 'puppeteer-core';
+import puppeteer from 'puppeteer';
 import { buildSignatureBlock } from './tableStyles';
 
 interface ContractGenerationOptions {
@@ -868,7 +868,8 @@ async function fetchClausesForContract(
     };
     const normalizedType = contractTypeNormalizer[contractType] || contractType;
     
-    const url = `http://localhost:5000/api/clauses?contractType=${encodeURIComponent(normalizedType)}`;
+    const port = process.env.PORT || '5000';
+    const url = `http://localhost:${port}/api/clauses?contractType=${encodeURIComponent(normalizedType)}`;
     console.log(`Fetching clauses from: ${url}`);
     
     const response = await fetch(url);
@@ -3455,48 +3456,10 @@ function formatNonTableContent(content: string): string {
   return html;
 }
 
-async function findChromiumPath(): Promise<string> {
-  const { execSync } = await import('child_process');
-  const fs = await import('fs');
-  
-  // Check environment variable first
-  if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
-    return process.env.PUPPETEER_EXECUTABLE_PATH;
-  }
-  
-  // Try to find chromium using which command
-  try {
-    const chromiumPath = execSync('which chromium', { encoding: 'utf-8' }).trim();
-    if (chromiumPath && fs.existsSync(chromiumPath)) {
-      return chromiumPath;
-    }
-  } catch (e) {
-    // which command failed, continue to fallback
-  }
-  
-  // Fallback paths for Replit environments
-  const fallbackPaths = [
-    '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-    '/usr/bin/google-chrome',
-  ];
-  
-  for (const path of fallbackPaths) {
-    if (fs.existsSync(path)) {
-      return path;
-    }
-  }
-  
-  throw new Error('Could not find Chromium executable. Please set PUPPETEER_EXECUTABLE_PATH environment variable.');
-}
 
 async function convertHTMLToPDF(html: string): Promise<Buffer> {
-  const chromiumPath = await findChromiumPath();
-  
   const browser = await puppeteer.launch({
     headless: true,
-    executablePath: chromiumPath,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
   });
   

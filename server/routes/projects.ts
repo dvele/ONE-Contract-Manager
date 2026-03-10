@@ -756,7 +756,7 @@ router.post('/projects/:projectId/units', async (req, res) => {
       `INSERT INTO project_units (project_id, model_id, unit_label, quantity, base_price_snapshot, organization_id)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [projectId, modelId, unitLabel, quantity || 1, model.offsite_base_price, req.organizationId]
+      [projectId, modelId, unitLabel, quantity || 1, model.offsite_base_price, req.organizationId || 1]
     );
     
     const newUnit = insertResult.rows[0];

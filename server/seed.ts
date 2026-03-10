@@ -3,7 +3,7 @@ import seedData from "./seed-data.json";
 
 const JSONB_COLUMNS: Record<string, Set<string>> = {
   clauses: new Set(["contract_types", "tags"]),
-  contract_templates: new Set(["conditional_rules"]),
+  contract_templates: new Set(["conditional_rules", "base_clause_ids"]),
   table_definitions: new Set(["columns", "rows"]),
 };
 
