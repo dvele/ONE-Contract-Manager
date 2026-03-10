@@ -5,8 +5,8 @@ import { useWizard, SHELL_TESTING_MODE } from './WizardContext';
 import { Step1ProjectInfo } from './steps/Step1ProjectInfo';
 import { Step2ServiceModel } from './steps/Step2ServiceModel';
 import { Step3PartyInfo } from './steps/Step3PartyInfo';
-import { Step4ChildLLC } from './steps/Step4ChildLLC';
-import { Step5SiteAndHome } from './steps/Step5SiteAndHome';
+import { Step4SiteAndHome } from './steps/Step4SiteAndHome';
+import { Step5ChildLLC } from './steps/Step5ChildLLC';
 import { Step6DatesSchedule } from './steps/Step6DatesSchedule';
 import { Step7Pricing } from './steps/Step7Pricing';
 import { Step8ScheduleWarranty } from './steps/Step8ScheduleWarranty';
@@ -155,8 +155,8 @@ export const WizardShell: React.FC = () => {
         {wizardState.currentStep === 1 && <Step1ProjectInfo />}
         {wizardState.currentStep === 2 && <Step2ServiceModel />}
         {wizardState.currentStep === 3 && <Step3PartyInfo />}
-        {wizardState.currentStep === 4 && <Step5SiteAndHome />}
-        {wizardState.currentStep === 5 && <Step4ChildLLC />}
+        {wizardState.currentStep === 4 && <Step4SiteAndHome />}
+        {wizardState.currentStep === 5 && <Step5ChildLLC />}
         {wizardState.currentStep === 6 && <Step6DatesSchedule />}
         {wizardState.currentStep === 7 && <Step7Pricing />}
         {wizardState.currentStep === 8 && <Step8ScheduleWarranty />}

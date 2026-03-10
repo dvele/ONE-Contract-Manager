@@ -19,7 +19,7 @@ interface LLC {
   formationState: string;
 }
 
-export const Step4ChildLLC: React.FC = () => {
+export const Step5ChildLLC: React.FC = () => {
   const { 
     wizardState, 
     updateProjectData

@@ -34,7 +34,7 @@ interface ProjectUnit {
   model: HomeModel;
 }
 
-export const Step5SiteAndHome: React.FC = () => {
+export const Step4SiteAndHome: React.FC = () => {
   const { 
     wizardState, 
     updateProjectData,
