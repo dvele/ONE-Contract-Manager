@@ -1,10 +1,16 @@
-import { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { ContractTypePicker } from "@/components/ui/contract-type-picker";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
@@ -48,7 +54,6 @@ import {
   BookOpen,
   RotateCcw,
   Settings,
-  CheckSquare,
   Square,
   FolderTree,
   Eye,
@@ -144,8 +149,6 @@ const EDIT_HIERARCHY_OPTIONS = [
   { value: 8, label: "Level 8 - Nested List" },
 ];
 
-const MIN_TREE_WIDTH = 200;
-const MIN_VIEWER_WIDTH = 300;
 
 export default function ClauseLibrary() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -164,13 +167,6 @@ export default function ClauseLibrary() {
   const [previewProjectId, setPreviewProjectId] = useState<string>("");
   const [resolveTablesPreview, setResolveTablesPreview] = useState(false);
   
-  const [treePanelWidth, setTreePanelWidth] = useState(35);
-  const [editorPanelHeight, setEditorPanelHeight] = useState(50);
-  const [isResizing, setIsResizing] = useState(false);
-  const [isVerticalResizing, setIsVerticalResizing] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const rightPaneRef = useRef<HTMLDivElement>(null);
-  
   const [selectedClauseIds, setSelectedClauseIds] = useState<Set<number>>(new Set());
   const [bulkLevelDialogOpen, setBulkLevelDialogOpen] = useState(false);
   const [bulkNewLevel, setBulkNewLevel] = useState<number>(3);
@@ -178,71 +174,6 @@ export default function ClauseLibrary() {
   const [pendingBulkAction, setPendingBulkAction] = useState<{ type: string; data?: any } | null>(null);
   
   const { toast } = useToast();
-  
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-  }, []);
-
-  const handleVerticalMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsVerticalResizing(true);
-  }, []);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isResizing && containerRef.current) {
-        const containerRect = containerRef.current.getBoundingClientRect();
-        const containerWidth = containerRect.width;
-        
-        if (containerWidth <= 0 || !isFinite(containerWidth)) return;
-        
-        const newTreeWidth = ((e.clientX - containerRect.left) / containerWidth) * 100;
-        
-        const minTreePercent = (MIN_TREE_WIDTH / containerWidth) * 100;
-        const maxTreePercent = 100 - (MIN_VIEWER_WIDTH / containerWidth) * 100;
-        
-        if (!isFinite(minTreePercent) || !isFinite(maxTreePercent) || minTreePercent >= maxTreePercent) return;
-        
-        const clampedWidth = Math.min(Math.max(newTreeWidth, minTreePercent), maxTreePercent);
-        if (isFinite(clampedWidth)) {
-          setTreePanelWidth(clampedWidth);
-        }
-      }
-      
-      if (isVerticalResizing && rightPaneRef.current) {
-        const paneRect = rightPaneRef.current.getBoundingClientRect();
-        const paneHeight = paneRect.height;
-        
-        if (paneHeight <= 0 || !isFinite(paneHeight)) return;
-        
-        const newEditorHeight = ((e.clientY - paneRect.top) / paneHeight) * 100;
-        const clampedHeight = Math.min(Math.max(newEditorHeight, 20), 80);
-        if (isFinite(clampedHeight)) {
-          setEditorPanelHeight(clampedHeight);
-        }
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsResizing(false);
-      setIsVerticalResizing(false);
-    };
-
-    if (isResizing || isVerticalResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = isVerticalResizing ? 'row-resize' : 'col-resize';
-      document.body.style.userSelect = 'none';
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-  }, [isResizing, isVerticalResizing]);
   
   const toggleClauseSelection = (clauseId: number, e?: React.MouseEvent) => {
     if (e) {
@@ -560,16 +491,6 @@ export default function ClauseLibrary() {
     setEditHeaderText("");
     setEditBodyHtml("");
     setEditContractTypes([]);
-  };
-
-  const toggleContractType = (type: string) => {
-    setEditContractTypes(prev => {
-      if (prev.includes(type)) {
-        return prev.filter(t => t !== type);
-      } else {
-        return [...prev, type];
-      }
-    });
   };
 
   const handleDragStart = (e: React.DragEvent, clause: Clause) => {
@@ -964,11 +885,9 @@ export default function ClauseLibrary() {
         </div>
       </div>
 
-      <div className="flex-1 flex min-h-0 overflow-hidden" ref={containerRef}>
-        <div 
-          className="border-r flex flex-col bg-muted/30 min-h-0 overflow-hidden"
-          style={{ width: `${treePanelWidth}%`, minWidth: MIN_TREE_WIDTH }}
-        >
+      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
+        <ResizablePanel defaultSize={35} minSize={15}>
+          <div className="flex flex-col h-full border-r overflow-hidden bg-muted/30">
           <div className="p-2 border-b bg-background flex-shrink-0">
             <div className="flex items-center justify-between gap-2">
               <h2 className="text-sm font-medium flex items-center gap-2">
@@ -1021,21 +940,13 @@ export default function ClauseLibrary() {
               )}
             </div>
           </div>
-        </div>
+          </div>
+        </ResizablePanel>
 
-        <div
-          className="w-2 bg-border hover:bg-primary/20 cursor-col-resize flex items-center justify-center transition-colors shrink-0"
-          onMouseDown={handleMouseDown}
-          data-testid="resize-handle"
-        >
-          <div className="w-0.5 h-8 bg-muted-foreground/30 rounded-full" />
-        </div>
+        <ResizableHandle />
 
-        <div 
-          ref={rightPaneRef}
-          className="flex flex-col min-h-0 flex-1"
-          style={{ minWidth: MIN_VIEWER_WIDTH }}
-        >
+        <ResizablePanel>
+          <div className="flex flex-col h-full min-h-0">
           {selectedClause ? (
             <>
               <div className="p-3 border-b bg-background flex-shrink-0">
@@ -1093,11 +1004,9 @@ export default function ClauseLibrary() {
                 </div>
               </div>
 
-              <div className="flex-1 flex flex-col min-h-0">
-                <div 
-                  className="flex flex-col min-h-0"
-                  style={{ height: `${editorPanelHeight}%` }}
-                >
+              <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">
+                <ResizablePanel defaultSize={50}>
+                  <div className="flex flex-col h-full">
                   <div className="p-2 border-b bg-muted/30 flex-shrink-0">
                     <h3 className="text-xs font-medium text-muted-foreground flex items-center gap-2">
                       <Code className="h-3 w-3" />
@@ -1190,22 +1099,11 @@ export default function ClauseLibrary() {
                           </div>
                           <div>
                             <Label>Contract Types (Tags)</Label>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {CONTRACT_TYPE_OPTIONS.map((type) => (
-                                <Badge
-                                  key={type.value}
-                                  variant={editContractTypes.includes(type.value) ? "default" : "outline"}
-                                  className="cursor-pointer"
-                                  onClick={() => toggleContractType(type.value)}
-                                  data-testid={`tag-${type.value}`}
-                                >
-                                  {editContractTypes.includes(type.value) && (
-                                    <CheckSquare className="h-3 w-3 mr-1" />
-                                  )}
-                                  {type.label}
-                                </Badge>
-                              ))}
-                            </div>
+                            <ContractTypePicker
+                              options={CONTRACT_TYPE_OPTIONS}
+                              value={editContractTypes}
+                              onChange={setEditContractTypes}
+                            />
                           </div>
                         </div>
                       </div>
@@ -1227,19 +1125,12 @@ export default function ClauseLibrary() {
                     )}
                   </div>
                 </div>
+                </ResizablePanel>
 
-                <div
-                  className="h-2 bg-border hover:bg-primary/20 cursor-row-resize flex items-center justify-center transition-colors shrink-0"
-                  onMouseDown={handleVerticalMouseDown}
-                  data-testid="vertical-resize-handle"
-                >
-                  <div className="w-8 h-0.5 bg-muted-foreground/30 rounded-full" />
-                </div>
+                <ResizableHandle />
 
-                <div 
-                  className="flex flex-col min-h-0"
-                  style={{ height: `${100 - editorPanelHeight}%` }}
-                >
+                <ResizablePanel>
+                  <div className="flex flex-col h-full">
                   <div className="p-2 border-b bg-muted/30 flex-shrink-0">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <h3 className="text-xs font-medium text-muted-foreground flex items-center gap-2">
@@ -1280,19 +1171,19 @@ export default function ClauseLibrary() {
                         isResolvingPreview ? (
                           <div className="text-center text-muted-foreground py-4">Resolving tables...</div>
                         ) : (
-                          <div 
+                          <div
                             className="prose prose-sm dark:prose-invert max-w-none"
-                            dangerouslySetInnerHTML={{ 
+                            dangerouslySetInnerHTML={{
                               __html: resolvedPreviewData?.html || '<p class="text-muted-foreground">No content to preview</p>'
                             }}
                             data-testid="resolved-preview"
                           />
                         )
                       ) : (
-                        <div 
+                        <div
                           className="prose prose-sm dark:prose-invert max-w-none"
-                          dangerouslySetInnerHTML={{ 
-                            __html: editingClause?.id === selectedClause.id 
+                          dangerouslySetInnerHTML={{
+                            __html: editingClause?.id === selectedClause.id
                               ? getPreviewHtml({ header_text: editHeaderText, body_html: editBodyHtml, hierarchy_level: editHierarchyLevel })
                               : getPreviewHtml(selectedClause)
                           }}
@@ -1301,8 +1192,9 @@ export default function ClauseLibrary() {
                       )}
                     </div>
                   </div>
-                </div>
-              </div>
+                  </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-muted-foreground">
@@ -1313,8 +1205,9 @@ export default function ClauseLibrary() {
               </div>
             </div>
           )}
-        </div>
-      </div>
+          </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
 
       <Dialog open={bulkLevelDialogOpen} onOpenChange={setBulkLevelDialogOpen}>
         <DialogContent>

@@ -15,16 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import {
   Form,
   FormControl,
@@ -841,25 +832,13 @@ export default function ComponentLibrary() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!deleteComponent} onOpenChange={(open) => !open && setDeleteComponent(null)}>
-        <AlertDialogContent data-testid="delete-confirm-dialog">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Component</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{deleteComponent?.tag_name}"? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteComponent && deleteMutation.mutate(deleteComponent.id)}
-              data-testid="button-confirm-delete"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={!!deleteComponent}
+        onOpenChange={(open) => !open && setDeleteComponent(null)}
+        title="Delete Component"
+        description={`Are you sure you want to delete "${deleteComponent?.tag_name}"? This action cannot be undone.`}
+        onConfirm={() => deleteComponent && deleteMutation.mutate(deleteComponent.id)}
+      />
     </ResizablePanelGroup>
   );
 }
