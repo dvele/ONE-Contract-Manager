@@ -17,7 +17,6 @@ import ContractDetail from "@/pages/contract-detail";
 import Templates from "@/pages/templates";
 import ContractPreview from "@/pages/contract-preview";
 import GenerateContracts from "@/pages/generate-contracts";
-import VariableMappings from "@/pages/variable-mappings";
 import TemplatesUpload from "@/pages/templates-upload";
 import Exhibits from "@/pages/exhibits";
 import StateDisclosures from "@/pages/state-disclosures";
@@ -49,7 +48,6 @@ function Router() {
       <Route path="/contracts/:id/edit" component={ContractDetail} />
       <Route path="/templates" component={Templates} />
       <Route path="/templates-upload" component={TemplatesUpload} />
-      <Route path="/variable-mappings" component={VariableMappings} />
       <Route path="/settings" component={Settings} />
       <Route path="/admin" component={AdminGeneral} />
       <Route path="/admin/home-models" component={AdminHomeModels} />

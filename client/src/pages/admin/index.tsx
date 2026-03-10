@@ -1,6 +1,5 @@
 import { AdminLayout } from "@/components/admin-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Building2 } from "lucide-react";
@@ -64,12 +63,6 @@ export default function AdminGeneral() {
             </div>
           </CardContent>
         </Card>
-
-        {/* <div className="flex justify-end">
-          <Button data-testid="button-save-settings">
-            Save Changes
-          </Button>
-        </div> */}
       </div>
     </AdminLayout>
   );
