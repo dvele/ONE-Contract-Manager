@@ -3,10 +3,10 @@ import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Clock, CheckCircle, Plus, Building2, TrendingUp } from "lucide-react";
 import type { DashboardStats, LLC } from "@shared/schema";
+import { StatusBadge, LLCStatusBadge } from "@/components/ui/status-badge";
 
 // Contract package type returned by /api/contracts
 interface ContractPackage {
@@ -345,35 +345,5 @@ export default function Dashboard() {
         </Card>
       </div>
     </div>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-    draft: { label: "Draft", variant: "secondary" },
-    pending_review: { label: "Pending", variant: "outline" },
-    approved: { label: "Approved", variant: "default" },
-    signed: { label: "Signed", variant: "default" },
-    expired: { label: "Expired", variant: "destructive" },
-  };
-  const config = statusConfig[status] || statusConfig.draft;
-  return (
-    <Badge variant={config.variant} data-testid={`badge-status-${status}`}>
-      {config.label}
-    </Badge>
-  );
-}
-
-function LLCStatusBadge({ status }: { status: string }) {
-  const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-    pending: { label: "Pending", variant: "outline" },
-    formed: { label: "Formed", variant: "default" },
-    dissolved: { label: "Dissolved", variant: "destructive" },
-  };
-  const config = statusConfig[status] || statusConfig.pending;
-  return (
-    <Badge variant={config.variant} data-testid={`badge-llc-status-${status}`}>
-      {config.label}
-    </Badge>
   );
 }

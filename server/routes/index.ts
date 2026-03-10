@@ -13,6 +13,7 @@ import contractVariablesRouter from "./contract-variables";
 import llcsRouter from "./llcs";
 import adminImportRouter from "./admin-import";
 import componentsRouter from "./components";
+import variableMappingsRouter from "./variable-mappings";
 
 const router = Router();
 
@@ -31,5 +32,6 @@ router.use(contractVariablesRouter);
 router.use(llcsRouter);
 router.use(adminImportRouter);
 router.use(componentsRouter);
+router.use(variableMappingsRouter);
 
 export default router;

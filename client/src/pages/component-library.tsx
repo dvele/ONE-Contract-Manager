@@ -715,7 +715,7 @@ export default function ComponentLibrary() {
                     <Database className="h-4 w-4" />
                     Data-Driven Tables
                   </span>
-                  <Badge variant="outline">3</Badge>
+                  <Badge variant="outline">{BUILTIN_TABLES.length}</Badge>
                 </button>
 
                 {builtinExpanded && (
