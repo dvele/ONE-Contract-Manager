@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ContractTypePicker } from "@/components/ui/contract-type-picker";
 import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
-import { HtmlEditor } from "@/components/ui/html-editor";
+import { WysiwygEditor } from "@/components/ui/wysiwyg-editor";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -25,7 +25,6 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
-  Code,
   Edit,
   Eye,
   FileText,
@@ -67,7 +66,6 @@ export default function ExhibitsPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [editData, setEditData] = useState<Partial<Exhibit>>({});
-  const [editorMode, setEditorMode] = useState<"visual" | "source">("source");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterContractType, setFilterContractType] = useState("ALL");
   const [deleteTarget, setDeleteTarget] = useState<Exhibit | null>(null);
@@ -171,7 +169,6 @@ export default function ExhibitsPage() {
     });
     setIsEditing(true);
     setIsCreating(false);
-    setEditorMode("source");
   };
 
   const startCreating = () => {
@@ -187,7 +184,6 @@ export default function ExhibitsPage() {
     setSelectedExhibit(null);
     setIsCreating(true);
     setIsEditing(true);
-    setEditorMode("source");
   };
 
   const cancelEditing = () => {
@@ -613,40 +609,17 @@ export default function ExhibitsPage() {
                         )}
 
                         <div className="space-y-1">
-                          <div className="flex items-center justify-between mb-1">
-                            <Label className="text-xs">Content</Label>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant={editorMode === "visual" ? "default" : "ghost"}
-                                size="sm"
-                                onClick={() => setEditorMode("visual")}
-                                data-testid="button-visual-mode">
-                                <Eye className="mr-1 h-3.5 w-3.5" />
-                                Visual
-                              </Button>
-                              <Button
-                                variant={editorMode === "source" ? "default" : "ghost"}
-                                size="sm"
-                                onClick={() => setEditorMode("source")}
-                                data-testid="button-source-mode">
-                                <Code className="mr-1 h-3.5 w-3.5" />
-                                Source
-                              </Button>
-                            </div>
-                          </div>
-                          <HtmlEditor
+                          <Label className="text-xs">Content</Label>
+                          <WysiwygEditor
                             value={editData.content || ""}
                             onChange={(html) =>
                               setEditData({ ...editData, content: html })
                             }
-                            mode={editorMode}
                             placeholder="Enter exhibit content (HTML). Use {{VARIABLE_NAME}} for dynamic values."
                             data-testid="textarea-exhibit-content"
                           />
                           <p className="text-[10px] text-muted-foreground">
-                            {editorMode === "source"
-                              ? `Supports HTML and variable placeholders like ${"{{PRICING_BREAKDOWN_TABLE}}"} or ${"{{PROJECT_STATE}}"}`
-                              : "Use Source mode to edit HTML tables and variable tags directly"}
+                            Supports HTML and variable placeholders like {"{{PRICING_BREAKDOWN_TABLE}}"} or {"{{PROJECT_STATE}}"}. Use Source mode to edit HTML directly.
                           </p>
                         </div>
                       </div>

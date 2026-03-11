@@ -3,8 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { WysiwygEditor } from "@/components/ui/wysiwyg-editor";
 import { ContractTypePicker } from "@/components/ui/contract-type-picker";
 import {
   ResizableHandle,
@@ -282,8 +281,18 @@ export default function ClauseLibrary() {
       const response = await apiRequest("PATCH", `/api/clauses/${id}`, rest);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/clauses"] });
+      // Update selectedClause so the preview reflects the saved content immediately
+      if (selectedClause && selectedClause.id === variables.id) {
+        setSelectedClause({
+          ...selectedClause,
+          header_text: variables.header_text ?? selectedClause.header_text,
+          body_html: variables.body_html ?? selectedClause.body_html,
+          hierarchy_level: variables.hierarchy_level ?? selectedClause.hierarchy_level,
+          contract_types: variables.contract_types ?? selectedClause.contract_types,
+        });
+      }
       setEditingClause(null);
       toast({
         title: "Clause Updated",
@@ -1004,18 +1013,18 @@ export default function ClauseLibrary() {
                 </div>
               </div>
 
+              {editingClause?.id === selectedClause.id ? (
               <ResizablePanelGroup direction="vertical" className="flex-1 min-h-0">
-                <ResizablePanel defaultSize={50}>
+                <ResizablePanel defaultSize={55}>
                   <div className="flex flex-col h-full">
                   <div className="p-2 border-b bg-muted/30 flex-shrink-0">
                     <h3 className="text-xs font-medium text-muted-foreground flex items-center gap-2">
                       <Code className="h-3 w-3" />
-                      {editingClause?.id === selectedClause.id ? "Editor" : "Content"}
+                      Editor
                     </h3>
                   </div>
                   <div className="flex-1 min-h-0 overflow-auto">
-                    {editingClause?.id === selectedClause.id ? (
-                      <div className="p-4 space-y-4">
+                    <div className="p-4 space-y-4">
                         <div>
                           <Label htmlFor="edit-header" className="flex items-center gap-2">
                             Header / Title
@@ -1068,13 +1077,10 @@ export default function ClauseLibrary() {
                               </SelectContent>
                             </Select>
                           </div>
-                          <Textarea
-                            id="edit-body"
+                          <WysiwygEditor
                             value={editBodyHtml}
-                            onChange={(e) => setEditBodyHtml(e.target.value)}
+                            onChange={(html) => setEditBodyHtml(html)}
                             placeholder="Clause body HTML content..."
-                            rows={6}
-                            className="font-mono text-sm"
                             data-testid="textarea-edit-body"
                           />
                         </div>
@@ -1107,22 +1113,6 @@ export default function ClauseLibrary() {
                           </div>
                         </div>
                       </div>
-                    ) : (
-                      <div className="p-4">
-                        <h3 className={`mb-2 ${
-                          selectedClause.hierarchy_level <= 2 ? 'font-bold text-lg text-[#1a73e8] uppercase' :
-                          selectedClause.hierarchy_level <= 4 ? 'font-semibold text-[#1a73e8]' :
-                          selectedClause.hierarchy_level === 6 ? 'font-bold uppercase text-amber-600' :
-                          'font-medium'
-                        }`}>
-                          {selectedClause.header_text || "(No Header)"}
-                        </h3>
-                        <div 
-                          className="text-sm text-muted-foreground prose prose-sm dark:prose-invert max-w-none"
-                          dangerouslySetInnerHTML={{ __html: selectedClause.body_html || "(No Content)" }}
-                        />
-                      </div>
-                    )}
                   </div>
                 </div>
                 </ResizablePanel>
@@ -1195,6 +1185,65 @@ export default function ClauseLibrary() {
                   </div>
                 </ResizablePanel>
               </ResizablePanelGroup>
+              ) : (
+              <div className="flex flex-col flex-1 min-h-0">
+                <div className="p-2 border-b bg-muted/30 flex-shrink-0 flex items-center justify-between gap-2 flex-wrap">
+                  <h3 className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                    <Eye className="h-3 w-3" />
+                    Preview
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="resolve-tables"
+                      checked={resolveTablesPreview}
+                      onCheckedChange={(checked) => setResolveTablesPreview(checked === true)}
+                      className="h-3 w-3"
+                      data-testid="checkbox-resolve-tables"
+                    />
+                    <Label htmlFor="resolve-tables" className="text-xs cursor-pointer">
+                      Resolve Tables
+                    </Label>
+                    {resolveTablesPreview && (
+                      <Select value={previewProjectId} onValueChange={setPreviewProjectId}>
+                        <SelectTrigger className="w-36 h-6 text-xs" data-testid="select-preview-project">
+                          <SelectValue placeholder="Select project..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {projects?.map((p) => (
+                            <SelectItem key={p.id} value={p.id.toString()}>
+                              {p.project_number} - {p.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0 overflow-auto">
+                  <div className="p-4">
+                    {resolveTablesPreview && previewProjectId ? (
+                      isResolvingPreview ? (
+                        <div className="text-center text-muted-foreground py-4">Resolving tables...</div>
+                      ) : (
+                        <div
+                          className="prose prose-sm dark:prose-invert max-w-none"
+                          dangerouslySetInnerHTML={{
+                            __html: resolvedPreviewData?.html || '<p class="text-muted-foreground">No content to preview</p>'
+                          }}
+                          data-testid="resolved-preview"
+                        />
+                      )
+                    ) : (
+                      <div
+                        className="prose prose-sm dark:prose-invert max-w-none"
+                        dangerouslySetInnerHTML={{ __html: getPreviewHtml(selectedClause) }}
+                        data-testid="standard-preview"
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+              )}
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-muted-foreground">

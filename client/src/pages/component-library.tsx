@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { WysiwygEditor } from "@/components/ui/wysiwyg-editor";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
@@ -33,7 +33,6 @@ import {
 } from "@/components/ui/select";
 import {
   Eye,
-  Code,
   Box,
   Layers,
   DollarSign,
@@ -48,8 +47,7 @@ import {
   ChevronDown,
   Database,
   Save,
-  ToggleLeft,
-  Power,
+  X,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -134,8 +132,9 @@ export default function ComponentLibrary() {
   const [builtinExpanded, setBuiltinExpanded] = useState(true);
 
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [editingComponent, setEditingComponent] = useState<ComponentRow | null>(null);
   const [deleteComponent, setDeleteComponent] = useState<ComponentRow | null>(null);
+  const [isEditingComp, setIsEditingComp] = useState(false);
+  const [editCompData, setEditCompData] = useState({ content: "", description: "", tagName: "", serviceModel: "" });
 
   const { data: projects } = useQuery<{ id: number; project_number: string; name: string; status: string }[]>({
     queryKey: ["/api/projects"],
@@ -190,11 +189,15 @@ export default function ComponentLibrary() {
         serviceModel: data.serviceModel || null,
       });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/components"] });
-      setIsFormDialogOpen(false);
-      setEditingComponent(null);
-      form.reset();
+      // Update selectedItem immediately so the preview reflects saved changes
+      setSelectedItem((prev) =>
+        prev && prev.type !== "builtin"
+          ? { ...prev, data: { ...prev.data, tag_name: variables.data.tagName, content: variables.data.content, description: variables.data.description || null, service_model: variables.data.serviceModel || null } }
+          : prev
+      );
+      setIsEditingComp(false);
       toast({ title: "Component updated successfully" });
     },
     onError: (error: any) => {
@@ -255,25 +258,17 @@ export default function ComponentLibrary() {
     enabled: isDbComponent && !!selectedProjectId,
   });
 
+  // Reset inline edit state whenever the selected item changes
+  useEffect(() => {
+    setIsEditingComp(false);
+  }, [selectedItem]);
+
   const openCreateDialog = (prefix: "BLOCK" | "TABLE") => {
-    setEditingComponent(null);
     form.reset({ tagName: `${prefix}_`, content: "", description: "", serviceModel: "" });
     setIsFormDialogOpen(true);
   };
 
-  const openEditDialog = (component: ComponentRow) => {
-    setEditingComponent(component);
-    form.reset({
-      tagName: component.tag_name,
-      content: component.content,
-      description: component.description || "",
-      serviceModel: component.service_model || "",
-    });
-    setIsFormDialogOpen(true);
-  };
-
   const openDuplicateDialog = (component: ComponentRow) => {
-    setEditingComponent(null);
     form.reset({
       tagName: component.tag_name,
       content: component.content,
@@ -284,11 +279,19 @@ export default function ComponentLibrary() {
   };
 
   const handleFormSubmit = (values: ComponentFormValues) => {
-    if (editingComponent) {
-      updateMutation.mutate({ id: editingComponent.id, data: values });
-    } else {
-      createMutation.mutate(values);
-    }
+    createMutation.mutate(values);
+  };
+
+  const startEditingComp = (comp: ComponentRow) => {
+    setEditCompData({ content: comp.content, description: comp.description || "", tagName: comp.tag_name, serviceModel: comp.service_model || "" });
+    setIsEditingComp(true);
+  };
+
+  const cancelEditingComp = () => setIsEditingComp(false);
+
+  const saveEditingComp = () => {
+    if (!selectedItem || selectedItem.type === "builtin") return;
+    updateMutation.mutate({ id: selectedItem.data.id, data: editCompData });
   };
 
   const getServiceModelBadge = (items: ComponentRow[]) => {
@@ -334,74 +337,95 @@ export default function ComponentLibrary() {
               {comp.is_system && <Badge variant="outline" data-testid="detail-system-badge">System</Badge>}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-                <SelectTrigger className="w-[200px]" data-testid="select-project">
-                  <SelectValue placeholder="Select project..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects?.map(p => (
-                    <SelectItem key={p.id} value={String(p.id)} data-testid={`project-option-${p.id}`}>
-                      {p.project_number} - {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {!isEditingComp && (
+                <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                  <SelectTrigger className="w-[200px]" data-testid="select-project">
+                    <SelectValue placeholder="Select project..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects?.map(p => (
+                      <SelectItem key={p.id} value={String(p.id)} data-testid={`project-option-${p.id}`}>
+                        {p.project_number} - {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               {!comp.is_system && (
-                <>
-                  <Button size="icon" variant="ghost" onClick={() => openEditDialog(comp)} data-testid="button-edit-component">
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" onClick={() => openDuplicateDialog(comp)} data-testid="button-duplicate-component">
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" onClick={() => setDeleteComponent(comp)} data-testid="button-delete-component">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </>
+                isEditingComp ? (
+                  <>
+                    <Button variant="ghost" size="sm" onClick={cancelEditingComp} data-testid="button-cancel-edit">
+                      <X className="h-4 w-4 mr-1" />Cancel
+                    </Button>
+                    <Button size="sm" onClick={saveEditingComp} disabled={updateMutation.isPending} data-testid="button-save-edit">
+                      <Save className="h-4 w-4 mr-1" />Save
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button size="icon" variant="ghost" onClick={() => startEditingComp(comp)} data-testid="button-edit-component">
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={() => openDuplicateDialog(comp)} data-testid="button-duplicate-component">
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={() => setDeleteComponent(comp)} data-testid="button-delete-component">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                )
               )}
             </div>
           </div>
-          <ScrollArea className="flex-1">
-            <div className="p-4 space-y-4">
-              {comp.description && (
-                <div>
-                  <Label className="text-xs text-muted-foreground">Description</Label>
-                  <p className="text-sm mt-1" data-testid="detail-description">{comp.description}</p>
+          {isEditingComp ? (
+            <ScrollArea className="flex-1">
+              <div className="p-4 space-y-4">
+                <div className="space-y-1">
+                  <Label className="text-xs">Tag Name</Label>
+                  <Input value={editCompData.tagName} onChange={(e) => setEditCompData({ ...editCompData, tagName: e.target.value })} data-testid="input-tag-name" />
                 </div>
-              )}
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Code className="h-4 w-4 text-muted-foreground" />
-                  <Label className="text-xs text-muted-foreground">HTML Content</Label>
+                <div className="space-y-1">
+                  <Label className="text-xs">Service Model</Label>
+                  <Select value={editCompData.serviceModel || "none"} onValueChange={(v) => setEditCompData({ ...editCompData, serviceModel: v === "none" ? "" : v })}>
+                    <SelectTrigger data-testid="select-service-model"><SelectValue placeholder="None (applies to all)" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None (applies to all)</SelectItem>
+                      <SelectItem value="CRC">CRC</SelectItem>
+                      <SelectItem value="CMOS">CMOS</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto whitespace-pre-wrap" data-testid="detail-code-block">
-                  {comp.content}
-                </pre>
+                <div className="space-y-1">
+                  <Label className="text-xs">Description</Label>
+                  <Input value={editCompData.description} onChange={(e) => setEditCompData({ ...editCompData, description: e.target.value })} placeholder="Optional description" data-testid="input-description" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Content (HTML)</Label>
+                  <WysiwygEditor value={editCompData.content} onChange={(html) => setEditCompData({ ...editCompData, content: html })} placeholder="<p>Your HTML content here...</p>" data-testid="textarea-content" />
+                </div>
               </div>
-              <Separator />
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Eye className="h-4 w-4 text-muted-foreground" />
-                  <Label className="text-xs text-muted-foreground">Rendered Preview</Label>
-                </div>
-                {selectedProjectId && resolvedPreviewLoading ? (
-                  <Skeleton className="h-40 w-full" />
-                ) : selectedProjectId && resolvedPreview?.html ? (
-                  <div
-                    className="border rounded-md p-4 bg-white"
-                    data-testid="detail-preview"
-                    dangerouslySetInnerHTML={{ __html: resolvedPreview.html }}
-                  />
-                ) : (
-                  <div
-                    className="border rounded-md p-4 bg-white"
-                    data-testid="detail-preview"
-                    dangerouslySetInnerHTML={{ __html: comp.content }}
-                  />
+            </ScrollArea>
+          ) : (
+            <ScrollArea className="flex-1">
+              <div className="p-4 space-y-4">
+                {comp.description && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Description</Label>
+                    <p className="text-sm mt-1" data-testid="detail-description">{comp.description}</p>
+                  </div>
                 )}
+                <div>
+                  {selectedProjectId && resolvedPreviewLoading ? (
+                    <Skeleton className="h-40 w-full" />
+                  ) : selectedProjectId && resolvedPreview?.html ? (
+                    <div className="border rounded-md p-4 bg-background text-foreground" data-testid="detail-preview" dangerouslySetInnerHTML={{ __html: resolvedPreview.html }} />
+                  ) : (
+                    <div className="border rounded-md p-4 bg-background text-foreground" data-testid="detail-preview" dangerouslySetInnerHTML={{ __html: comp.content }} />
+                  )}
+                </div>
               </div>
-            </div>
-          </ScrollArea>
+            </ScrollArea>
+          )}
         </div>
       );
     }
@@ -413,9 +437,9 @@ export default function ComponentLibrary() {
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between gap-2 flex-wrap p-4 border-b">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-lg font-semibold" data-testid="detail-tag-name">{freshComp.tag_name}</h2>
+              <h2 className="text-lg font-semibold" data-testid="detail-tag-name">{isEditingComp ? editCompData.tagName : freshComp.tag_name}</h2>
               {freshComp.is_system && <Badge variant="outline" data-testid="detail-system-badge">System</Badge>}
-              {!freshComp.is_system && (
+              {!freshComp.is_system && !isEditingComp && (
                 <div className="flex items-center gap-2">
                   <Label className="text-xs text-muted-foreground">Active</Label>
                   <Switch
@@ -426,78 +450,94 @@ export default function ComponentLibrary() {
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-                <SelectTrigger className="w-[200px]" data-testid="select-project">
-                  <SelectValue placeholder="Select project..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects?.map(p => (
-                    <SelectItem key={p.id} value={String(p.id)} data-testid={`project-option-${p.id}`}>
-                      {p.project_number} - {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {!freshComp.is_system && (
-                <>
-                  <Button size="icon" variant="ghost" onClick={() => openEditDialog(freshComp)} data-testid="button-edit-component">
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" variant="ghost" onClick={() => setDeleteComponent(freshComp)} data-testid="button-delete-component">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </>
-              )}
-            </div>
-          </div>
-          <ScrollArea className="flex-1">
-            <div className="p-4 space-y-4">
-              {freshComp.description && (
-                <div>
-                  <Label className="text-xs text-muted-foreground">Description</Label>
-                  <p className="text-sm mt-1" data-testid="detail-description">{freshComp.description}</p>
-                </div>
-              )}
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Code className="h-4 w-4 text-muted-foreground" />
-                  <Label className="text-xs text-muted-foreground">HTML Content</Label>
-                </div>
-                <pre className="bg-muted rounded-md p-3 text-xs overflow-x-auto whitespace-pre-wrap" data-testid="detail-code-block">
-                  {freshComp.content}
-                </pre>
+            {isEditingComp ? (
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={cancelEditingComp} data-testid="button-cancel-edit">
+                  <X className="h-4 w-4 mr-1" />Cancel
+                </Button>
+                <Button size="sm" onClick={saveEditingComp} disabled={updateMutation.isPending} data-testid="button-save-component">
+                  {updateMutation.isPending ? "Saving..." : "Save"}
+                </Button>
               </div>
-              <Separator />
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Eye className="h-4 w-4 text-muted-foreground" />
-                  <Label className="text-xs text-muted-foreground">Rendered Preview</Label>
-                </div>
-                {!selectedProjectId ? (
-                  <div
-                    className="border rounded-md p-4 bg-white"
-                    data-testid="detail-preview"
-                    dangerouslySetInnerHTML={{ __html: freshComp.content }}
-                  />
-                ) : resolvedPreviewLoading ? (
-                  <Skeleton className="h-40 w-full" />
-                ) : resolvedPreview?.html ? (
-                  <div
-                    className="border rounded-md p-4 bg-white"
-                    data-testid="detail-preview"
-                    dangerouslySetInnerHTML={{ __html: resolvedPreview.html }}
-                  />
-                ) : (
-                  <div
-                    className="border rounded-md p-4 bg-white"
-                    data-testid="detail-preview"
-                    dangerouslySetInnerHTML={{ __html: freshComp.content }}
-                  />
+            ) : (
+              <div className="flex items-center gap-2 flex-wrap">
+                <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                  <SelectTrigger className="w-[200px]" data-testid="select-project">
+                    <SelectValue placeholder="Select project..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects?.map(p => (
+                      <SelectItem key={p.id} value={String(p.id)} data-testid={`project-option-${p.id}`}>
+                        {p.project_number} - {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!freshComp.is_system && (
+                  <>
+                    <Button size="icon" variant="ghost" onClick={() => startEditingComp(freshComp)} data-testid="button-edit-component">
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button size="icon" variant="ghost" onClick={() => setDeleteComponent(freshComp)} data-testid="button-delete-component">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
                 )}
               </div>
-            </div>
-          </ScrollArea>
+            )}
+          </div>
+          {isEditingComp ? (
+            <ScrollArea className="flex-1">
+              <div className="p-4 space-y-4">
+                <div className="space-y-1">
+                  <Label className="text-xs">Tag Name</Label>
+                  <Input value={editCompData.tagName} onChange={(e) => setEditCompData({ ...editCompData, tagName: e.target.value })} placeholder="e.g. TABLE_SCHEDULE" data-testid="input-tag-name" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Description</Label>
+                  <Input value={editCompData.description} onChange={(e) => setEditCompData({ ...editCompData, description: e.target.value })} placeholder="Optional description" data-testid="input-description" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Content (HTML)</Label>
+                  <WysiwygEditor value={editCompData.content} onChange={(html) => setEditCompData({ ...editCompData, content: html })} placeholder="<table>...</table>" data-testid="textarea-content" />
+                </div>
+              </div>
+            </ScrollArea>
+          ) : (
+            <ScrollArea className="flex-1">
+              <div className="p-4 space-y-4">
+                {freshComp.description && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Description</Label>
+                    <p className="text-sm mt-1" data-testid="detail-description">{freshComp.description}</p>
+                  </div>
+                )}
+                <div>
+                  {!selectedProjectId ? (
+                    <div
+                      className="border rounded-md p-4 bg-background text-foreground"
+                      data-testid="detail-preview"
+                      dangerouslySetInnerHTML={{ __html: freshComp.content }}
+                    />
+                  ) : resolvedPreviewLoading ? (
+                    <Skeleton className="h-40 w-full" />
+                  ) : resolvedPreview?.html ? (
+                    <div
+                      className="border rounded-md p-4 bg-background text-foreground"
+                      data-testid="detail-preview"
+                      dangerouslySetInnerHTML={{ __html: resolvedPreview.html }}
+                    />
+                  ) : (
+                    <div
+                      className="border rounded-md p-4 bg-background text-foreground"
+                      data-testid="detail-preview"
+                      dangerouslySetInnerHTML={{ __html: freshComp.content }}
+                    />
+                  )}
+                </div>
+              </div>
+            </ScrollArea>
+          )}
         </div>
       );
     }
@@ -557,7 +597,7 @@ export default function ComponentLibrary() {
                   <Skeleton className="h-40 w-full" />
                 ) : builtinPreview?.html ? (
                   <div
-                    className="border rounded-md p-4 bg-white"
+                    className="border rounded-md p-4 bg-background text-foreground"
                     data-testid="detail-preview"
                     dangerouslySetInnerHTML={{ __html: builtinPreview.html }}
                   />
@@ -741,9 +781,9 @@ export default function ComponentLibrary() {
       <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
         <DialogContent className="max-w-lg" data-testid="component-form-dialog">
           <DialogHeader>
-            <DialogTitle>{editingComponent ? "Edit Component" : "Create Component"}</DialogTitle>
+            <DialogTitle>Create Component</DialogTitle>
             <DialogDescription>
-              {editingComponent ? "Update the component details below." : "Fill in the details to create a new component."}
+              Fill in the details to create a new component.
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -806,10 +846,10 @@ export default function ComponentLibrary() {
                   <FormItem>
                     <FormLabel>Content (HTML)</FormLabel>
                     <FormControl>
-                      <Textarea
+                      <WysiwygEditor
+                        value={field.value}
+                        onChange={field.onChange}
                         placeholder="<p>Your HTML content here...</p>"
-                        className="min-h-[200px] font-mono text-xs"
-                        {...field}
                         data-testid="textarea-content"
                       />
                     </FormControl>
@@ -822,9 +862,9 @@ export default function ComponentLibrary() {
                 <Button type="button" variant="outline" onClick={() => setIsFormDialogOpen(false)} data-testid="button-cancel-form">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending} data-testid="button-submit-form">
+                <Button type="submit" disabled={createMutation.isPending} data-testid="button-submit-form">
                   <Save className="h-4 w-4 mr-2" />
-                  {editingComponent ? "Update" : "Create"}
+                  Create
                 </Button>
               </DialogFooter>
             </form>
