@@ -2,132 +2,164 @@ import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { 
-  ArrowLeft, 
-  Download, 
-  FileText, 
-  Calendar, 
-  User, 
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
+  ArrowLeft,
+  Download,
+  FileText,
+  Calendar,
+  User,
   ChevronDown,
   ChevronRight,
   CheckCircle2,
   Clock,
   FileCheck,
   Edit3,
-  Code
+  Code,
 } from "lucide-react";
 import { useState, useCallback } from "react";
 import { Eye } from "lucide-react";
 
 // HTML escape function for XSS protection
 const escapeHtml = (text: string): string => {
-  const div = document.createElement('div');
+  const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
 };
 
 // Format clause content: convert markdown tables/bullets to HTML
 const formatContent = (content: string): string => {
-  if (!content) return '';
-  
-  const lines = content.split('\n');
+  if (!content) return "";
+
+  const lines = content.split("\n");
   const outputBlocks: string[] = [];
   let i = 0;
-  
+
   while (i < lines.length) {
     const line = lines[i].trim();
-    
+
     // Detect table: line starts and ends with | and has multiple cells
-    if (line.startsWith('|') && line.endsWith('|') && line.split('|').length > 2) {
+    if (
+      line.startsWith("|") &&
+      line.endsWith("|") &&
+      line.split("|").length > 2
+    ) {
       const tableLines: string[] = [];
       while (i < lines.length) {
         const tLine = lines[i].trim();
-        if (tLine.startsWith('|') && tLine.endsWith('|')) {
+        if (tLine.startsWith("|") && tLine.endsWith("|")) {
           tableLines.push(tLine);
           i++;
         } else {
           break;
         }
       }
-      
-      let tableHtml = '<table class="w-full text-sm border-collapse mb-4"><tbody>';
+
+      let tableHtml =
+        '<table class="w-full text-sm border-collapse mb-4"><tbody>';
       let isHeader = true;
-      
+
       for (const tLine of tableLines) {
         // Skip separator rows (|---|---|---| with any number of columns)
         if (tLine.match(/^\|[\s\-:|]+\|$/)) continue;
-        
-        const cells = tLine.split('|').slice(1, -1).map(c => escapeHtml(c.trim()));
+
+        const cells = tLine
+          .split("|")
+          .slice(1, -1)
+          .map((c) => escapeHtml(c.trim()));
         if (cells.length > 0) {
-          const tag = isHeader ? 'th' : 'td';
-          const cellClass = isHeader 
-            ? 'border border-border bg-muted/50 px-3 py-2 text-left font-medium'
-            : 'border border-border px-3 py-2';
-          tableHtml += `<tr>${cells.map(c => `<${tag} class="${cellClass}">${c}</${tag}>`).join('')}</tr>`;
+          const tag = isHeader ? "th" : "td";
+          const cellClass = isHeader
+            ? "border border-border bg-muted/50 px-3 py-2 text-left font-medium"
+            : "border border-border px-3 py-2";
+          tableHtml += `<tr>${cells.map((c) => `<${tag} class="${cellClass}">${c}</${tag}>`).join("")}</tr>`;
           isHeader = false;
         }
       }
-      tableHtml += '</tbody></table>';
+      tableHtml += "</tbody></table>";
       outputBlocks.push(tableHtml);
       continue;
     }
-    
+
     // Detect bullet list: line starts with • or - followed by space
-    if (line.startsWith('•') || (line.startsWith('- ') && !line.startsWith('---'))) {
+    if (
+      line.startsWith("•") ||
+      (line.startsWith("- ") && !line.startsWith("---"))
+    ) {
       const listItems: string[] = [];
       while (i < lines.length) {
         const bulletLine = lines[i].trim();
-        if (bulletLine.startsWith('•') || (bulletLine.startsWith('- ') && !bulletLine.startsWith('---'))) {
-          listItems.push(escapeHtml(bulletLine.replace(/^[•\-]\s*/, '')));
+        if (
+          bulletLine.startsWith("•") ||
+          (bulletLine.startsWith("- ") && !bulletLine.startsWith("---"))
+        ) {
+          listItems.push(escapeHtml(bulletLine.replace(/^[•\-]\s*/, "")));
           i++;
         } else {
           break;
         }
       }
-      const listHtml = `<ul class="list-disc pl-4 my-2">${listItems.map(item => `<li class="ml-4">${item}</li>`).join('')}</ul>`;
+      const listHtml = `<ul class="list-disc pl-4 my-2">${listItems.map((item) => `<li class="ml-4">${item}</li>`).join("")}</ul>`;
       outputBlocks.push(listHtml);
       continue;
     }
-    
+
     // Empty line creates paragraph break (skip consecutive empties)
-    if (line === '') {
-      if (outputBlocks.length === 0 || !outputBlocks[outputBlocks.length - 1].endsWith('<br/>')) {
-        outputBlocks.push('<br/>');
+    if (line === "") {
+      if (
+        outputBlocks.length === 0 ||
+        !outputBlocks[outputBlocks.length - 1].endsWith("<br/>")
+      ) {
+        outputBlocks.push("<br/>");
       }
       i++;
       continue;
     }
-    
+
     // Regular text - collect consecutive non-special lines
     const textLines: string[] = [];
     while (i < lines.length) {
       const tLine = lines[i].trim();
-      const isBullet = tLine.startsWith('•') || (tLine.startsWith('- ') && !tLine.startsWith('---'));
-      const isTable = tLine.startsWith('|') && tLine.endsWith('|');
-      if (tLine === '' || isBullet || isTable) {
+      const isBullet =
+        tLine.startsWith("•") ||
+        (tLine.startsWith("- ") && !tLine.startsWith("---"));
+      const isTable = tLine.startsWith("|") && tLine.endsWith("|");
+      if (tLine === "" || isBullet || isTable) {
         break;
       }
       textLines.push(escapeHtml(tLine));
       i++;
     }
     if (textLines.length > 0) {
-      outputBlocks.push(`<p class="my-1">${textLines.join('<br/>')}</p>`);
+      outputBlocks.push(`<p class="my-1">${textLines.join("<br/>")}</p>`);
     }
   }
-  
-  let formatted = outputBlocks.join('');
-  
+
+  let formatted = outputBlocks.join("");
+
   // Wrap in container
   formatted = `<div class="prose prose-sm max-w-none dark:prose-invert">${formatted}</div>`;
-  
+
   // Highlight variables
-  formatted = formatted.replace(/\{\{([A-Z0-9_]+)\}\}/g, '<span class="bg-primary/20 text-primary px-1 rounded font-mono text-sm">{{$1}}</span>');
-  
+  formatted = formatted.replace(
+    /\{\{([A-Z0-9_]+)\}\}/g,
+    '<span class="bg-primary/20 text-primary px-1 rounded font-mono text-sm">{{$1}}</span>'
+  );
+
   return formatted;
 };
 
@@ -157,65 +189,92 @@ interface Clause {
 }
 
 const statusSteps = [
-  { key: "Draft", label: "Draft", icon: Edit3, description: "Initial draft created" },
-  { key: "PendingReview", label: "Pending Review", icon: Clock, description: "Awaiting review" },
-  { key: "Approved", label: "Approved", icon: CheckCircle2, description: "Approved by reviewer" },
-  { key: "Signed", label: "Signed", icon: FileCheck, description: "Fully executed" },
+  {
+    key: "Draft",
+    label: "Draft",
+    icon: Edit3,
+    description: "Initial draft created",
+  },
+  {
+    key: "PendingReview",
+    label: "Pending Review",
+    icon: Clock,
+    description: "Awaiting review",
+  },
+  {
+    key: "Approved",
+    label: "Approved",
+    icon: CheckCircle2,
+    description: "Approved by reviewer",
+  },
+  {
+    key: "Signed",
+    label: "Signed",
+    icon: FileCheck,
+    description: "Fully executed",
+  },
 ];
 
 function normalizeStatusKey(status: string): string {
   // Handle various status formats: "Draft", "draft", "PendingReview", "pending_review", "Pending Review"
-  const normalized = status.replace(/[\s_]+/g, '').toLowerCase();
+  const normalized = status.replace(/[\s_]+/g, "").toLowerCase();
   const statusMap: Record<string, string> = {
-    'draft': 'Draft',
-    'pendingreview': 'PendingReview',
-    'pending': 'PendingReview',
-    'approved': 'Approved',
-    'signed': 'Signed',
-    'executed': 'Signed', // Map legacy status
-    'sent': 'Approved', // Map legacy status
+    draft: "Draft",
+    pendingreview: "PendingReview",
+    pending: "PendingReview",
+    approved: "Approved",
+    signed: "Signed",
+    executed: "Signed", // Map legacy status
+    sent: "Approved", // Map legacy status
   };
-  return statusMap[normalized] || 'Draft';
+  return statusMap[normalized] || "Draft";
 }
 
 function getStatusDisplayLabel(status: string): string {
   const normalizedKey = normalizeStatusKey(status);
   const labels: Record<string, string> = {
-    'Draft': 'Draft',
-    'PendingReview': 'Pending Review',
-    'Approved': 'Approved',
-    'Signed': 'Signed',
+    Draft: "Draft",
+    PendingReview: "Pending Review",
+    Approved: "Approved",
+    Signed: "Signed",
   };
   return labels[normalizedKey] || status;
 }
 
 function getStatusIndex(status: string): number {
   const normalizedKey = normalizeStatusKey(status);
-  return statusSteps.findIndex(s => s.key === normalizedKey);
+  return statusSteps.findIndex((s) => s.key === normalizedKey);
 }
 
 function getContractTypeName(type: string): string {
   const typeMap: Record<string, string> = {
-    'master_ef': 'Master Purchase Agreement',
-    'MASTER_EF': 'Master Purchase Agreement',
-    'ONE': 'ONE Agreement (Archived)',
-    'one_agreement': 'ONE Agreement (Archived)',
-    'MANUFACTURING': 'Manufacturing Subcontract (Archived)',
-    'manufacturing_sub': 'Manufacturing Subcontract (Archived)',
-    'ONSITE': 'OnSite Subcontract (Archived)',
-    'onsite_sub': 'OnSite Subcontract (Archived)',
+    master_ef: "Master Purchase Agreement",
+    MASTER_EF: "Master Purchase Agreement",
+    ONE: "ONE Agreement (Archived)",
+    one_agreement: "ONE Agreement (Archived)",
+    MANUFACTURING: "Manufacturing Subcontract (Archived)",
+    manufacturing_sub: "Manufacturing Subcontract (Archived)",
+    ONSITE: "OnSite Subcontract (Archived)",
+    onsite_sub: "OnSite Subcontract (Archived)",
   };
   return typeMap[type] || type;
 }
 
-function getStatusBadgeVariant(status: string): "default" | "secondary" | "outline" | "destructive" {
+function getStatusBadgeVariant(
+  status: string
+): "default" | "secondary" | "outline" | "destructive" {
   const normalizedKey = normalizeStatusKey(status);
   switch (normalizedKey) {
-    case "Draft": return "secondary";
-    case "PendingReview": return "outline";
-    case "Approved": return "default";
-    case "Signed": return "default";
-    default: return "secondary";
+    case "Draft":
+      return "secondary";
+    case "PendingReview":
+      return "outline";
+    case "Approved":
+      return "default";
+    case "Signed":
+      return "default";
+    default:
+      return "secondary";
   }
 }
 
@@ -223,7 +282,9 @@ export default function ContractDetail() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [expandedClauses, setExpandedClauses] = useState<Set<number>>(new Set());
+  const [expandedClauses, setExpandedClauses] = useState<Set<number>>(
+    new Set()
+  );
   const [isGenerating, setIsGenerating] = useState(false);
 
   const contractId = parseInt(params.id || "0");
@@ -242,10 +303,14 @@ export default function ContractDetail() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async (newStatus: string) => {
-      return apiRequest("PATCH", `/api/contracts/${contractId}`, { status: newStatus });
+      return apiRequest("PATCH", `/api/contracts/${contractId}`, {
+        status: newStatus,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/contracts", contractId] });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/contracts", contractId],
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
       toast({
         title: "Status Updated",
@@ -262,7 +327,7 @@ export default function ContractDetail() {
   });
 
   const toggleClause = (clauseId: number) => {
-    setExpandedClauses(prev => {
+    setExpandedClauses((prev) => {
       const next = new Set(prev);
       if (next.has(clauseId)) {
         next.delete(clauseId);
@@ -276,15 +341,15 @@ export default function ContractDetail() {
   // Map contract type from stored format to API format
   const getContractTypeForApi = (contractType: string): string => {
     const typeMap: Record<string, string> = {
-      'master_ef': 'MASTER_EF',
-      'MASTER_EF': 'MASTER_EF',
-      'Master Ef': 'MASTER_EF',
-      'one_agreement': 'ONE',
-      'ONE': 'ONE',
-      'manufacturing_sub': 'MANUFACTURING',
-      'MANUFACTURING': 'MANUFACTURING',
-      'onsite_sub': 'ONSITE',
-      'ONSITE': 'ONSITE',
+      master_ef: "MASTER_EF",
+      MASTER_EF: "MASTER_EF",
+      "Master Ef": "MASTER_EF",
+      one_agreement: "ONE",
+      ONE: "ONE",
+      manufacturing_sub: "MANUFACTURING",
+      MANUFACTURING: "MANUFACTURING",
+      onsite_sub: "ONSITE",
+      ONSITE: "ONSITE",
     };
     return typeMap[contractType] || contractType.toUpperCase();
   };
@@ -301,10 +366,10 @@ export default function ContractDetail() {
 
     setIsGenerating(true);
     try {
-      const response = await fetch('/api/contracts/download-pdf', {
-        method: 'POST',
+      const response = await fetch("/api/contracts/download-pdf", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           contractType: getContractTypeForApi(contract.contractType),
@@ -313,12 +378,12 @@ export default function ContractDetail() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate PDF');
+        throw new Error("Failed to generate PDF");
       }
 
       return await response.blob();
     } catch (error) {
-      console.error('PDF generation error:', error);
+      console.error("PDF generation error:", error);
       toast({
         title: "Generation Failed",
         description: "Failed to generate PDF document.",
@@ -334,9 +399,9 @@ export default function ContractDetail() {
     const blob = await generatePdf();
     if (blob) {
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `${contract?.projectNumber || 'Contract'}_${getContractTypeName(contract?.contractType || 'MASTER_EF').replace(/\s+/g, '_')}.pdf`;
+      a.download = `${contract?.projectNumber || "Contract"}_${getContractTypeName(contract?.contractType || "MASTER_EF").replace(/\s+/g, "_")}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -349,7 +414,7 @@ export default function ContractDetail() {
     if (blob) {
       // Open PDF in a new tab for reliable viewing across all browsers
       const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
+      window.open(url, "_blank");
       // Clean up the URL after a short delay to allow the tab to load
       setTimeout(() => URL.revokeObjectURL(url), 5000);
     }
@@ -367,10 +432,10 @@ export default function ContractDetail() {
 
     setIsGenerating(true);
     try {
-      const response = await fetch('/api/contracts/draft-preview', {
-        method: 'POST',
+      const response = await fetch("/api/contracts/draft-preview", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           contractType: getContractTypeForApi(contract.contractType),
@@ -379,19 +444,19 @@ export default function ContractDetail() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate HTML preview');
+        throw new Error("Failed to generate HTML preview");
       }
 
       const html = await response.text();
-      
+
       // Open HTML in a new tab
-      const newWindow = window.open('', '_blank');
+      const newWindow = window.open("", "_blank");
       if (newWindow) {
         newWindow.document.write(html);
         newWindow.document.close();
       }
     } catch (error) {
-      console.error('HTML preview error:', error);
+      console.error("HTML preview error:", error);
       toast({
         title: "Preview Failed",
         description: "Failed to generate HTML preview.",
@@ -402,14 +467,13 @@ export default function ContractDetail() {
     }
   };
 
-
   const handleStatusChange = (newStatus: string) => {
     updateStatusMutation.mutate(newStatus);
   };
 
   if (contractLoading) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="space-y-6 p-6">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-48 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -422,10 +486,14 @@ export default function ContractDetail() {
       <div className="p-6">
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Contract Not Found</h2>
-            <p className="text-muted-foreground mb-4">The contract you're looking for doesn't exist.</p>
-            <Button onClick={() => setLocation("/contracts")} data-testid="button-back-to-contracts">
+            <FileText className="mb-4 h-12 w-12 text-muted-foreground" />
+            <h2 className="mb-2 text-xl font-semibold">Contract Not Found</h2>
+            <p className="mb-4 text-muted-foreground">
+              The contract you're looking for doesn't exist.
+            </p>
+            <Button
+              onClick={() => setLocation("/contracts")}
+              data-testid="button-back-to-contracts">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Contracts
             </Button>
@@ -438,19 +506,20 @@ export default function ContractDetail() {
   const currentStatusIndex = getStatusIndex(contract.status);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setLocation("/contracts")}
-            data-testid="button-back"
-          >
+            data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-contract-title">
+            <h1
+              className="text-2xl font-bold"
+              data-testid="text-contract-title">
               {getContractTypeName(contract.contractType)}
             </h1>
             <p className="text-muted-foreground">
@@ -459,34 +528,33 @@ export default function ContractDetail() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant={getStatusBadgeVariant(contract.status)} data-testid="badge-status">
+          <Badge
+            variant={getStatusBadgeVariant(contract.status)}
+            data-testid="badge-status">
             {getStatusDisplayLabel(contract.status)}
           </Badge>
-          <Button 
-            variant="outline" 
-            onClick={handleHtmlPreview} 
+          <Button
+            variant="outline"
+            onClick={handleHtmlPreview}
             disabled={isGenerating || !contract?.projectId}
-            data-testid="button-html-preview"
-          >
+            data-testid="button-html-preview">
             <Code className="mr-2 h-4 w-4" />
-            {isGenerating ? 'Generating...' : 'View HTML'}
+            {isGenerating ? "Generating..." : "View HTML"}
           </Button>
-          <Button 
-            variant="outline" 
-            onClick={handlePreview} 
+          <Button
+            variant="outline"
+            onClick={handlePreview}
             disabled={isGenerating || !contract?.projectId}
-            data-testid="button-preview"
-          >
+            data-testid="button-preview">
             <Eye className="mr-2 h-4 w-4" />
-            {isGenerating ? 'Generating...' : 'View PDF'}
+            {isGenerating ? "Generating..." : "View PDF"}
           </Button>
-          <Button 
-            onClick={handleDownload} 
+          <Button
+            onClick={handleDownload}
             disabled={isGenerating || !contract?.projectId}
-            data-testid="button-download"
-          >
+            data-testid="button-download">
             <Download className="mr-2 h-4 w-4" />
-            {isGenerating ? 'Generating...' : 'Download PDF'}
+            {isGenerating ? "Generating..." : "Download PDF"}
           </Button>
         </div>
       </div>
@@ -494,10 +562,12 @@ export default function ContractDetail() {
       <Card>
         <CardHeader>
           <CardTitle>Contract Details</CardTitle>
-          <CardDescription>Overview and metadata for this contract</CardDescription>
+          <CardDescription>
+            Overview and metadata for this contract
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
             <div>
               <p className="text-sm text-muted-foreground">Contract Type</p>
               <p className="font-medium" data-testid="text-contract-type">
@@ -506,32 +576,34 @@ export default function ContractDetail() {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Version</p>
-              <p className="font-medium" data-testid="text-version">v{contract.version}</p>
+              <p className="font-medium" data-testid="text-version">
+                v{contract.version}
+              </p>
             </div>
             <div className="flex items-start gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <Calendar className="mt-0.5 h-4 w-4 text-muted-foreground" />
               <div>
                 <p className="text-sm text-muted-foreground">Generated</p>
                 <p className="font-medium" data-testid="text-generated-date">
-                  {contract.generatedAt 
-                    ? new Date(contract.generatedAt).toLocaleDateString() 
-                    : 'N/A'}
+                  {contract.generatedAt
+                    ? new Date(contract.generatedAt).toLocaleDateString()
+                    : "N/A"}
                 </p>
               </div>
             </div>
             <div className="flex items-start gap-2">
-              <User className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <User className="mt-0.5 h-4 w-4 text-muted-foreground" />
               <div>
                 <p className="text-sm text-muted-foreground">Generated By</p>
                 <p className="font-medium" data-testid="text-generated-by">
-                  {contract.generatedBy || 'System'}
+                  {contract.generatedBy || "System"}
                 </p>
               </div>
             </div>
           </div>
           {contract.fileName && (
-            <div className="mt-6 pt-6 border-t">
-              <p className="text-sm text-muted-foreground mb-2">File</p>
+            <div className="mt-6 border-t pt-6">
+              <p className="mb-2 text-sm text-muted-foreground">File</p>
               <div className="flex items-center gap-2 text-sm">
                 <FileText className="h-4 w-4" />
                 <span data-testid="text-filename">{contract.fileName}</span>
@@ -544,7 +616,9 @@ export default function ContractDetail() {
       <Card>
         <CardHeader>
           <CardTitle>Status Workflow</CardTitle>
-          <CardDescription>Track and update the contract through its lifecycle</CardDescription>
+          <CardDescription>
+            Track and update the contract through its lifecycle
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between">
@@ -552,54 +626,53 @@ export default function ContractDetail() {
               const Icon = step.icon;
               const isCompleted = index < currentStatusIndex;
               const isCurrent = index === currentStatusIndex;
-              const isNext = index === currentStatusIndex + 1;
-              
+              const isNextOrPrevious =
+                index === currentStatusIndex + 1 ||
+                index === currentStatusIndex - 1;
+
               return (
-                <div key={step.key} className="flex flex-col items-center flex-1">
-                  <div className="flex items-center w-full">
+                <div
+                  key={step.key}
+                  className="flex flex-1 flex-col items-center">
+                  <div className="flex w-full items-center">
                     {index > 0 && (
-                      <div 
+                      <div
                         className={`h-1 flex-1 ${
-                          index <= currentStatusIndex ? 'bg-primary' : 'bg-muted'
+                          index <= currentStatusIndex
+                            ? "bg-primary"
+                            : "bg-muted"
                         }`}
                       />
                     )}
                     <button
-                      onClick={() => isNext && handleStatusChange(step.key)}
-                      disabled={!isNext || updateStatusMutation.isPending}
-                      className={`
-                        relative z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 
-                        transition-all
-                        ${isCompleted ? 'bg-primary border-primary text-primary-foreground' : ''}
-                        ${isCurrent ? 'bg-primary border-primary text-primary-foreground ring-4 ring-primary/20' : ''}
-                        ${!isCompleted && !isCurrent ? 'bg-background border-muted text-muted-foreground' : ''}
-                        ${isNext ? 'cursor-pointer hover:border-primary hover:text-primary' : ''}
-                        ${!isNext && !isCurrent && !isCompleted ? 'cursor-not-allowed' : ''}
-                      `}
-                      data-testid={`button-status-${step.key.toLowerCase()}`}
-                    >
+                      onClick={() =>
+                        isNextOrPrevious && handleStatusChange(step.key)
+                      }
+                      disabled={
+                        !isNextOrPrevious || updateStatusMutation.isPending
+                      }
+                      className={`relative z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all ${isCompleted ? "border-primary bg-primary text-primary-foreground" : ""} ${isCurrent ? "border-primary bg-primary text-primary-foreground ring-4 ring-primary/20" : ""} ${!isCompleted && !isCurrent ? "border-muted bg-background text-muted-foreground" : ""} ${isNextOrPrevious ? "cursor-pointer hover:border-primary hover:text-primary" : ""} ${!isNextOrPrevious && !isCurrent && !isCompleted ? "cursor-not-allowed" : ""} `}
+                      data-testid={`button-status-${step.key.toLowerCase()}`}>
                       <Icon className="h-5 w-5" />
                     </button>
                     {index < statusSteps.length - 1 && (
-                      <div 
+                      <div
                         className={`h-1 flex-1 ${
-                          index < currentStatusIndex ? 'bg-primary' : 'bg-muted'
+                          index < currentStatusIndex ? "bg-primary" : "bg-muted"
                         }`}
                       />
                     )}
                   </div>
-                  <span className={`
-                    mt-2 text-xs text-center
-                    ${isCurrent ? 'font-semibold text-primary' : 'text-muted-foreground'}
-                  `}>
+                  <span
+                    className={`mt-2 text-center text-xs ${isCurrent ? "font-semibold text-primary" : "text-muted-foreground"} `}>
                     {step.label}
                   </span>
                 </div>
               );
             })}
           </div>
-          <p className="text-sm text-muted-foreground text-center mt-6">
-            {currentStatusIndex < statusSteps.length - 1 
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            {currentStatusIndex < statusSteps.length - 1
               ? `Click "${statusSteps[currentStatusIndex + 1]?.label}" to advance the contract status`
               : "Contract is fully executed"}
           </p>
@@ -610,28 +683,29 @@ export default function ContractDetail() {
         <CardHeader>
           <CardTitle>Included Clauses</CardTitle>
           <CardDescription>
-            {clausesLoading 
-              ? "Loading clauses..." 
+            {clausesLoading
+              ? "Loading clauses..."
               : `${clauses?.length || 0} clauses included in this contract`}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {clausesLoading ? (
             <div className="space-y-3">
-              {[1, 2, 3].map(i => (
+              {[1, 2, 3].map((i) => (
                 <Skeleton key={i} className="h-16 w-full" />
               ))}
             </div>
           ) : clauses && clauses.length > 0 ? (
             <div className="space-y-2">
               {clauses.map((clause) => (
-                <Collapsible key={clause.id} open={expandedClauses.has(clause.id)}>
+                <Collapsible
+                  key={clause.id}
+                  open={expandedClauses.has(clause.id)}>
                   <CollapsibleTrigger asChild>
                     <button
                       onClick={() => toggleClause(clause.id)}
-                      className="w-full flex items-center justify-between p-3 rounded-lg border hover-elevate text-left"
-                      data-testid={`button-clause-${clause.id}`}
-                    >
+                      className="hover-elevate flex w-full items-center justify-between rounded-lg border p-3 text-left"
+                      data-testid={`button-clause-${clause.id}`}>
                       <div className="flex items-center gap-3">
                         {expandedClauses.has(clause.id) ? (
                           <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -639,7 +713,9 @@ export default function ContractDetail() {
                           <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         )}
                         <div>
-                          <span className="font-medium">{clause.section_number}</span>
+                          <span className="font-medium">
+                            {clause.section_number}
+                          </span>
                           <span className="ml-2">{clause.name}</span>
                         </div>
                       </div>
@@ -648,10 +724,13 @@ export default function ContractDetail() {
                           {clause.hierarchy_level}
                         </Badge>
                         {clause.risk_level && (
-                          <Badge 
-                            variant={clause.risk_level === 'high' ? 'destructive' : 'secondary'}
-                            className="text-xs"
-                          >
+                          <Badge
+                            variant={
+                              clause.risk_level === "high"
+                                ? "destructive"
+                                : "secondary"
+                            }
+                            className="text-xs">
                             {clause.risk_level} risk
                           </Badge>
                         )}
@@ -659,10 +738,12 @@ export default function ContractDetail() {
                     </button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <div className="p-4 ml-7 border-l-2 border-muted mt-1">
-                      <div 
+                    <div className="ml-7 mt-1 border-l-2 border-muted p-4">
+                      <div
                         className="text-sm"
-                        dangerouslySetInnerHTML={{ __html: formatContent(clause.content) }}
+                        dangerouslySetInnerHTML={{
+                          __html: formatContent(clause.content),
+                        }}
                       />
                     </div>
                   </CollapsibleContent>
@@ -670,10 +751,12 @@ export default function ContractDetail() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <div className="py-8 text-center text-muted-foreground">
+              <FileText className="mx-auto mb-2 h-8 w-8 opacity-50" />
               <p>No clause data available for this contract.</p>
-              <p className="text-sm mt-1">Clauses are embedded in the generated document.</p>
+              <p className="mt-1 text-sm">
+                Clauses are embedded in the generated document.
+              </p>
             </div>
           )}
         </CardContent>
@@ -685,11 +768,12 @@ export default function ContractDetail() {
             <CardTitle>Notes</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm" data-testid="text-notes">{contract.notes}</p>
+            <p className="text-sm" data-testid="text-notes">
+              {contract.notes}
+            </p>
           </CardContent>
         </Card>
       )}
-
     </div>
   );
 }
