@@ -1,11 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { 
-  LayoutDashboard, 
-  FileCheck,
-  Shield,
-  Plus,
-  Box
-} from "lucide-react";
+import { LayoutDashboard, FileCheck, Shield, Plus, Box } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -36,11 +30,11 @@ const mainNavItems = [
     url: "/contracts",
     icon: FileCheck,
   },
-  {
-    title: "Component Library",
-    url: "/component-library",
-    icon: Box,
-  },
+  // {
+  //   title: "Component Library",
+  //   url: "/component-library",
+  //   icon: Box,
+  // },
 ];
 
 const adminNavItems = [
@@ -63,11 +57,13 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="px-4 py-5">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary font-bold text-primary-foreground">
             D
           </div>
           <div className="flex flex-col">
-            <span className="text-base font-semibold text-sidebar-foreground" data-testid="text-app-title">
+            <span
+              className="text-base font-semibold text-sidebar-foreground"
+              data-testid="text-app-title">
               Dvele ONE
             </span>
             <span className="text-xs text-muted-foreground">
@@ -76,9 +72,9 @@ export function AppSidebar() {
           </div>
         </div>
       </SidebarHeader>
-      
+
       <SidebarSeparator />
-      
+
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -88,15 +84,13 @@ export function AppSidebar() {
             <SidebarMenu>
               {mainNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild 
+                  <SidebarMenuButton
+                    asChild
                     isActive={isActive(item.url)}
-                    tooltip={item.title}
-                  >
-                    <Link 
+                    tooltip={item.title}>
+                    <Link
                       href={item.url}
-                      data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                    >
+                      data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </Link>
@@ -106,21 +100,19 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        
+
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>
             <SidebarMenu>
               {adminNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild 
+                  <SidebarMenuButton
+                    asChild
                     isActive={isActive(item.url)}
-                    tooltip={item.title}
-                  >
-                    <Link 
+                    tooltip={item.title}>
+                    <Link
                       href={item.url}
-                      data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
-                    >
+                      data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </Link>
@@ -131,11 +123,9 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      
+
       <SidebarFooter className="px-4 py-4">
-        <div className="text-xs text-muted-foreground">
-          Version 1.0.0
-        </div>
+        <div className="text-xs text-muted-foreground">Version 1.0.0</div>
       </SidebarFooter>
     </Sidebar>
   );

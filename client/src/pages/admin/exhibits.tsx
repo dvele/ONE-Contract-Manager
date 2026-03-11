@@ -29,6 +29,7 @@ import {
   Edit,
   Eye,
   FileText,
+  GripVertical,
   Plus,
   Save,
   Search,
@@ -70,6 +71,9 @@ export default function ExhibitsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterContractType, setFilterContractType] = useState("ALL");
   const [deleteTarget, setDeleteTarget] = useState<Exhibit | null>(null);
+  const [draggedId, setDraggedId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
+  const [pendingReorder, setPendingReorder] = useState<{ id: number; letter: string }[] | null>(null);
   const { toast } = useToast();
 
   const { data: exhibits, isLoading } = useQuery<Exhibit[]>({
@@ -141,6 +145,20 @@ export default function ExhibitsPage() {
     },
   });
 
+  const reorderMutation = useMutation({
+    mutationFn: async (updates: { id: number; letter: string }[]) => {
+      await apiRequest("POST", "/api/exhibits/reorder", updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/exhibits", "includeInactive"],
+      });
+    },
+    onError: () => {
+      toast({ title: "Failed to reorder exhibits", variant: "destructive" });
+    },
+  });
+
   const startEditing = (exhibit: Exhibit) => {
     setEditData({
       letter: exhibit.letter,
@@ -149,7 +167,6 @@ export default function ExhibitsPage() {
       is_dynamic: exhibit.is_dynamic,
       disclosure_code: exhibit.disclosure_code,
       contract_types: exhibit.contract_types,
-      sort_order: exhibit.sort_order,
       is_active: exhibit.is_active,
     });
     setIsEditing(true);
@@ -165,7 +182,6 @@ export default function ExhibitsPage() {
       is_dynamic: false,
       disclosure_code: null,
       contract_types: ["MASTER_EF"],
-      sort_order: (exhibits?.length || 0) + 1,
       is_active: true,
     });
     setSelectedExhibit(null);
@@ -186,7 +202,6 @@ export default function ExhibitsPage() {
       title: editData.title,
       content: editData.content,
       contractTypes: editData.contract_types,
-      sortOrder: editData.sort_order,
       isDynamic: editData.is_dynamic,
       disclosureCode: editData.disclosure_code,
       isActive: editData.is_active,
@@ -216,6 +231,30 @@ export default function ExhibitsPage() {
       return true;
     });
   }, [exhibits, searchTerm, filterContractType]);
+
+  const sortedExhibits = useMemo(
+    () => [...(exhibits || [])].sort((a, b) => a.letter.localeCompare(b.letter)),
+    [exhibits]
+  );
+
+  const isDragEnabled = !searchTerm && filterContractType === "ALL";
+
+  const handleDrop = (targetId: number, srcId: number) => {
+    if (!srcId || srcId === targetId) return;
+    const draggedIdx = sortedExhibits.findIndex((e) => e.id === srcId);
+    const targetIdx = sortedExhibits.findIndex((e) => e.id === targetId);
+    if (draggedIdx === -1 || targetIdx === -1) return;
+    const reordered = [...sortedExhibits];
+    const [dragged] = reordered.splice(draggedIdx, 1);
+    reordered.splice(targetIdx, 0, dragged);
+    const updates = reordered.map((exhibit, index) => ({
+      id: exhibit.id,
+      letter: EXHIBIT_LETTERS[index],
+    }));
+    setPendingReorder(updates);
+    setDraggedId(null);
+    setDragOverId(null);
+  };
 
   const previewContent = useMemo(() => {
     if (isEditing) return editData.content || "";
@@ -295,52 +334,84 @@ export default function ExhibitsPage() {
                     No exhibits found
                   </div>
                 ) : (
-                  filteredExhibits.map((exhibit) => (
-                    <button
+                  (isDragEnabled ? sortedExhibits : filteredExhibits).map((exhibit) => (
+                    <div
                       key={exhibit.id}
-                      onClick={() => {
-                        if (isEditing && !isCreating) cancelEditing();
-                        setSelectedExhibit(exhibit);
-                        setIsCreating(false);
+                      draggable={isDragEnabled}
+                      onDragStart={(e) => {
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", String(exhibit.id));
+                        setDraggedId(exhibit.id);
                       }}
-                      className={`w-full rounded-md p-2.5 text-left transition-colors ${
-                        selectedExhibit?.id === exhibit.id && !isCreating
-                          ? "bg-accent"
-                          : "hover-elevate"
-                      } ${!exhibit.is_active ? "opacity-50" : ""}`}
-                      data-testid={`button-exhibit-${exhibit.id}`}>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant="outline"
-                          className="flex-shrink-0 font-mono text-xs">
-                          {exhibit.letter}
-                        </Badge>
-                        <span className="truncate text-sm font-medium">
-                          {exhibit.title}
-                        </span>
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-1">
-                        {exhibit.contract_types?.map((type) => (
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                        setDragOverId(exhibit.id);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const srcId = parseInt(e.dataTransfer.getData("text/plain"), 10);
+                        handleDrop(exhibit.id, srcId);
+                      }}
+                      onDragEnd={() => {
+                        setDraggedId(null);
+                        setDragOverId(null);
+                      }}
+                      className={`flex items-stretch rounded-md transition-all ${
+                        dragOverId === exhibit.id && draggedId !== exhibit.id
+                          ? "ring-2 ring-primary ring-offset-1"
+                          : ""
+                      } ${draggedId === exhibit.id ? "opacity-40" : ""}`}>
+                      {isDragEnabled && (
+                        <div className="flex cursor-grab items-center px-1 text-muted-foreground/40 hover:text-muted-foreground/70">
+                          <GripVertical className="h-3.5 w-3.5 flex-shrink-0" />
+                        </div>
+                      )}
+                      <button
+                        onClick={() => {
+                          if (isEditing && !isCreating) cancelEditing();
+                          setSelectedExhibit(exhibit);
+                          setIsCreating(false);
+                        }}
+                        className={`min-w-0 flex-1 rounded-md p-2.5 text-left transition-colors ${
+                          selectedExhibit?.id === exhibit.id && !isCreating
+                            ? "bg-accent"
+                            : "hover-elevate"
+                        } ${!exhibit.is_active ? "opacity-50" : ""}`}
+                        data-testid={`button-exhibit-${exhibit.id}`}>
+                        <div className="flex items-center gap-2">
                           <Badge
-                            key={type}
-                            variant="secondary"
-                            className="py-0 text-[10px]">
-                            {type}
+                            variant="outline"
+                            className="flex-shrink-0 font-mono text-xs">
+                            {exhibit.letter}
                           </Badge>
-                        ))}
-                        {exhibit.is_dynamic && (
-                          <Badge variant="secondary" className="py-0 text-[10px]">
-                            <Zap className="mr-0.5 h-2.5 w-2.5" />
-                            Dynamic
-                          </Badge>
-                        )}
-                        {!exhibit.is_active && (
-                          <Badge variant="destructive" className="py-0 text-[10px]">
-                            Inactive
-                          </Badge>
-                        )}
-                      </div>
-                    </button>
+                          <span className="truncate text-sm font-medium">
+                            {exhibit.title}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-1">
+                          {exhibit.contract_types?.map((type) => (
+                            <Badge
+                              key={type}
+                              variant="secondary"
+                              className="py-0 text-[10px]">
+                              {type}
+                            </Badge>
+                          ))}
+                          {exhibit.is_dynamic && (
+                            <Badge variant="secondary" className="py-0 text-[10px]">
+                              <Zap className="mr-0.5 h-2.5 w-2.5" />
+                              Dynamic
+                            </Badge>
+                          )}
+                          {!exhibit.is_active && (
+                            <Badge variant="destructive" className="py-0 text-[10px]">
+                              Inactive
+                            </Badge>
+                          )}
+                        </div>
+                      </button>
+                    </div>
                   ))
                 )}
               </div>
@@ -484,31 +555,15 @@ export default function ExhibitsPage() {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-xs">Sort Order</Label>
-                            <Input
-                              type="number"
-                              value={editData.sort_order || 0}
-                              onChange={(e) =>
-                                setEditData({
-                                  ...editData,
-                                  sort_order: parseInt(e.target.value) || 0,
-                                })
-                              }
-                              data-testid="input-sort-order"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Contract Types</Label>
-                            <ContractTypePicker
-                              options={CONTRACT_TYPES}
-                              value={editData.contract_types}
-                              onChange={(types) =>
-                                setEditData({ ...editData, contract_types: types })
-                              }
-                            />
-                          </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Contract Types</Label>
+                          <ContractTypePicker
+                            options={CONTRACT_TYPES}
+                            value={editData.contract_types}
+                            onChange={(types) =>
+                              setEditData({ ...editData, contract_types: types })
+                            }
+                          />
                         </div>
 
                         <div className="flex items-center gap-6">
@@ -648,6 +703,18 @@ export default function ExhibitsPage() {
         actionLabel="Deactivate"
         actionClassName="bg-destructive text-destructive-foreground"
         onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+      />
+
+      <DeleteConfirmDialog
+        open={!!pendingReorder}
+        onOpenChange={(open) => !open && setPendingReorder(null)}
+        title="Reorder Exhibits?"
+        description="This will reassign all exhibit letters to match the new order. Make sure any clause references to exhibit letters (e.g. 'See Exhibit B') are updated accordingly, as they will not update automatically."
+        actionLabel="Reorder"
+        onConfirm={() => {
+          if (pendingReorder) reorderMutation.mutate(pendingReorder);
+          setPendingReorder(null);
+        }}
       />
     </>
   );

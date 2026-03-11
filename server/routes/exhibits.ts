@@ -189,6 +189,34 @@ router.put("/exhibits/:id", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/exhibits/reorder", async (req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const updates: { id: number; letter: string }[] = req.body;
+
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ error: "updates must be a non-empty array" });
+    }
+
+    await client.query("BEGIN");
+    for (const { id, letter } of updates) {
+      await client.query(
+        `UPDATE exhibits SET letter = $1, exhibit_code = $2, updated_at = NOW()
+         WHERE id = $3 AND organization_id = $4`,
+        [letter, `EXHIBIT_${letter}`, id, req.organizationId]
+      );
+    }
+    await client.query("COMMIT");
+    res.json({ success: true });
+  } catch (error: any) {
+    await client.query("ROLLBACK");
+    console.error("Error reordering exhibits:", error);
+    res.status(500).json({ error: "Failed to reorder exhibits" });
+  } finally {
+    client.release();
+  }
+});
+
 router.delete("/exhibits/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
