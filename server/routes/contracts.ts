@@ -1,12 +1,9 @@
 import { Router } from "express";
 import { db } from "../db/index";
 import { pool } from "../db";
-import { contracts, projects, clauses, financials } from "../../shared/schema";
-import { eq, count, desc, and, sql } from "drizzle-orm";
+import { contracts, projects, clauses, financials, projectUnits, homeModels } from "../../shared/schema";
+import { eq, sql } from "drizzle-orm";
 import { getProjectWithRelations } from "./helpers";
-import { mapProjectToVariables } from "../lib/mapper";
-import { resolveComponentTags, ComponentRenderContext } from "../services/component-library";
-import { getVariableMap } from "../services/variable-mapper";
 import path from "path";
 import fs from "fs";
 import multer from "multer";
@@ -499,58 +496,6 @@ async function ingestStateDisclosuresFromDocument(filePath: string): Promise<num
   return insertedCount;
 }
 
-// Get list of existing templates
-router.get("/contracts/templates", async (req, res) => {
-  try {
-    const templatesDir = path.join(process.cwd(), "server", "templates");
-    
-    if (!fs.existsSync(templatesDir)) {
-      return res.json({ templates: [] });
-    }
-    
-    const files = fs.readdirSync(templatesDir)
-      .filter(f => f.endsWith(".docx") && !f.startsWith("~$"))
-      .map(f => {
-        const filePath = path.join(templatesDir, f);
-        const stats = fs.statSync(filePath);
-        const contractType = f
-          .replace(/\.docx$/i, "")
-          .replace(/^Template[_-]?/i, "")
-          .replace(/[_-]/g, "_")
-          .toUpperCase()
-          .replace(/_+/g, "_")
-          .replace(/^_|_$/g, "");
-        
-        return {
-          fileName: f,
-          contractType,
-          uploadedAt: stats.mtime.toISOString(),
-          size: stats.size,
-        };
-      });
-    
-    // Get clause counts for each contract type using JSONB array unnest
-    const clauseCounts = await pool.query(`
-      SELECT type_val, COUNT(*)::int as count
-      FROM clauses, jsonb_array_elements_text(contract_types) AS type_val
-      GROUP BY type_val
-    `);
-    
-    const countMap = new Map(clauseCounts.rows.map((c: any) => [c.type_val, c.count]));
-    
-    const templates = files.map(f => ({
-      ...f,
-      clauseCount: countMap.get(f.contractType) || 0,
-    }));
-    
-    res.json({ templates });
-    
-  } catch (error: any) {
-    console.error("Failed to list templates:", error);
-    res.status(500).json({ error: "Failed to list templates" });
-  }
-});
-
 // Delete a template
 router.delete("/contracts/templates/:fileName", async (req, res) => {
   try {
@@ -618,20 +563,50 @@ router.delete("/contracts/templates/:fileName", async (req, res) => {
 // CONTRACT CRUD
 // ---------------------------------------------------------------------------
 
-router.get("/contracts/download/:fileName", async (req, res) => {
+router.get("/contracts/templates", async (req, res) => {
   try {
-    const fileName = req.params.fileName;
-    const outputDir = path.join(process.cwd(), "generated");
-    const filePath = path.join(outputDir, fileName);
+    const templatesDir = path.join(process.cwd(), "server", "templates");
 
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: "File not found" });
+    if (!fs.existsSync(templatesDir)) {
+      return res.json({ templates: [] });
     }
 
-    res.download(filePath, fileName);
+    const files = fs.readdirSync(templatesDir).filter(
+      (f) => f.endsWith(".docx") && !f.startsWith("~$")
+    );
+
+    const templates = await Promise.all(
+      files.map(async (fileName) => {
+        const filePath = path.join(templatesDir, fileName);
+        const stats = fs.statSync(filePath);
+
+        const contractType = fileName
+          .replace(/\.docx$/i, "")
+          .replace(/^Template[_-]?/i, "")
+          .replace(/[_-]/g, "_")
+          .toUpperCase()
+          .replace(/_+/g, "_")
+          .replace(/^_|_$/g, "");
+
+        const countResult = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(clauses)
+          .where(sql`${clauses.contractTypes} @> ${JSON.stringify([contractType])}`);
+
+        return {
+          fileName,
+          contractType,
+          uploadedAt: stats.mtime.toISOString(),
+          size: stats.size,
+          clauseCount: countResult[0]?.count || 0,
+        };
+      })
+    );
+
+    res.json({ templates });
   } catch (error) {
-    console.error("Failed to download contract:", error);
-    res.status(500).json({ error: "Failed to download contract" });
+    console.error("Failed to fetch templates:", error);
+    res.status(500).json({ error: "Failed to fetch templates" });
   }
 });
 
@@ -919,45 +894,6 @@ router.post("/contracts", async (req, res) => {
   }
 });
 
-// Cleanup endpoint - remove duplicate draft contracts, keeping only the latest
-router.post("/contracts/cleanup-duplicates", async (req, res) => {
-  try {
-    // Find all projects with duplicate drafts
-    const duplicatesQuery = `
-      WITH ranked AS (
-        SELECT id, project_id, contract_type, status, generated_at,
-               ROW_NUMBER() OVER (PARTITION BY project_id, contract_type, status ORDER BY generated_at DESC) as rn
-        FROM contracts
-        WHERE status = 'Draft'
-      )
-      SELECT id FROM ranked WHERE rn > 1
-    `;
-    
-    const result = await pool.query(duplicatesQuery);
-    const duplicateIds = result.rows.map(r => r.id);
-    
-    if (duplicateIds.length === 0) {
-      return res.json({ success: true, message: "No duplicates found", deletedCount: 0 });
-    }
-    
-    // Delete the duplicates
-    const deleteQuery = `DELETE FROM contracts WHERE id = ANY($1)`;
-    await pool.query(deleteQuery, [duplicateIds]);
-    
-    console.log(`🧹 Cleaned up ${duplicateIds.length} duplicate draft contracts`);
-    
-    res.json({ 
-      success: true, 
-      message: `Deleted ${duplicateIds.length} duplicate draft contracts`,
-      deletedCount: duplicateIds.length,
-      deletedIds: duplicateIds
-    });
-  } catch (error) {
-    console.error("Failed to cleanup duplicates:", error);
-    res.status(500).json({ error: "Failed to cleanup duplicates" });
-  }
-});
-
 router.get("/contracts/:id", async (req, res) => {
   try {
     const contractId = parseInt(req.params.id);
@@ -994,12 +930,11 @@ router.get("/contracts/:id/clauses", async (req, res) => {
   try {
     const contractId = parseInt(req.params.id);
     const [contract] = await db.select().from(contracts).where(eq(contracts.id, contractId));
-    
+
     if (!contract) {
       return res.status(404).json({ error: "Contract not found" });
     }
 
-    // FIRST: Try to get hydrated clauses from contract_clauses table
     const hydratedQuery = `
       SELECT cc.id, cc.clause_id, cc.header_text, cc.body_html, cc.level, cc."order",
              c.slug, c.contract_types, c.tags
@@ -1008,84 +943,52 @@ router.get("/contracts/:id/clauses", async (req, res) => {
       WHERE cc.contract_id = $1
       ORDER BY cc."order" ASC
     `;
-    
+
     let result = await pool.query(hydratedQuery, [contractId]);
-    console.log(`📋 Contract ${contractId}: Found ${result.rows.length} hydrated clauses in contract_clauses`);
-    
-    // FALLBACK: If no hydrated clauses, query from clauses table using contract_types
+
     if (result.rows.length === 0) {
-      console.log(`⚠️ No hydrated clauses for contract ${contractId}, falling back to clauses table`);
-      
       const contractTypeMap: Record<string, string> = {
-        'one_agreement': 'ONE_AGREEMENT',
-        'ONE': 'ONE_AGREEMENT',
-        'ONE Agreement': 'ONE_AGREEMENT',
-        'ONE_AGREEMENT': 'ONE_AGREEMENT',
-        'manufacturing_sub': 'OFFSITE',
-        'MANUFACTURING': 'OFFSITE',
-        'OFFSITE': 'OFFSITE',
-        'onsite_sub': 'ON_SITE',
-        'ONSITE': 'ON_SITE',
-        'ON_SITE': 'ON_SITE',
+        'one_agreement': 'ONE_AGREEMENT', 'ONE': 'ONE_AGREEMENT',
+        'ONE Agreement': 'ONE_AGREEMENT', 'ONE_AGREEMENT': 'ONE_AGREEMENT',
+        'manufacturing_sub': 'OFFSITE', 'MANUFACTURING': 'OFFSITE', 'OFFSITE': 'OFFSITE',
+        'onsite_sub': 'ON_SITE', 'ONSITE': 'ON_SITE', 'ON_SITE': 'ON_SITE',
       };
-      
       const templateType = contractTypeMap[contract.contractType] || 'ONE_AGREEMENT';
-      
-      const clauseQuery = `
-        SELECT c.id, c.slug, c.header_text, c.body_html, c.level, c."order", c.contract_types, c.tags
-        FROM clauses c
-        WHERE c.contract_types @> $1::jsonb OR c.contract_types @> '["ALL"]'::jsonb
-        ORDER BY c."order", c.slug
-      `;
-      
-      result = await pool.query(clauseQuery, [JSON.stringify([templateType])]);
-      console.log(`📋 Fallback: Found ${result.rows.length} clauses from clauses table`);
+      result = await pool.query(
+        `SELECT c.id, c.slug, c.header_text, c.body_html, c.level, c."order", c.contract_types, c.tags
+         FROM clauses c
+         WHERE c.contract_types @> $1::jsonb OR c.contract_types @> '["ALL"]'::jsonb
+         ORDER BY c."order", c.slug`,
+        [JSON.stringify([templateType])]
+      );
     }
-    
+
     let variables: Record<string, string | number | boolean | null> = {};
     if (contract.projectId) {
       const projectData = await getProjectWithRelations(contract.projectId);
       if (projectData) {
         const { mapProjectToVariables } = await import('../lib/mapper');
         const { calculateProjectPricing } = await import('../services/pricingEngine');
-        
-        // Calculate pricing to populate table variables
         let pricingSummary = null;
         try {
           pricingSummary = await calculateProjectPricing(contract.projectId);
         } catch (e) {
           console.warn('Pricing calculation failed for clause preview:', e);
         }
-        
         variables = mapProjectToVariables(projectData, pricingSummary || undefined);
       }
     }
-    
+
     const clausesWithValues = result.rows.map((clause: any) => {
-      // Replace variables in both header and body
-      let headerText = clause.header_text || '';
-      let bodyHtml = clause.body_html || '';
-      
-      const replaceVars = (text: string) => {
-        return text.replace(/\{\{([A-Z0-9_]+)\}\}/g, (match: string, varName: string) => {
+      const replaceVars = (text: string) =>
+        text.replace(/\{\{([A-Z0-9_]+)\}\}/g, (_match: string, varName: string) => {
           const value = variables[varName];
-          if (value !== null && value !== undefined && value !== '') {
-            return String(value);
-          }
-          return match;
+          return value !== null && value !== undefined && value !== '' ? String(value) : _match;
         });
-      };
-      
-      headerText = replaceVars(headerText);
-      bodyHtml = replaceVars(bodyHtml);
-      
-      // Reconstruct content field for frontend compatibility
-      const content = `
-        <div class="clause-wrapper level-${clause.level}">
-          <h4 class="clause-header">${headerText}</h4>
-          <div class="clause-body">${bodyHtml}</div>
-        </div>`;
-      
+
+      const headerText = replaceVars(clause.header_text || '');
+      const bodyHtml = replaceVars(clause.body_html || '');
+
       return {
         id: clause.id,
         clause_code: clause.slug,
@@ -1093,13 +996,13 @@ router.get("/contracts/:id/clauses", async (req, res) => {
         name: headerText,
         header_text: headerText,
         body_html: bodyHtml,
-        content: content,
+        content: `<div class="clause-wrapper level-${clause.level}"><h4 class="clause-header">${headerText}</h4><div class="clause-body">${bodyHtml}</div></div>`,
         hierarchy_level: clause.level,
         contract_types: clause.contract_types,
-        tags: clause.tags
+        tags: clause.tags,
       };
     });
-    
+
     res.json(clausesWithValues);
   } catch (error) {
     console.error("Failed to fetch contract clauses:", error);
@@ -1119,363 +1022,6 @@ router.patch("/contracts/:id", async (req, res) => {
   } catch (error) {
     console.error("Failed to update contract:", error);
     res.status(500).json({ error: "Failed to update contract" });
-  }
-});
-
-router.post("/contracts/:id/send", async (req, res) => {
-  try {
-    const contractId = parseInt(req.params.id);
-    const { sentTo } = req.body;
-    
-    const [result] = await db
-      .update(contracts)
-      .set({
-        status: "Sent",
-        sentAt: new Date(),
-        sentTo,
-      })
-      .where(eq(contracts.id, contractId))
-      .returning();
-    
-    res.json(result);
-  } catch (error) {
-    console.error("Failed to mark contract as sent:", error);
-    res.status(500).json({ error: "Failed to mark contract as sent" });
-  }
-});
-
-router.post("/contracts/:id/execute", async (req, res) => {
-  try {
-    const contractId = parseInt(req.params.id);
-    const { executedFilePath } = req.body;
-    
-    const [result] = await db
-      .update(contracts)
-      .set({
-        status: "Executed",
-        executedAt: new Date(),
-        executedFilePath,
-      })
-      .where(eq(contracts.id, contractId))
-      .returning();
-    
-    res.json(result);
-  } catch (error) {
-    console.error("Failed to mark contract as executed:", error);
-    res.status(500).json({ error: "Failed to mark contract as executed" });
-  }
-});
-
-// ---------------------------------------------------------------------------
-// CONTRACT GENERATION
-// ---------------------------------------------------------------------------
-
-router.get("/contracts/variables/:contractType", async (req, res) => {
-  try {
-    const { contractType } = req.params;
-    
-    const query = `
-      SELECT DISTINCT 
-        cv.variable_name,
-        cv.display_name,
-        cv.data_type,
-        cv.category,
-        cv.description,
-        cv.default_value,
-        cv.is_required
-      FROM contract_variables cv
-      WHERE $1 = ANY(cv.used_in_contracts)
-      ORDER BY cv.category, cv.variable_name
-    `;
-    
-    const result = await pool.query(query, [contractType.toUpperCase()]);
-    
-    const byCategory = result.rows.reduce((acc: Record<string, any[]>, variable: any) => {
-      const category = variable.category || 'other';
-      if (!acc[category]) acc[category] = [];
-      acc[category].push(variable);
-      return acc;
-    }, {});
-    
-    res.json({
-      contractType: contractType.toUpperCase(),
-      totalVariables: result.rows.length,
-      categories: Object.keys(byCategory),
-      variablesByCategory: byCategory,
-      allVariables: result.rows
-    });
-    
-  } catch (error) {
-    console.error("Error fetching required variables:", error);
-    res.status(500).json({ 
-      error: "Failed to fetch required variables",
-      message: error instanceof Error ? error.message : "Unknown error"
-    });
-  }
-});
-
-router.post("/contracts/preview-clauses", async (req, res) => {
-  try {
-    const { contractType, projectData } = req.body;
-    
-    if (!contractType || !projectData) {
-      return res.status(400).json({ 
-        error: "Both contractType and projectData are required" 
-      });
-    }
-    
-    const templateQuery = `
-      SELECT * FROM contract_templates
-      WHERE contract_type = $1 AND (status = 'active' OR status IS NULL)
-      LIMIT 1
-    `;
-    
-    const templateResult = await pool.query(templateQuery, [contractType.toUpperCase()]);
-    
-    if (templateResult.rows.length === 0) {
-      return res.status(404).json({ 
-        error: `No template found for: ${contractType}` 
-      });
-    }
-    
-    const template = templateResult.rows[0];
-    
-    // Try base_clause_ids first, then fall back to template_clauses junction
-    let clauseIds = [...(template.base_clause_ids || [])];
-    
-    // If base_clause_ids is empty, try template_clauses junction table
-    if (clauseIds.length === 0) {
-      console.log(`⚠️ Template ${template.id} has empty base_clause_ids, checking template_clauses junction`);
-      const junctionResult = await pool.query(
-        `SELECT clause_id FROM template_clauses WHERE template_id = $1 ORDER BY order_index`,
-        [template.id]
-      );
-      clauseIds = junctionResult.rows.map((r: any) => r.clause_id);
-      console.log(`📋 Found ${clauseIds.length} clauses via template_clauses junction`);
-    }
-    
-    const conditionalRules = template.conditional_rules || {};
-    for (const [conditionKey, ruleSet] of Object.entries(conditionalRules)) {
-      const projectValue = projectData[conditionKey];
-      const rules = ruleSet as Record<string, number[]>;
-      if (projectValue !== undefined && rules[String(projectValue)]) {
-        clauseIds.push(...rules[String(projectValue)]);
-      }
-    }
-    
-    if (clauseIds.length === 0) {
-      return res.json({
-        contractType: contractType.toUpperCase(),
-        template: template.display_name || template.name,
-        summary: { totalClauses: 0, sections: 0, subsections: 0, paragraphs: 0 },
-        allClauses: []
-      });
-    }
-    
-    // Use atomic clause structure
-    const clausesQuery = `
-      SELECT 
-        id, slug, parent_id, level, "order",
-        header_text, body_html, contract_types, tags
-      FROM clauses
-      WHERE id = ANY($1)
-      ORDER BY "order"
-    `;
-    
-    const clausesResult = await pool.query(clausesQuery, [clauseIds]);
-    const clausesList = clausesResult.rows;
-    
-    const sections = clausesList.filter((c: any) => c.level === 1);
-    const subsections = clausesList.filter((c: any) => c.level === 2);
-    const paragraphs = clausesList.filter((c: any) => c.level === 3);
-    const conditionalIncluded = clausesList.filter((c: any) => c.tags?.conditions !== null);
-    
-    res.json({
-      contractType: contractType.toUpperCase(),
-      template: template.display_name,
-      summary: {
-        totalClauses: clausesList.length,
-        sections: sections.length,
-        subsections: subsections.length,
-        paragraphs: paragraphs.length,
-        conditionalIncluded: conditionalIncluded.length
-      },
-      conditionalClauses: conditionalIncluded.map((c: any) => ({
-        code: c.slug,
-        name: c.header_text,
-        conditions: c.tags?.conditions,
-        category: c.tags?.category
-      })),
-      allClauses: clausesList.map((c: any) => ({
-        code: c.slug,
-        level: c.level,
-        name: c.header_text,
-        category: c.tags?.category,
-        variablesUsed: c.tags?.variables_used,
-        conditional: c.tags?.conditions !== null
-      }))
-    });
-    
-  } catch (error) {
-    console.error("Error previewing clauses:", error);
-    res.status(500).json({ 
-      error: "Failed to preview clauses",
-      message: error instanceof Error ? error.message : "Unknown error"
-    });
-  }
-});
-
-router.post("/contracts/generate-package", async (req, res) => {
-  try {
-    const { projectData } = req.body;
-    
-    if (!projectData) {
-      return res.status(400).json({ 
-        error: "Project data is required",
-        message: "Please provide projectData object with all required variables"
-      });
-    }
-    
-    console.log('\n=== WIZARD DATA RECEIVED ===');
-    console.log(JSON.stringify(projectData, null, 2));
-    console.log('=== END WIZARD DATA ===\n');
-    
-    console.log("Generating contract package for project:", projectData.PROJECT_NAME);
-    
-    const enrichedData = {
-      ...projectData,
-      IS_CRC: projectData.SERVICE_MODEL === "CRC",
-      IS_CMOS: projectData.SERVICE_MODEL === "CMOS",
-      CONTRACT_DATE: projectData.CONTRACT_DATE || new Date().toISOString().split("T")[0]
-    };
-    
-    const generateSingleContract = async (contractType: string) => {
-      const templateQuery = `
-        SELECT * FROM contract_templates
-        WHERE contract_type = $1 AND status = 'active'
-        LIMIT 1
-      `;
-      
-      const templateResult = await pool.query(templateQuery, [contractType]);
-      
-      if (templateResult.rows.length === 0) {
-        throw new Error(`No active template found for contract type: ${contractType}`);
-      }
-      
-      const template = templateResult.rows[0];
-      
-      let clauseIds = [...(template.base_clause_ids || [])];
-      const conditionalRules = template.conditional_rules || {};
-      
-      for (const [conditionKey, ruleSet] of Object.entries(conditionalRules)) {
-        const projectValue = enrichedData[conditionKey];
-        const rules = ruleSet as Record<string, number[]>;
-        if (projectValue !== undefined && rules[String(projectValue)]) {
-          clauseIds.push(...rules[String(projectValue)]);
-        }
-      }
-      
-      if (clauseIds.length === 0) {
-        return { content: "", filename: `${contractType}_empty.docx`, clauseCount: 0 };
-      }
-      
-      // Use atomic clause structure
-      const clausesQuery = `
-        SELECT slug, level, header_text, body_html
-        FROM clauses
-        WHERE id = ANY($1)
-        ORDER BY "order"
-      `;
-      
-      const clausesResult = await pool.query(clausesQuery, [clauseIds]);
-      const clausesList = clausesResult.rows;
-      
-      let documentText = "";
-      for (const clause of clausesList) {
-        const headerText = clause.header_text || '';
-        const bodyHtml = clause.body_html || '';
-        
-        if (clause.level === 1) {
-          documentText += `\n\n${headerText.toUpperCase()}\n\n`;
-        } else if (clause.level === 2) {
-          documentText += `\n${headerText}\n\n`;
-        } else {
-          documentText += "\n";
-        }
-        documentText += bodyHtml + "\n";
-      }
-      
-      // Pre-process: Resolve BLOCK_ and TABLE_ component tags first
-      // Standardize service model source: check SERVICE_MODEL, ON_SITE_SELECTION, or default to CRC
-      const serviceModel = (enrichedData.SERVICE_MODEL || enrichedData.ON_SITE_SELECTION || 'CRC').toUpperCase();
-      const componentContext: ComponentRenderContext = {
-        projectId: enrichedData.PROJECT_ID || 0,
-        organizationId: enrichedData.ORGANIZATION_ID || 1,
-        contractType: contractType as any,
-        onSiteType: serviceModel
-      };
-      
-      documentText = await resolveComponentTags(documentText, componentContext);
-      
-      // Then replace simple variable tags
-      documentText = documentText.replace(/\{\{([A-Z_]+)\}\}/g, (match, varName) => {
-        const value = enrichedData[varName];
-        if (value === undefined || value === null) {
-          return `[${varName}]`;
-        }
-        if (typeof value === "boolean") return value ? "Yes" : "No";
-        if (typeof value === "number") return value.toLocaleString();
-        return String(value);
-      });
-      
-      const projectName = enrichedData.PROJECT_NAME || "Unnamed";
-      const sanitizedName = projectName.replace(/[^a-z0-9]/gi, "_");
-      const filename = `${sanitizedName}_${contractType}_${Date.now()}.docx`;
-      
-      return {
-        content: documentText,
-        filename,
-        clauseCount: clausesList.length
-      };
-    };
-    
-    const [oneAgreement, manufacturing, onsite] = await Promise.all([
-      generateSingleContract("ONE"),
-      generateSingleContract("MANUFACTURING"),
-      generateSingleContract("ONSITE")
-    ]);
-    
-    res.json({
-      success: true,
-      message: "Contract package generated successfully",
-      projectName: enrichedData.PROJECT_NAME,
-      serviceModel: enrichedData.SERVICE_MODEL,
-      contracts: {
-        one_agreement: {
-          filename: oneAgreement.filename,
-          content: oneAgreement.content,
-          clauseCount: oneAgreement.clauseCount
-        },
-        manufacturing_subcontract: {
-          filename: manufacturing.filename,
-          content: manufacturing.content,
-          clauseCount: manufacturing.clauseCount
-        },
-        onsite_subcontract: {
-          filename: onsite.filename,
-          content: onsite.content,
-          clauseCount: onsite.clauseCount
-        }
-      },
-      generatedAt: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    console.error("Error generating contract package:", error);
-    res.status(500).json({ 
-      error: "Failed to generate contract package",
-      message: error instanceof Error ? error.message : "Unknown error"
-    });
   }
 });
 
@@ -1559,10 +1105,10 @@ router.post("/contracts/download-all-zip", async (req, res) => {
             unitCounts[unit.modelName] = { count: 0, labels: [] };
           }
           unitCounts[unit.modelName].count++;
-          unitCounts[unit.modelName].labels.push(unit.unitLabel);
+          unitCounts[unit.modelName].labels.push(unit.unitLabel ?? "");
         });
-        
-        const unitSummaryParts = Object.entries(unitCounts).map(([model, data]) => 
+
+        const unitSummaryParts = Object.entries(unitCounts).map(([model, data]) =>
           `${data.count}x ${model} (${data.labels.join(', ')})`
         );
         const unitSummary = `${pricingSummary.unitCount} Unit${pricingSummary.unitCount !== 1 ? 's' : ''}: ${unitSummaryParts.join(', ')}`;
@@ -1741,7 +1287,7 @@ router.post("/contracts/download-pdf", async (req, res) => {
               unitCounts[unit.modelName] = { count: 0, labels: [] };
             }
             unitCounts[unit.modelName].count++;
-            unitCounts[unit.modelName].labels.push(unit.unitLabel);
+            unitCounts[unit.modelName].labels.push(unit.unitLabel ?? "");
           });
           
           const unitSummaryParts = Object.entries(unitCounts).map(([model, data]) => 
@@ -1876,7 +1422,7 @@ router.get("/contracts/download-pdf/:projectId/:contractType", async (req, res) 
           projectData[`MILESTONE_${num}_NAME`] = milestone.name;
           projectData[`MILESTONE_${num}_PERCENT`] = `${milestone.percentage}%`;
           projectData[`MILESTONE_${num}_AMOUNT`] = formatCentsAsCurrency(milestone.amount);
-          projectData[`MILESTONE_${num}_PHASE`] = milestone.phase;
+          projectData[`MILESTONE_${num}_PHASE`] = milestone.phase ?? null;
         });
 
         const unitCounts: Record<string, { count: number; labels: string[] }> = {};
@@ -1885,7 +1431,7 @@ router.get("/contracts/download-pdf/:projectId/:contractType", async (req, res) 
             unitCounts[unit.modelName] = { count: 0, labels: [] };
           }
           unitCounts[unit.modelName].count++;
-          unitCounts[unit.modelName].labels.push(unit.unitLabel);
+          unitCounts[unit.modelName].labels.push(unit.unitLabel ?? "");
         });
         const unitSummaryParts = Object.entries(unitCounts).map(([model, data]) =>
           `${data.count}x ${model} (${data.labels.join(', ')})`
@@ -2006,7 +1552,7 @@ router.post("/contracts/draft-preview", async (req, res) => {
         });
         
         const unitCounts: Record<string, { count: number; labels: string[] }> = {};
-        projectUnitsData.forEach((unit: { unitLabel: string; modelName: string }) => {
+        projectUnitsData.forEach((unit: { unitLabel: string | null; modelName: string }) => {
           if (!unitCounts[unit.modelName]) {
             unitCounts[unit.modelName] = { count: 0, labels: [] };
           }
@@ -2496,42 +2042,6 @@ router.post("/clauses/:id/reorder", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// DEBUG ENDPOINTS
-// ---------------------------------------------------------------------------
-
-router.get('/debug/variables-in-clauses', async (req, res) => {
-  try {
-    // Use snake_case column names
-    const clausesResult = await pool.query('SELECT body_html FROM clauses');
-    const clausesList = clausesResult.rows;
-    
-    const variableSet = new Set<string>();
-    
-    clausesList.forEach((clause: any) => {
-      const content = clause.body_html || '';
-      const matches = content.match(/\{\{([A-Z_0-9]+)\}\}/g);
-      if (matches) {
-        matches.forEach((match: string) => {
-          const varName = match.replace(/[{}]/g, '');
-          variableSet.add(varName);
-        });
-      }
-    });
-    
-    const variables = Array.from(variableSet).sort();
-    
-    res.json({
-      totalVariables: variables.length,
-      variables: variables,
-      clausesChecked: clausesList.length
-    });
-    
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ---------------------------------------------------------------------------
 // COMPONENT LIBRARY PREVIEWS
 // ---------------------------------------------------------------------------
 
@@ -2754,175 +2264,6 @@ router.get("/components/preview-resolved/:componentId", async (req, res) => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// TABLE DEFINITIONS CRUD
-// ---------------------------------------------------------------------------
-
-router.get("/table-definitions", async (req, res) => {
-  try {
-    const result = await pool.query(
-      "SELECT * FROM table_definitions WHERE is_active = true ORDER BY display_name"
-    );
-    res.json(result.rows);
-  } catch (error: any) {
-    console.error("Failed to fetch table definitions:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get("/table-definitions/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query(
-      "SELECT * FROM table_definitions WHERE id = $1",
-      [id]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Table definition not found" });
-    }
-    res.json(result.rows[0]);
-  } catch (error: any) {
-    console.error("Failed to fetch table definition:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.post("/table-definitions", async (req, res) => {
-  try {
-    const { variable_name, display_name, description, columns, rows } = req.body;
-    
-    if (!variable_name || !display_name || !columns) {
-      return res.status(400).json({ error: "variable_name, display_name, and columns are required" });
-    }
-    
-    const result = await pool.query(
-      `INSERT INTO table_definitions (variable_name, display_name, description, columns, rows)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [variable_name, display_name, description, JSON.stringify(columns), rows ? JSON.stringify(rows) : null]
-    );
-    
-    res.status(201).json(result.rows[0]);
-  } catch (error: any) {
-    console.error("Failed to create table definition:", error);
-    if (error.code === "23505") {
-      return res.status(400).json({ error: "A table with this variable name already exists" });
-    }
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.patch("/table-definitions/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { display_name, description, columns } = req.body;
-    
-    const updateFields: string[] = [];
-    const values: any[] = [];
-    let paramCount = 1;
-    
-    if (display_name !== undefined) {
-      updateFields.push(`display_name = $${paramCount}`);
-      values.push(display_name);
-      paramCount++;
-    }
-    if (description !== undefined) {
-      updateFields.push(`description = $${paramCount}`);
-      values.push(description);
-      paramCount++;
-    }
-    if (columns !== undefined) {
-      updateFields.push(`columns = $${paramCount}`);
-      values.push(JSON.stringify(columns));
-      paramCount++;
-    }
-    if (req.body.rows !== undefined) {
-      updateFields.push(`rows = $${paramCount}`);
-      values.push(req.body.rows ? JSON.stringify(req.body.rows) : null);
-      paramCount++;
-    }
-    
-    if (updateFields.length === 0) {
-      return res.status(400).json({ error: "No fields to update" });
-    }
-    
-    updateFields.push(`updated_at = NOW()`);
-    values.push(id);
-    
-    const result = await pool.query(
-      `UPDATE table_definitions SET ${updateFields.join(', ')} WHERE id = $${paramCount} RETURNING *`,
-      values
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Table definition not found" });
-    }
-    
-    res.json(result.rows[0]);
-  } catch (error: any) {
-    console.error("Failed to update table definition:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.delete("/table-definitions/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query(
-      "UPDATE table_definitions SET is_active = false, updated_at = NOW() WHERE id = $1 RETURNING *",
-      [id]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Table definition not found" });
-    }
-    
-    res.json({ success: true, message: "Table definition deleted" });
-  } catch (error: any) {
-    console.error("Failed to delete table definition:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get("/table-definitions/:id/preview", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { projectId } = req.query;
-    
-    const { renderDynamicTable } = await import("../lib/tableBuilders");
-    const html = await renderDynamicTable(
-      parseInt(id),
-      projectId ? parseInt(projectId as string) : null
-    );
-    
-    res.json({ html });
-  } catch (error: any) {
-    console.error("Failed to preview table:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.post("/table-definitions/preview-columns", async (req, res) => {
-  try {
-    const { columns, projectId } = req.body;
-    
-    if (!columns || !Array.isArray(columns)) {
-      return res.status(400).json({ error: "columns array is required" });
-    }
-    
-    const { renderTableFromColumns } = await import("../lib/tableBuilders");
-    const html = await renderTableFromColumns(
-      columns,
-      projectId ? parseInt(projectId) : null
-    );
-    
-    res.json({ html });
-  } catch (error: any) {
-    console.error("Failed to preview table from columns:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
 router.post("/resolve-clause-tables", async (req, res) => {
   try {
     const { content, projectId } = req.body;
@@ -2952,12 +2293,12 @@ router.post("/resolve-clause-tables", async (req, res) => {
           const projectData = mapProjectToVariables(fullProject);
           const uniqueVars = Array.from(new Set(remainingVars));
           for (const varTag of uniqueVars) {
-            const varName = varTag.replace(/\{\{|\}\}/g, "");
+            const varName = (varTag as string).replace(/\{\{|\}\}/g, "");
             const value = (projectData as any)[varName];
-            const replacement = (value !== undefined && value !== null && value !== '') 
-              ? String(value) 
+            const replacement = (value !== undefined && value !== null && value !== '')
+              ? String(value)
               : `[${varName}]`;
-            resolvedContent = resolvedContent.replace(new RegExp(varTag.replace(/[{}]/g, '\\$&'), 'g'), replacement);
+            resolvedContent = resolvedContent.replace(new RegExp((varTag as string).replace(/[{}]/g, '\\$&'), 'g'), replacement);
           }
         }
       }

@@ -6,7 +6,6 @@ import {
   clients,
   projectDetails,
   contractors,
-  milestones,
   warrantyTerms,
 } from "../../shared/schema";
 import { eq, ne, and, sql, desc } from "drizzle-orm";
@@ -427,150 +426,6 @@ router.patch("/projects/:projectId/details", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// MILESTONES
-// ---------------------------------------------------------------------------
-
-router.get("/projects/:projectId/milestones", async (req, res) => {
-  try {
-    const projectId = parseInt(req.params.projectId);
-    const projectMilestones = await db.select().from(milestones).where(eq(milestones.projectId, projectId));
-    res.json(projectMilestones);
-  } catch (error) {
-    console.error("Failed to fetch milestones:", error);
-    res.status(500).json({ error: "Failed to fetch milestones" });
-  }
-});
-
-router.get("/projects/:projectId/milestones/:type", async (req, res) => {
-  try {
-    const projectId = parseInt(req.params.projectId);
-    const milestoneType = req.params.type;
-    const projectMilestones = await db
-      .select()
-      .from(milestones)
-      .where(eq(milestones.projectId, projectId));
-    const filtered = projectMilestones.filter(m => m.milestoneType === milestoneType);
-    res.json(filtered);
-  } catch (error) {
-    console.error("Failed to fetch milestones:", error);
-    res.status(500).json({ error: "Failed to fetch milestones" });
-  }
-});
-
-router.post("/projects/:projectId/milestones", async (req, res) => {
-  try {
-    const projectId = parseInt(req.params.projectId);
-    const [result] = await db.insert(milestones).values({ ...req.body, projectId }).returning();
-    res.json(result);
-  } catch (error) {
-    console.error("Failed to create milestone:", error);
-    res.status(500).json({ error: "Failed to create milestone" });
-  }
-});
-
-router.patch("/milestones/:id", async (req, res) => {
-  try {
-    const milestoneId = parseInt(req.params.id);
-    const [result] = await db
-      .update(milestones)
-      .set(req.body)
-      .where(eq(milestones.id, milestoneId))
-      .returning();
-    res.json(result);
-  } catch (error) {
-    console.error("Failed to update milestone:", error);
-    res.status(500).json({ error: "Failed to update milestone" });
-  }
-});
-
-router.post("/milestones/:id/pay", async (req, res) => {
-  try {
-    const milestoneId = parseInt(req.params.id);
-    const { paidAmount, invoiceNumber } = req.body;
-    
-    const [result] = await db
-      .update(milestones)
-      .set({
-        status: "Paid",
-        paidDate: new Date().toISOString(),
-        paidAmount,
-        invoiceNumber,
-      })
-      .where(eq(milestones.id, milestoneId))
-      .returning();
-    
-    res.json(result);
-  } catch (error) {
-    console.error("Failed to mark milestone as paid:", error);
-    res.status(500).json({ error: "Failed to mark milestone as paid" });
-  }
-});
-
-router.delete("/milestones/:id", async (req, res) => {
-  try {
-    const milestoneId = parseInt(req.params.id);
-    await db.delete(milestones).where(eq(milestones.id, milestoneId));
-    res.json({ success: true });
-  } catch (error) {
-    console.error("Failed to delete milestone:", error);
-    res.status(500).json({ error: "Failed to delete milestone" });
-  }
-});
-
-router.post("/projects/:projectId/milestones/create-defaults", async (req, res) => {
-  try {
-    const projectId = parseInt(req.params.projectId);
-    const { milestoneType } = req.body;
-    
-    const defaults: Record<string, Array<{ name: string; percentage: number; dueUpon: string }>> = {
-      client: [
-        { name: "Deposit", percentage: 10, dueUpon: "Contract Execution" },
-        { name: "Design Completion", percentage: 15, dueUpon: "Design Approval" },
-        { name: "Green Light", percentage: 25, dueUpon: "Green Light Approval" },
-        { name: "Production Start", percentage: 20, dueUpon: "Production Commencement" },
-        { name: "Delivery", percentage: 20, dueUpon: "Module Delivery" },
-        { name: "Final", percentage: 10, dueUpon: "Final Inspection" },
-      ],
-      manufacturing: [
-        { name: "Production Start", percentage: 30, dueUpon: "Production Commencement" },
-        { name: "Mid-Production", percentage: 30, dueUpon: "50% Production Complete" },
-        { name: "Production Complete", percentage: 30, dueUpon: "Production Complete" },
-        { name: "Delivery", percentage: 10, dueUpon: "Module Delivery" },
-      ],
-      onsite: [
-        { name: "Site Prep Start", percentage: 20, dueUpon: "Site Work Commencement" },
-        { name: "Foundation Complete", percentage: 25, dueUpon: "Foundation Inspection" },
-        { name: "Set Complete", percentage: 25, dueUpon: "Module Set Complete" },
-        { name: "Systems Complete", percentage: 20, dueUpon: "MEP Rough Complete" },
-        { name: "Final", percentage: 10, dueUpon: "Certificate of Occupancy" },
-      ],
-    };
-    
-    const milestonesToCreate = defaults[milestoneType] || [];
-    const results = [];
-    
-    for (let i = 0; i < milestonesToCreate.length; i++) {
-      const m = milestonesToCreate[i];
-      const [result] = await db.insert(milestones).values({
-        projectId,
-        milestoneType,
-        milestoneNumber: i + 1,
-        name: m.name,
-        percentage: m.percentage,
-        dueUpon: m.dueUpon,
-        status: "Pending",
-      }).returning();
-      results.push(result);
-    }
-    
-    res.json(results);
-  } catch (error) {
-    console.error("Failed to create default milestones:", error);
-    res.status(500).json({ error: "Failed to create default milestones" });
-  }
-});
-
-// ---------------------------------------------------------------------------
 // WARRANTY TERMS
 // ---------------------------------------------------------------------------
 
@@ -783,6 +638,62 @@ router.post('/projects/:projectId/units', async (req, res) => {
   } catch (error) {
     console.error("Failed to add unit:", error);
     res.status(500).json({ error: "Failed to add unit" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// CHILD LLC — upsert an LLC record linked to a project by project_name
+// The variable mapper reads from the llcs table via project_name to resolve
+// CHILD_LLC_* variables, so this endpoint keeps that record in sync.
+// ---------------------------------------------------------------------------
+
+router.post("/projects/:projectId/child-llc", async (req, res) => {
+  try {
+    const projectId = parseInt(req.params.projectId);
+    const { legalName, formationState, entityType, ein, address, city, state, zip } = req.body;
+
+    if (!legalName) {
+      return res.status(400).json({ error: "legalName is required" });
+    }
+
+    // Fetch the project to get its name (used as the link key in llcs.project_name)
+    const projectResult = await pool.query(
+      `SELECT name FROM projects WHERE id = $1 AND organization_id = $2`,
+      [projectId, req.organizationId]
+    );
+    if (projectResult.rows.length === 0) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+    const projectName = projectResult.rows[0].name;
+
+    const result = await pool.query(
+      `INSERT INTO llcs (
+        organization_id, name, project_name,
+        state_of_formation, entity_type, ein,
+        address, city, state_address, zip, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'forming')
+      ON CONFLICT (name) DO UPDATE SET
+        project_name = EXCLUDED.project_name,
+        state_of_formation = COALESCE(EXCLUDED.state_of_formation, llcs.state_of_formation),
+        entity_type = COALESCE(EXCLUDED.entity_type, llcs.entity_type),
+        ein = COALESCE(EXCLUDED.ein, llcs.ein),
+        address = COALESCE(EXCLUDED.address, llcs.address),
+        city = COALESCE(EXCLUDED.city, llcs.city),
+        state_address = COALESCE(EXCLUDED.state_address, llcs.state_address),
+        zip = COALESCE(EXCLUDED.zip, llcs.zip),
+        updated_at = NOW()
+      RETURNING id, name`,
+      [
+        req.organizationId, legalName, projectName,
+        formationState || "Delaware", entityType || "LLC", ein || null,
+        address || null, city || null, state || null, zip || null,
+      ]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (error: any) {
+    console.error("Error upserting child LLC:", error);
+    res.status(500).json({ error: "Failed to upsert child LLC", details: error.message });
   }
 });
 

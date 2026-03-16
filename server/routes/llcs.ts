@@ -1,7 +1,6 @@
 import { Router, Request, Response } from "express";
 import { Pool } from "pg";
 import { requireAuth } from "../middleware/auth";
-import { generateLLCName, validateLLCName } from "../services/llc-service";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const router = Router();
@@ -299,83 +298,6 @@ router.delete("/llcs/:id", async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Error deleting LLC:", error);
     res.status(500).json({ error: "Failed to delete LLC" });
-  }
-});
-
-router.get("/llcs-v3", async (req: Request, res: Response) => {
-  try {
-    const result = await pool.query(
-      `SELECT * FROM llcs 
-       WHERE organization_id = $1 
-       ORDER BY name`,
-      [req.organizationId]
-    );
-    res.json(result.rows);
-  } catch (error: any) {
-    console.error("Error fetching LLCs:", error);
-    res.status(500).json({ error: "Failed to fetch LLCs" });
-  }
-});
-
-router.get("/llcs-v3/:id", async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query(
-      `SELECT * FROM llcs 
-       WHERE id = $1 AND organization_id = $2`,
-      [id, req.organizationId]
-    );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "LLC not found" });
-    }
-    
-    res.json(result.rows[0]);
-  } catch (error: any) {
-    console.error("Error fetching LLC:", error);
-    res.status(500).json({ error: "Failed to fetch LLC" });
-  }
-});
-
-router.post("/llcs/suggest-name", async (req: Request, res: Response) => {
-  try {
-    const { address, state } = req.body;
-
-    if (!address) {
-      return res.status(400).json({ error: "Address is required" });
-    }
-
-    const suggestion = await generateLLCName({
-      address,
-      state,
-      organizationId: req.organizationId!
-    });
-
-    res.json(suggestion);
-  } catch (error: any) {
-    console.error("Error suggesting LLC name:", error);
-    res.status(500).json({ error: "Failed to suggest LLC name" });
-  }
-});
-
-router.post("/llcs/validate-name", async (req: Request, res: Response) => {
-  try {
-    const { name, excludeId } = req.body;
-
-    if (!name) {
-      return res.status(400).json({ error: "Name is required" });
-    }
-
-    const validation = await validateLLCName(
-      name,
-      req.organizationId!,
-      excludeId
-    );
-
-    res.json(validation);
-  } catch (error: any) {
-    console.error("Error validating LLC name:", error);
-    res.status(500).json({ error: "Failed to validate LLC name" });
   }
 });
 
