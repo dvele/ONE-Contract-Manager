@@ -13,7 +13,7 @@ const useAuthHelper = () => {
       const payload = session.tokens?.idToken?.payload;
       const groups = (payload?.["cognito:groups"] as string[]) ?? [];
 
-      const isSales = groups.includes("sales");
+      const isSales = groups.includes("sales") || groups.includes("admin");
       setIsSales(isSales);
 
       setCurrentUserIsAdmin(groups.includes("admin"));

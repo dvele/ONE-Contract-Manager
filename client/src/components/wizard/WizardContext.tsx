@@ -616,23 +616,22 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         
         // Fetch all data in parallel for efficiency
         const [projectRes, clientRes, financialsRes, detailsRes, warrantyRes, contractorsRes, unitsRes] = await Promise.all([
-          fetch(`/api/projects/${projectId}`),
-          fetch(`/api/projects/${projectId}/client`),
-          fetch(`/api/projects/${projectId}/financials`),
-          fetch(`/api/projects/${projectId}/details`),
-          fetch(`/api/projects/${projectId}/warranty-terms`),
-          fetch(`/api/projects/${projectId}/contractors`),
-          fetch(`/api/projects/${projectId}/units`),
+          apiRequest('GET', `/api/projects/${projectId}`),
+          apiRequest('GET', `/api/projects/${projectId}/client`),
+          apiRequest('GET', `/api/projects/${projectId}/financials`),
+          apiRequest('GET', `/api/projects/${projectId}/details`),
+          apiRequest('GET', `/api/projects/${projectId}/warranty-terms`),
+          apiRequest('GET', `/api/projects/${projectId}/contractors`),
+          apiRequest('GET', `/api/projects/${projectId}/units`),
         ]);
-        
-        if (!projectRes.ok) throw new Error('Failed to load project');
+
         const project = await projectRes.json();
-        const client = clientRes.ok ? await clientRes.json() : null;
-        const financials = financialsRes.ok ? await financialsRes.json() : null;
-        const details = detailsRes.ok ? await detailsRes.json() : null;
-        const warranty = warrantyRes.ok ? await warrantyRes.json() : null;
-        const contractors = contractorsRes.ok ? await contractorsRes.json() : [];
-        const unitsData = unitsRes.ok ? await unitsRes.json() : [];
+        const client = await clientRes.json();
+        const financials = await financialsRes.json();
+        const details = await detailsRes.json();
+        const warranty = await warrantyRes.json();
+        const contractors = await contractorsRes.json();
+        const unitsData = await unitsRes.json();
         
         // Build the project data from fetched data
         const loadedData: Partial<ProjectData> = {

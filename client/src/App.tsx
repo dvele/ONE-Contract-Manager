@@ -136,7 +136,10 @@ const authComponents = {
 function App() {
   return (
     <ThemeProvider defaultTheme="light" storageKey="dvele-ui-theme">
-      <Authenticator socialProviders={["google"]} components={authComponents}>
+      <Authenticator
+        socialProviders={["google"]}
+        components={authComponents}
+        hideSignUp={true}>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <AppContent />
