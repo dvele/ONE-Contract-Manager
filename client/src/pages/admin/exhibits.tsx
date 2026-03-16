@@ -77,8 +77,7 @@ export default function ExhibitsPage() {
   const { data: exhibits, isLoading } = useQuery<Exhibit[]>({
     queryKey: ["/api/exhibits", "includeInactive"],
     queryFn: async () => {
-      const res = await fetch("/api/exhibits?includeInactive=true");
-      if (!res.ok) throw new Error("Failed to fetch exhibits");
+      const res = await apiRequest("GET", "/api/exhibits?includeInactive=true");
       return res.json();
     },
   });

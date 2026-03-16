@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Card,
   CardContent,
@@ -81,10 +82,7 @@ export default function Contracts() {
 
   const scrapMutation = useMutation({
     mutationFn: async (projectId: number) => {
-      const res = await fetch(`/api/projects/${projectId}/draft`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Failed to scrap draft");
+      const res = await apiRequest("DELETE", `/api/projects/${projectId}/draft`);
       return res.json();
     },
     onSuccess: () => {
@@ -127,15 +125,10 @@ export default function Contracts() {
   ) => {
     setGeneratingContract(contractId);
     try {
-      const response = await fetch("/api/contracts/draft-preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contractType: getContractTypeForApi(contractType),
-          projectId,
-        }),
+      const response = await apiRequest("POST", "/api/contracts/draft-preview", {
+        contractType: getContractTypeForApi(contractType),
+        projectId,
       });
-      if (!response.ok) throw new Error("Failed to generate preview");
       const html = await response.text();
       const newWindow = window.open("", "_blank");
       if (newWindow) {

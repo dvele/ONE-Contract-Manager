@@ -1,5 +1,12 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, FileCheck, Shield, Plus, Box } from "lucide-react";
+import {
+  LayoutDashboard,
+  FileCheck,
+  Shield,
+  Plus,
+  Box,
+  LogOut,
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -13,6 +20,9 @@ import {
   SidebarFooter,
   SidebarSeparator,
 } from "@/components/ui/sidebar";
+import { Button } from "./ui/button";
+import { signOut } from "aws-amplify/auth";
+import useAuthHelper from "@/hooks/use-auth-helper";
 
 const mainNavItems = [
   {
@@ -47,6 +57,7 @@ const adminNavItems = [
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { currentUserIsAdmin } = useAuthHelper();
 
   const isActive = (url: string) => {
     if (url === "/") return location === url;
@@ -104,21 +115,34 @@ export function AppSidebar() {
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>
             <SidebarMenu>
-              {adminNavItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(item.url)}
-                    tooltip={item.title}>
-                    <Link
-                      href={item.url}
-                      data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {currentUserIsAdmin &&
+                adminNavItems.map((item) => (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive(item.url)}
+                      tooltip={item.title}>
+                      <Link
+                        href={item.url}
+                        data-testid={`link-nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip={"Logout"}>
+                  <Button
+                    variant={"ghost"}
+                    size={"sm"}
+                    className="justify-start"
+                    onClick={async () => await signOut({ global: true })}>
+                    <LogOut className="h-4 w-4 rotate-180" />
+                    <span>Logout</span>
+                  </Button>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

@@ -218,8 +218,7 @@ export default function ClauseLibrary() {
       if (hierarchyLevel !== "all") params.append("hierarchyLevel", hierarchyLevel);
       if (searchTerm) params.append("search", searchTerm);
       
-      const response = await fetch(`/api/clauses?${params.toString()}`);
-      if (!response.ok) throw new Error("Failed to fetch clauses");
+      const response = await apiRequest("GET", `/api/clauses?${params.toString()}`);
       return response.json();
     },
   });
@@ -247,12 +246,7 @@ export default function ClauseLibrary() {
       if (!previewContent || !previewProjectId) {
         return { html: "" };
       }
-      const response = await fetch("/api/resolve-clause-tables", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: previewContent, projectId: previewProjectId }),
-      });
-      if (!response.ok) throw new Error("Failed to resolve tables");
+      const response = await apiRequest("POST", "/api/resolve-clause-tables", { content: previewContent, projectId: previewProjectId });
       return response.json();
     },
     enabled: resolveTablesPreview && !!previewProjectId && !!selectedClause,

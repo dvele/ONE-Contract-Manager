@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import type { Server } from "http";
 import apiRouter from "./routes/index";
+import { requireAuth } from "./middleware/auth";
 import { pool } from "./db";
 import { seedProductionData } from "./seed";
 
@@ -49,7 +50,7 @@ export async function registerRoutes(server: Server, app: Express) {
   await seedDefaults();
   await seedProductionData();
 
-  app.use("/api", apiRouter);
+  app.use("/api", requireAuth, apiRouter);
   
   console.log("API routes registered successfully");
 }

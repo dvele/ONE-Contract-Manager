@@ -1,5 +1,6 @@
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
+import { Authenticator } from "@aws-amplify/ui-react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +9,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import NotFound from "@/pages/not-found";
+import unAuthorized from "@/pages/unauthorized";
 import Dashboard from "@/pages/dashboard";
 import ClauseLibrary from "@/pages/clause-library";
 import Contracts from "@/pages/contracts";
@@ -16,7 +18,6 @@ import Templates from "@/pages/templates";
 import ContractPreview from "@/pages/contract-preview";
 import GenerateContracts from "@/pages/generate-contracts";
 import TemplatesUpload from "@/pages/templates-upload";
-import Exhibits from "@/pages/exhibits";
 import StateDisclosures from "@/pages/state-disclosures";
 import ComponentLibrary from "@/pages/component-library";
 import AdminGeneral from "@/pages/admin/index";
@@ -29,6 +30,8 @@ import AdminContractorEntities from "@/pages/admin/contractor-entities";
 import AdminProjectUnits from "@/pages/admin/project-units";
 import AdminImportTemplates from "@/pages/admin/import-templates";
 import AdminVariables from "@/pages/admin/variables";
+import "@aws-amplify/ui-react/styles.css";
+import { Amplify } from "aws-amplify";
 
 function Router() {
   return (
@@ -64,6 +67,7 @@ function Router() {
       <Route path="/admin/project-units" component={AdminProjectUnits} />
       <Route path="/admin/import-templates" component={AdminImportTemplates} />
       <Route path="/admin/variables" component={AdminVariables} />
+      <Route path="/unauthorized" component={unAuthorized} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -92,16 +96,54 @@ function AppContent() {
     </SidebarProvider>
   );
 }
+const redirectURL = import.meta.env["VITE_FRONTEND_URL"];
+Amplify.configure({
+  Auth: {
+    Cognito: {
+      //oauthSignIn: true,
+      loginWith: {
+        oauth: {
+          scopes: [
+            "email",
+            "openid",
+            "profile",
+            "aws.cognito.signin.user.admin",
+          ],
+          domain: "onedvele.auth.us-west-1.amazoncognito.com",
+          redirectSignIn: [redirectURL],
+          redirectSignOut: [redirectURL + "/login"],
+          responseType: "code",
+        },
+      },
+      identityPoolId: import.meta.env["VITE_COGNITO_IDENTITY_POOL_ID"],
+      // region: import.meta.env["VITE_COGNITO_REGION"],
+      userPoolId: import.meta.env["VITE_COGNITO_USER_POOL_ID"],
+      userPoolClientId: import.meta.env["VITE_COGNITO_APP_ID"],
+    },
+  },
+});
+
+const authComponents = {
+  Header() {
+    return (
+      <div className="mt-24 p-8 text-center">
+        <h1 className="text-3xl font-bold">Dvele Contract Generator</h1>
+      </div>
+    );
+  },
+};
 
 function App() {
   return (
     <ThemeProvider defaultTheme="light" storageKey="dvele-ui-theme">
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <AppContent />
-          <Toaster />
-        </TooltipProvider>
-      </QueryClientProvider>
+      <Authenticator socialProviders={["google"]} components={authComponents}>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <AppContent />
+            <Toaster />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </Authenticator>
     </ThemeProvider>
   );
 }

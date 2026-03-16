@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { useWizard } from "../WizardContext";
 import {
   Card,
@@ -252,19 +253,9 @@ export const Step9ReviewGenerate: React.FC = () => {
     try {
       setIsDownloading("all");
 
-      const response = await fetch("/api/contracts/download-all-zip", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          projectId: draftProjectId,
-        }),
+      const response = await apiRequest("POST", "/api/contracts/download-all-zip", {
+        projectId: draftProjectId,
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to generate contract package");
-      }
 
       // Get filename from Content-Disposition header if available
       const contentDisposition = response.headers.get("Content-Disposition");

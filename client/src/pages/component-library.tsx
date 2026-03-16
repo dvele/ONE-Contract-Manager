@@ -239,8 +239,7 @@ export default function ComponentLibrary() {
     queryKey: ["/api/components/preview", selectedItem?.type === "builtin" ? selectedItem.data.id : "", selectedProjectId],
     queryFn: async () => {
       if (selectedItem?.type !== "builtin" || !selectedProjectId) return { html: "" };
-      const response = await fetch(`/api/components/preview/${selectedItem.data.id}?projectId=${selectedProjectId}`);
-      if (!response.ok) throw new Error("Failed to fetch preview");
+      const response = await apiRequest("GET", `/api/components/preview/${selectedItem.data.id}?projectId=${selectedProjectId}`);
       return response.json();
     },
     enabled: selectedItem?.type === "builtin" && !!selectedProjectId,
@@ -251,8 +250,7 @@ export default function ComponentLibrary() {
     queryKey: ["/api/components/preview-resolved", isDbComponent ? selectedItem.data.id : "", selectedProjectId],
     queryFn: async () => {
       if (!isDbComponent || !selectedProjectId) return { html: "" };
-      const response = await fetch(`/api/components/preview-resolved/${selectedItem.data.id}?projectId=${selectedProjectId}`);
-      if (!response.ok) throw new Error("Failed to fetch resolved preview");
+      const response = await apiRequest("GET", `/api/components/preview-resolved/${selectedItem.data.id}?projectId=${selectedProjectId}`);
       return response.json();
     },
     enabled: isDbComponent && !!selectedProjectId,

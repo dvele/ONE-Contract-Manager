@@ -697,8 +697,8 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         // Load LLC data if project has llcId
         if (project.llcId) {
           try {
-            const llcRes = await fetch(`/api/llcs/${project.llcId}`);
-            if (llcRes.ok) {
+            const llcRes = await apiRequest('GET', `/api/llcs/${project.llcId}`);
+            {
               const llc = await llcRes.json();
               loadedData.llcOption = 'existing';
               loadedData.selectedExistingLlcId = String(llc.id);
@@ -1018,7 +1018,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
     try {
       // Exclude current project when editing to avoid self-collision
       const excludeParam = draftProjectId ? `?excludeId=${draftProjectId}` : '';
-      const response = await fetch(`/api/projects/check-number/${encodeURIComponent(projectNumber)}${excludeParam}`);
+      const response = await apiRequest('GET', `/api/projects/check-number/${encodeURIComponent(projectNumber)}${excludeParam}`);
       const data = await response.json();
       setNumberIsUnique(data.isUnique);
     } catch (error) {
@@ -1413,12 +1413,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
   const { data: comparisonData, isLoading: comparisonLoading } = useQuery<ClauseComparison>({
     queryKey: ['/api/contracts/compare-service-models'],
     queryFn: async () => {
-      const response = await fetch('/api/contracts/compare-service-models', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ projectData: { serviceModel: 'CRC' } }),
-      });
-      if (!response.ok) throw new Error('Failed to compare service models');
+      const response = await apiRequest('POST', '/api/contracts/compare-service-models', { projectData: { serviceModel: 'CRC' } });
       return response.json();
     },
     enabled: showComparisonModal || wizardState.currentStep === 2,
@@ -2051,8 +2046,8 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         // Also create child_llcs record using existing LLC's data for backwards compatibility
         // Fetch the existing LLC details first
         try {
-          const llcDetailsResponse = await fetch(`/api/llcs/${linkedLlcId}`);
-          if (llcDetailsResponse.ok) {
+          const llcDetailsResponse = await apiRequest('GET', `/api/llcs/${linkedLlcId}`);
+          {
             const existingLlc = await llcDetailsResponse.json();
             // API returns snake_case - handle both snake_case and camelCase field names
             const childLlcPayload = {
@@ -2068,8 +2063,6 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
             };
             await apiRequest('POST', `/api/projects/${projectId}/child-llc`, childLlcPayload);
             llcName = existingLlc.name;
-          } else {
-            throw new Error('Failed to fetch LLC details');
           }
         } catch (e) {
           console.error('Child LLC creation from existing LLC failed:', e);
@@ -2191,8 +2184,8 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
       // Fetch available templates and map to contract types
       const templateMap: Record<string, number> = {};
       try {
-        const templatesResponse = await fetch('/api/contract-templates');
-        if (templatesResponse.ok) {
+        const templatesResponse = await apiRequest('GET', '/api/contract-templates');
+        {
           const templates = await templatesResponse.json();
           // Build a map of contract_type -> template_id
           for (const t of templates) {

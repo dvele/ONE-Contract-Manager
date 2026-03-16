@@ -366,20 +366,10 @@ export default function ContractDetail() {
 
     setIsGenerating(true);
     try {
-      const response = await fetch("/api/contracts/download-pdf", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contractType: getContractTypeForApi(contract.contractType),
-          projectId: contract.projectId,
-        }),
+      const response = await apiRequest("POST", "/api/contracts/download-pdf", {
+        contractType: getContractTypeForApi(contract.contractType),
+        projectId: contract.projectId,
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to generate PDF");
-      }
 
       return await response.blob();
     } catch (error) {
@@ -432,20 +422,10 @@ export default function ContractDetail() {
 
     setIsGenerating(true);
     try {
-      const response = await fetch("/api/contracts/draft-preview", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contractType: getContractTypeForApi(contract.contractType),
-          projectId: contract.projectId,
-        }),
+      const response = await apiRequest("POST", "/api/contracts/draft-preview", {
+        contractType: getContractTypeForApi(contract.contractType),
+        projectId: contract.projectId,
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to generate HTML preview");
-      }
 
       const html = await response.text();
 

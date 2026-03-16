@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -89,12 +90,7 @@ export default function ContractPreview() {
   const { data: comparisonData, isLoading: comparisonLoading } = useQuery<ClauseComparison>({
     queryKey: ["/api/contracts/compare-service-models", serviceModel],
     queryFn: async () => {
-      const response = await fetch("/api/contracts/compare-service-models", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectData: { ...SAMPLE_PROJECT_DATA, serviceModel } }),
-      });
-      if (!response.ok) throw new Error("Failed to compare service models");
+      const response = await apiRequest("POST", "/api/contracts/compare-service-models", { projectData: { ...SAMPLE_PROJECT_DATA, serviceModel } });
       return response.json();
     },
   });

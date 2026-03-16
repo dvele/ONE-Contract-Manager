@@ -1,4 +1,9 @@
 import { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
+import jwksClient from "jwks-rsa";
+
+const COGNITO_REGION = process.env.VITE_COGNITO_REGION || "us-west-1";
+const COGNITO_USER_POOL_ID = process.env.VITE_COGNITO_USER_POOL_ID!;
 
 declare global {
   namespace Express {
@@ -13,42 +18,86 @@ declare global {
   }
 }
 
+const client = jwksClient({
+  jwksUri: `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/${COGNITO_USER_POOL_ID}/.well-known/jwks.json`,
+  cache: true,
+  rateLimit: true,
+});
+
+function getKey(header: jwt.JwtHeader, callback: jwt.SigningKeyCallback) {
+  client.getSigningKey(header.kid!, (err, key) => {
+    callback(err, key?.getPublicKey());
+  });
+}
+
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const skipAuth = process.env.SKIP_AUTH === "true" || process.env.NODE_ENV !== "production";
+  const skipAuth = process.env.SKIP_AUTH === "true";
 
   const authHeader = req.headers.authorization;
 
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    const token = authHeader.slice(7);
-    try {
-      // TODO: validate JWT token and extract org/user when real auth is added
-    } catch (error) {
-      return res.status(401).json({ error: "Unauthorized - Invalid token" });
+  if (!authHeader?.startsWith("Bearer ")) {
+    if (skipAuth) {
+      req.organizationId = 1;
+      req.user = { email: "dev@dvele.com", role: "admin" };
+      return next();
     }
-  }
-
-  if (skipAuth) {
-    req.organizationId = req.organizationId || 1;
-    req.user = req.user || {
-      id: 1,
-      email: "admin@dvele.com",
-      role: "admin",
-    };
-    return next();
-  }
-
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ error: "Unauthorized - No token provided" });
   }
 
-  req.organizationId = req.organizationId || 1;
-  req.user = req.user || {
-    id: 1,
-    email: "admin@dvele.com",
-    role: "admin",
-  };
-  return next();
+  const token = authHeader.slice(7);
+
+  jwt.verify(token, getKey, { algorithms: ["RS256"] }, (err, decoded) => {
+    if (err || !decoded || typeof decoded === "string") {
+      return res.status(401).json({ error: "Unauthorized - Invalid token" });
+    }
+
+    const groups: string[] = (decoded["cognito:groups"] as string[]) ?? [];
+    req.user = {
+      email: decoded["email"] as string,
+      role: groups.includes("admin") ? "admin" : "user",
+    };
+    req.organizationId = 1; // until multi-org is needed
+    next();
+  });
 }
+
+// export function requireAuth(req: Request, res: Response, next: NextFunction) {
+//   const skipAuth = process.env.SKIP_AUTH === "true" || process.env.NODE_ENV !== "production";
+
+//   const authHeader = req.headers.authorization;
+
+//   if (authHeader && authHeader.startsWith("Bearer ")) {
+//     const token = authHeader.slice(7);
+//     try {
+//       // TODO: validate JWT token and extract org/user when real auth is added
+
+//     } catch (error) {
+//       return res.status(401).json({ error: "Unauthorized - Invalid token" });
+//     }
+//   }
+
+//   if (skipAuth) {
+//     req.organizationId = req.organizationId || 1;
+//     req.user = req.user || {
+//       id: 1,
+//       email: "admin@dvele.com",
+//       role: "admin",
+//     };
+//     return next();
+//   }
+
+//   if (!authHeader || !authHeader.startsWith("Bearer ")) {
+//     return res.status(401).json({ error: "Unauthorized - No token provided" });
+//   }
+
+//   req.organizationId = req.organizationId || 1;
+//   req.user = req.user || {
+//     id: 1,
+//     email: "admin@dvele.com",
+//     role: "admin",
+//   };
+//   return next();
+// }
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (req.user?.role !== "admin") {

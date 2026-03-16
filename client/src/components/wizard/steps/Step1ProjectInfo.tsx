@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useWizard, US_STATES } from '../WizardContext';
 import { useQuery } from '@tanstack/react-query';
+import { apiRequest } from '@/lib/queryClient';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -74,16 +75,12 @@ export const Step1ProjectInfo: React.FC = () => {
     const numberToCheck = projectNumber;
     checkTimeoutRef.current = setTimeout(async () => {
       try {
-        const response = await fetch(`/api/projects/check-number/${encodeURIComponent(numberToCheck)}`);
+        const response = await apiRequest('GET', `/api/projects/check-number/${encodeURIComponent(numberToCheck)}`);
         if (projectData.projectNumber !== numberToCheck) {
           return;
         }
-        if (response.ok) {
-          const data = await response.json();
-          setProjectNumberStatus(data.exists ? 'exists' : 'available');
-        } else {
-          setProjectNumberStatus('idle');
-        }
+        const data = await response.json();
+        setProjectNumberStatus(data.exists ? 'exists' : 'available');
       } catch (error) {
         console.error('Failed to check project number:', error);
         setProjectNumberStatus('idle');

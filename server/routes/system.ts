@@ -441,7 +441,7 @@ router.post("/system/sync-variables-from-mapper", async (req, res) => {
             .replace(/Sq Ft/g, 'Sq Ft');
 
           await pool.query(
-            `INSERT INTO contract_variables (variable_name, display_name, category, data_type) VALUES ($1, $2, $3, $4)`,
+            `INSERT INTO contract_variables (variable_name, display_name, category, data_type, organization_id) VALUES ($1, $2, $3, $4, 1)`,
             [varName, displayName, category, dataType]
           );
           created++;

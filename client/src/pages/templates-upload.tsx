@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, apiRequest, getAuthHeaders } from "@/lib/queryClient";
 import {
   Upload,
   FileText,
@@ -102,8 +102,11 @@ export default function TemplatesUpload() {
       formData.append("template", file);
       formData.append("objectType", objectType);
 
+      const authHeaders = await getAuthHeaders() as Record<string, string>;
+      const { "Content-Type": _, ...uploadHeaders } = authHeaders;
       const response = await fetch("/api/contracts/upload-template", {
         method: "POST",
+        headers: uploadHeaders,
         body: formData,
       });
 
@@ -142,12 +145,7 @@ export default function TemplatesUpload() {
 
   const deleteMutation = useMutation({
     mutationFn: async (fileName: string) => {
-      const response = await fetch(
-        `/api/contracts/templates/${encodeURIComponent(fileName)}`,
-        {
-          method: "DELETE",
-        }
-      );
+      const response = await apiRequest("DELETE", `/api/contracts/templates/${encodeURIComponent(fileName)}`);
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.message || "Delete failed");
