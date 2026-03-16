@@ -9,7 +9,7 @@ export default function GenerateContractsPage() {
   const projectId = params.get("projectId");
 
   return (
-    <div className="container relative mx-auto py-8">
+    <div className="container relative mx-auto w-full py-8">
       <Button variant="outline" className="absolute left-8" asChild>
         <Link to="contracts" className={"flex gap-2"}>
           <ChevronLeft className="mr-2 h-4 w-4" />
