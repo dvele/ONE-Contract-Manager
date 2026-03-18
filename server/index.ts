@@ -18,7 +18,7 @@ app.use(
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
-  }),
+  })
 );
 
 app.use(express.urlencoded({ extended: false }));

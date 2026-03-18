@@ -718,7 +718,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
             squareFootage: u.squareFootage || 1500,
             bedrooms: u.bedrooms || 3,
             bathrooms: u.bathrooms || 2,
-            price: u.basePrice ? u.basePrice / 100 : 0,
+            price: u.basePriceSnapshot ? u.basePriceSnapshot / 100 : 0,
           }));
           loadedData.totalUnits = unitsData.length;
         } else if (details && (details.homeModel || details.homeSqFt)) {
