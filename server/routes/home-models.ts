@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { Pool } from "pg";
 import { requireAuth } from "../middleware/auth";
+import { syncCatalog } from "../services/catalogSync";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const router = Router();
@@ -101,6 +102,16 @@ router.patch("/home-models/:id", async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Error updating home model:", error);
     res.status(500).json({ error: "Failed to update home model" });
+  }
+});
+
+router.post("/home-models/sync", async (req: Request, res: Response) => {
+  try {
+    const result = await syncCatalog(req.organizationId!);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Error syncing catalog:", error);
+    res.status(500).json({ error: error.message || "Failed to sync catalog" });
   }
 });
 

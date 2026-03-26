@@ -41,7 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -90,7 +90,24 @@ export default function AdminHomeModels() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingModel, setEditingModel] = useState<HomeModel | null>(null);
   const [deleteModel, setDeleteModel] = useState<HomeModel | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncConfirmOpen, setSyncConfirmOpen] = useState(false);
   const { toast } = useToast();
+
+  const handleSync = async () => {
+    setSyncConfirmOpen(false);
+    setSyncing(true);
+    try {
+      const res = await apiRequest("POST", "/api/home-models/sync");
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/home-models"] });
+      toast({ title: `Synced ${data.synced} models${data.errors > 0 ? ` (${data.errors} errors)` : ""}` });
+    } catch (err: any) {
+      toast({ title: err.message || "Sync failed", variant: "destructive" });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const { data: homeModels, isLoading } = useQuery<HomeModel[]>({
     queryKey: ["/api/home-models"],
@@ -214,10 +231,16 @@ export default function AdminHomeModels() {
               Manage your home model catalog
             </p>
           </div>
-          <Button onClick={handleOpenCreate} data-testid="button-add-model">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Model
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setSyncConfirmOpen(true)} disabled={syncing}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Syncing..." : "Sync Catalog"}
+            </Button>
+            <Button onClick={handleOpenCreate} data-testid="button-add-model">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Model
+            </Button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -453,6 +476,21 @@ export default function AdminHomeModels() {
             </Form>
           </DialogContent>
         </Dialog>
+
+        <AlertDialog open={syncConfirmOpen} onOpenChange={setSyncConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Sync Catalog from Odoo</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action will pull the latest model information from Odoo and will overwrite what's currently been set for each model.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleSync}>Sync</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog open={!!deleteModel} onOpenChange={() => setDeleteModel(null)}>
           <AlertDialogContent>

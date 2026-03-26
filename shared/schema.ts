@@ -1,4 +1,4 @@
-import { pgTable, text, integer, real, serial, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, real, serial, boolean, jsonb, timestamp, unique } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -50,7 +50,9 @@ export const homeModels = pgTable("home_models", {
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at"),
-});
+}, (t) => [
+  unique().on(t.organizationId, t.modelCode),
+]);
 
 // =============================================================================
 // PROJECT UNITS (Multi-Tenant)
