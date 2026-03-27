@@ -31,7 +31,6 @@ import {
   Edit3,
   Code,
   RotateCcw,
-  AlertTriangle,
 } from "lucide-react";
 import { useState, useCallback } from "react";
 import { Eye } from "lucide-react";
@@ -541,27 +540,6 @@ export default function ContractDetail() {
             data-testid="badge-status">
             {getStatusDisplayLabel(contract.status)}
           </Badge>
-          {isStale && (
-            <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
-              Template v{contract.templateVersion} → v{contract.currentTemplateVersion}
-            </span>
-          )}
-          {!isStale && contract.templateVersion !== null && contract.currentTemplateVersion !== null && (
-            <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
-              Template v{contract.currentTemplateVersion}
-            </span>
-          )}
-          {isStale && (
-            <Button
-              variant="outline"
-              className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
-              onClick={handleRegenerate}
-              disabled={isRegenerating}
-              data-testid="button-regenerate">
-              <RotateCcw className="mr-2 h-4 w-4" />
-              {isRegenerating ? "Regenerating..." : "Regenerate"}
-            </Button>
-          )}
           <Button
             variant="outline"
             onClick={handleHtmlPreview}
@@ -588,25 +566,25 @@ export default function ContractDetail() {
         </div>
       </div>
 
-      {isStale && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
-          <p className="text-sm text-amber-800">
-            This contract was generated with template{" "}
-            <strong>v{contract.templateVersion}</strong>. The template has since
-            been updated to{" "}
-            <strong>v{contract.currentTemplateVersion}</strong>. Regenerating
-            will apply the latest clauses.
-          </p>
-        </div>
-      )}
-
       <Card>
-        <CardHeader>
-          <CardTitle>Contract Details</CardTitle>
-          <CardDescription>
-            Overview and metadata for this contract
-          </CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between">
+          <div>
+            <CardTitle>Contract Details</CardTitle>
+            <CardDescription>
+              Overview and metadata for this contract
+            </CardDescription>
+          </div>
+          {isStale && (
+            <Button
+              variant="outline"
+              className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+              onClick={handleRegenerate}
+              disabled={isRegenerating}
+              data-testid="button-regenerate">
+              <RotateCcw className="mr-2 h-4 w-4" />
+              {isRegenerating ? "Regenerating..." : "Regenerate"}
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
@@ -617,10 +595,18 @@ export default function ContractDetail() {
               </p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Version</p>
-              <p className="font-medium" data-testid="text-version">
-                v{contract.version}
-              </p>
+              <p className="text-sm text-muted-foreground">Template Version</p>
+              {isStale ? (
+                <p className="font-medium text-amber-700" data-testid="text-version">
+                  v{contract.templateVersion} → v{contract.currentTemplateVersion}
+                </p>
+              ) : contract.templateVersion !== null ? (
+                <p className="font-medium text-emerald-700" data-testid="text-version">
+                  v{contract.currentTemplateVersion}
+                </p>
+              ) : (
+                <p className="font-medium text-muted-foreground" data-testid="text-version">—</p>
+              )}
             </div>
             <div className="flex items-start gap-2">
               <Calendar className="mt-0.5 h-4 w-4 text-muted-foreground" />
