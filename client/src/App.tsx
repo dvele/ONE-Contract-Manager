@@ -25,6 +25,7 @@ import AdminLLCs from "@/pages/admin/llcs";
 import AdminExhibits from "@/pages/admin/exhibits";
 import AdminStateDisclosures from "@/pages/admin/state-disclosures";
 import AdminContractTemplates from "@/pages/admin/contract-templates";
+import TemplateEditor from "@/pages/admin/template-editor";
 import AdminContractorEntities from "@/pages/admin/contractor-entities";
 import AdminProjectUnits from "@/pages/admin/project-units";
 import AdminImportTemplates from "@/pages/admin/import-templates";
@@ -57,6 +58,10 @@ function Router() {
       <Route
         path="/admin/contract-templates"
         component={AdminContractTemplates}
+      />
+      <Route
+        path="/admin/contract-templates/:id/edit"
+        component={TemplateEditor}
       />
       <Route
         path="/admin/contractor-entities"

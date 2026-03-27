@@ -148,6 +148,24 @@ export const templateClauses = pgTable("template_clauses", {
 });
 
 // =============================================================================
+// TEMPLATE EXHIBITS (Junction table linking templates to exhibits)
+// =============================================================================
+
+export const templateExhibits = pgTable("template_exhibits", {
+  id: serial("id").primaryKey(),
+  templateId: integer("template_id")
+    .references(() => contractTemplates.id)
+    .notNull(),
+  exhibitId: integer("exhibit_id")
+    .references(() => exhibits.id)
+    .notNull(),
+  orderIndex: integer("order_index").notNull(),
+  organizationId: integer("organization_id")
+    .references(() => organizations.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// =============================================================================
 // CONTRACT VARIABLES (Multi-Tenant)
 // =============================================================================
 
@@ -547,6 +565,7 @@ export const contracts = pgTable("contracts", {
   // Generation Info
   generatedAt: timestamp("generated_at").defaultNow(),
   generatedBy: text("generated_by"),
+  templateId: integer("template_id").references(() => contractTemplates.id),
   templateVersion: text("template_version"),
   
   // File Storage
@@ -876,6 +895,9 @@ export type NewContractTemplate = typeof contractTemplates.$inferInsert;
 
 export type TemplateClause = typeof templateClauses.$inferSelect;
 export type NewTemplateClause = typeof templateClauses.$inferInsert;
+
+export type TemplateExhibit = typeof templateExhibits.$inferSelect;
+export type NewTemplateExhibit = typeof templateExhibits.$inferInsert;
 
 export type ContractVariable = typeof contractVariables.$inferSelect;
 export type NewContractVariable = typeof contractVariables.$inferInsert;

@@ -838,8 +838,8 @@ router.post("/contracts", async (req, res) => {
       
       // Insert new contract
       const insertResult = await client.query(
-        `INSERT INTO contracts (project_id, contract_type, version, status, generated_at, generated_by, template_version, file_path, file_name, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `INSERT INTO contracts (project_id, contract_type, version, status, generated_at, generated_by, template_id, template_version, file_path, file_name, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
         [
           contractData.projectId,
@@ -848,6 +848,7 @@ router.post("/contracts", async (req, res) => {
           contractData.status || 'Draft',
           contractData.generatedAt || new Date(),
           contractData.generatedBy || null,
+          templateId,
           contractData.templateVersion || null,
           contractData.filePath || null,
           contractData.fileName || null,
@@ -1445,12 +1446,62 @@ router.get("/contracts/download-pdf/:projectId/:contractType", async (req, res) 
       console.warn('Pricing enrichment failed for GET download:', pricingError);
     }
 
+    // Look up the saved contract to use its clause snapshot and templateId.
+    // This ensures edits to the clause/exhibit libraries never cascade into
+    // an already-generated contract.
+    const savedContract = await pool.query(
+      `SELECT id, template_id FROM contracts
+       WHERE project_id = $1 AND UPPER(contract_type) = UPPER($2)
+       ORDER BY generated_at DESC LIMIT 1`,
+      [projectId, contractType]
+    );
+
+    let snapshotClauses: any[] | undefined;
+    let templateId: number | undefined;
+
+    if (savedContract.rows.length > 0) {
+      const saved = savedContract.rows[0];
+      templateId = saved.template_id ?? undefined;
+
+      const snapshotResult = await pool.query(
+        `SELECT cc.clause_id AS id, c.slug AS clause_code, cc.header_text AS name,
+                cc.body_html AS content, c.contract_types, cc.level AS hierarchy_level,
+                cc."order" AS sort_order, c.tags
+         FROM contract_clauses cc
+         LEFT JOIN clauses c ON c.id = cc.clause_id
+         WHERE cc.contract_id = $1
+         ORDER BY cc."order" ASC`,
+        [saved.id]
+      );
+      if (snapshotResult.rows.length > 0) {
+        snapshotClauses = snapshotResult.rows.map((r: any) => ({
+          id: r.id,
+          clause_code: r.clause_code || '',
+          name: r.name || '',
+          content: r.content || '',
+          contract_type: Array.isArray(r.contract_types) ? r.contract_types[0] : r.contract_types,
+          hierarchy_level: r.hierarchy_level,
+          sort_order: r.sort_order,
+          parent_clause_id: null,
+          conditions: null,
+          block_type: null,
+          disclosure_code: null,
+          category: '',
+          variables_used: [],
+          service_model_condition: null,
+        }));
+        console.log(`📄 Using clause snapshot (${snapshotClauses.length} clauses) from contract ${saved.id}`);
+      }
+    }
+
     const { generateContract, getContractFilename } = await import('../lib/contractGenerator');
 
     const buffer = await generateContract({
       contractType: contractFilterType,
       projectData,
-      format: 'pdf'
+      format: 'pdf',
+      snapshotClauses,
+      templateId,
     });
 
     const filename = getContractFilename(contractType, projectData, 'pdf');

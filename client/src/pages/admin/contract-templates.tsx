@@ -50,7 +50,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, FileUp } from "lucide-react";
+import { Plus, Pencil, Trash2, FileUp, Settings2 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -243,6 +243,15 @@ export default function AdminContractTemplates() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <Link href={`/admin/contract-templates/${template.id}/edit`}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              data-testid={`button-manage-${template.id}`}
+                            >
+                              <Settings2 className="h-4 w-4" />
+                            </Button>
+                          </Link>
                           <Button
                             size="icon"
                             variant="ghost"

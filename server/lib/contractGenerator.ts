@@ -1,10 +1,13 @@
 import puppeteer from 'puppeteer';
 import { buildSignatureBlock } from './tableStyles';
+import { pool } from '../db';
 
 interface ContractGenerationOptions {
   contractType: 'MASTER_EF' | 'ONE' | 'MANUFACTURING' | 'ONSITE';
   projectData: Record<string, any>;
   format?: 'pdf' | 'html';
+  snapshotClauses?: Clause[]; // Pre-fetched from contract_clauses — bypasses live clause library
+  templateId?: number;        // Used to fetch exhibits from template_exhibits
 }
 
 interface Clause {
@@ -238,31 +241,24 @@ async function resolveInlineStateDisclosureTags(content: string, projectState: s
  * Fetch exhibits from database for a given contract type
  * Returns array of exhibit records ordered by sortOrder and letter
  */
-async function fetchExhibitsForContract(contractType: string): Promise<any[]> {
+async function fetchExhibitsForContract(contractType: string, templateId?: number): Promise<any[]> {
   try {
-    const { db } = await import('../db');
-    const { exhibits } = await import('@shared/schema');
-    const { asc } = await import('drizzle-orm');
-    
-    const allExhibits = await db.select()
-      .from(exhibits)
-      .orderBy(asc(exhibits.letter)); // Primary sort by exhibit_letter (A, B, C, D, E, F, G)
-    
-    // Filter by contract type and active status
-    const filteredExhibits = allExhibits.filter(exhibit => {
-      const types = exhibit.contractTypes as string[] | null;
-      return exhibit.isActive && types?.includes(contractType.toUpperCase());
-    });
-    
-    // Ensure exhibits are sorted by letter ascending (A-G)
-    filteredExhibits.sort((a, b) => {
-      const letterA = (a.letter || '').toUpperCase();
-      const letterB = (b.letter || '').toUpperCase();
-      return letterA.localeCompare(letterB);
-    });
-    
-    console.log(`📎 Found ${filteredExhibits.length} exhibits for ${contractType}, sorted A-G: ${filteredExhibits.map(e => e.letter).join(', ')}`);
-    return filteredExhibits;
+    if (templateId) {
+      const result = await pool.query(
+        `SELECT e.letter, e.title, e.content, e.is_dynamic, e.disclosure_code
+         FROM template_exhibits te
+         JOIN exhibits e ON e.id = te.exhibit_id
+         WHERE te.template_id = $1 AND e.is_active = true
+         ORDER BY te.order_index ASC`,
+        [templateId]
+      );
+      console.log(`📎 Found ${result.rows.length} exhibits via template_exhibits for template ${templateId}`);
+      return result.rows;
+    }
+
+    // Fallback: no template — return empty (contract types no longer drive exhibit inclusion)
+    console.warn(`📎 No templateId provided for exhibit fetch — no exhibits will be included`);
+    return [];
   } catch (error) {
     console.error('Error fetching exhibits:', error);
     return [];
@@ -346,13 +342,13 @@ interface BlockNode {
 }
 
 export async function generateContract(options: ContractGenerationOptions): Promise<Buffer> {
-  const { contractType, projectData, format = 'pdf' } = options;
-  
+  const { contractType, projectData, format = 'pdf', snapshotClauses, templateId } = options;
+
   console.log(`\n=== Generating ${contractType} Contract (${format.toUpperCase()}) ===`);
-  
-  // Step 1: Fetch and filter clauses
-  const clauses = await fetchClausesForContract(contractType, projectData);
-  console.log(`✓ Fetched ${clauses.length} clauses`);
+
+  // Step 1: Use snapshot if provided (already-saved contract), otherwise fetch live from library
+  const clauses = snapshotClauses ?? await fetchClausesForContract(contractType, projectData);
+  console.log(`✓ ${snapshotClauses ? 'Loaded' : 'Fetched'} ${clauses.length} clauses`);
   
   // Extract project state for state-specific filtering
   const projectState = projectData.PROJECT_STATE || projectData.state || projectData.siteState || '';
@@ -380,7 +376,7 @@ export async function generateContract(options: ContractGenerationOptions): Prom
   await preloadBlockComponents(projectData.organizationId || 1, currentServiceModel);
   
   // Preload exhibit content for {{EXHIBIT_A}} through {{EXHIBIT_G}} tags
-  await preloadExhibits(projectData.organizationId || 1, contractType);
+  await preloadExhibits(projectData.organizationId || 1, contractType, templateId);
   
   // Step 1.5: Preload state disclosures for dynamic_disclosure blocks AND inline tags
   const disclosureCodes = clauses
@@ -442,8 +438,8 @@ export async function generateContract(options: ContractGenerationOptions): Prom
   processBlockTreeVariables(blockTree, variableMap);
   console.log(`✓ Processed block tree with variable replacement`);
   
-  // Step 5.5: Fetch and render exhibits for this contract type
-  const exhibitRecords = await fetchExhibitsForContract(contractType);
+  // Step 5.5: Fetch and render exhibits for this template
+  const exhibitRecords = await fetchExhibitsForContract(contractType, templateId);
   let exhibitsHtml = '';
   if (exhibitRecords.length > 0) {
     exhibitsHtml = await renderExhibitsHTML(exhibitRecords, variableMap, projectState);
@@ -868,39 +864,34 @@ async function fetchClausesForContract(
     };
     const normalizedType = contractTypeNormalizer[contractType] || contractType;
     
-    const port = process.env.PORT || '5000';
-    const url = `http://localhost:${port}/api/clauses?contractType=${encodeURIComponent(normalizedType)}`;
-    console.log(`Fetching clauses from: ${url}`);
-    
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch clauses: ${response.status} ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    const rawClauses = data.clauses || [];
-    
-    // Map API field names to Clause interface field names
-    // API returns: header_text, body_html | Interface expects: name, content
-    const allClauses: Clause[] = rawClauses.map((c: any) => ({
+    console.log(`Fetching clauses for contract type: ${normalizedType}`);
+
+    const result = await pool.query(
+      `SELECT id, slug, parent_id, level, "order", header_text, body_html, contract_types, tags
+       FROM clauses
+       WHERE contract_types @> $1::jsonb
+       ORDER BY "order", slug`,
+      [JSON.stringify([normalizedType])]
+    );
+
+    const allClauses: Clause[] = result.rows.map((c: any) => ({
       id: c.id,
-      clause_code: c.clause_code,
-      name: c.header_text || '',           // API: header_text → Interface: name
-      content: c.body_html || '',          // API: body_html → Interface: content
+      clause_code: c.slug,
+      name: c.header_text || '',
+      content: c.body_html || '',
       contract_type: Array.isArray(c.contract_types) ? c.contract_types[0] : c.contract_types,
-      hierarchy_level: c.hierarchy_level,
-      sort_order: c.sort_order,
-      parent_clause_id: c.parent_clause_id,
-      conditions: c.conditions || null,
-      block_type: c.block_type || null,
-      disclosure_code: c.disclosure_code || null,
-      category: c.category || '',
-      variables_used: c.variables_used || [],
-      service_model_condition: c.service_model_condition || null,
+      hierarchy_level: c.level,
+      sort_order: c.order,
+      parent_clause_id: c.parent_id,
+      conditions: null,
+      block_type: null,
+      disclosure_code: null,
+      category: '',
+      variables_used: [],
+      service_model_condition: null,
     }));
-    
-    console.log(`Received ${allClauses.length} total clauses from API`);
+
+    console.log(`Fetched ${allClauses.length} clauses from DB`);
     
     const serviceModel = (projectData.serviceModel || 'CRC').toUpperCase();
     console.log('📝 Generating for Service Model:', serviceModel);
@@ -1072,38 +1063,33 @@ export async function preloadBlockComponents(organizationId: number, serviceMode
  * This allows synchronous resolution of {{EXHIBIT_A}} through {{EXHIBIT_G}} tags
  * Filters by contract type to ensure correct exhibits for each contract
  */
-export async function preloadExhibits(organizationId: number, contractType: string): Promise<void> {
-  const { Pool } = await import('pg');
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  const normalizedType = contractType.toUpperCase();
-  
+export async function preloadExhibits(organizationId: number, contractType: string, templateId?: number): Promise<void> {
   try {
-    // Fetch exhibits that match this contract type (stored as ARRAY in contract_types column)
-    const result = await pool.query(
-      `SELECT letter, title, content, contract_types FROM exhibits 
-       WHERE organization_id = $1 
-         AND is_active = true
-         AND letter IS NOT NULL
-       ORDER BY letter`,
-      [organizationId]
-    );
-    
-    // Build cache keyed by EXHIBIT_X format, filtering by contract type
-    for (const row of result.rows) {
-      // Check if this exhibit applies to the current contract type
-      const types = row.contract_types as string[] | null;
-      if (types && !types.includes(normalizedType)) {
-        continue; // Skip exhibits not matching this contract type
-      }
-      
+    let rows: any[] = [];
+
+    if (templateId) {
+      const result = await pool.query(
+        `SELECT e.letter, e.title, e.content
+         FROM template_exhibits te
+         JOIN exhibits e ON e.id = te.exhibit_id
+         WHERE te.template_id = $1 AND e.is_active = true
+         ORDER BY te.order_index ASC`,
+        [templateId]
+      );
+      rows = result.rows;
+    }
+    // No templateId — cache stays empty; {{EXHIBIT_X}} tags won't resolve
+
+    for (const row of rows) {
+      if (!row.letter) continue;
       const exhibitKey = `EXHIBIT_${row.letter.toUpperCase()}`;
       const exhibitHtml = `<h2>Exhibit ${row.letter}: ${row.title}</h2>\n${row.content || ''}`;
       exhibitContentCache.set(exhibitKey, exhibitHtml);
     }
-    
-    console.log(`Preloaded ${exhibitContentCache.size} exhibits for ${normalizedType}`);
-  } finally {
-    await pool.end();
+
+    console.log(`Preloaded ${exhibitContentCache.size} exhibits${templateId ? ` for template ${templateId}` : ''}`);
+  } catch (error) {
+    console.error('Error preloading exhibits:', error);
   }
 }
 
