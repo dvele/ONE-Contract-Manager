@@ -554,13 +554,12 @@ export default function ContractDetail() {
           {isStale && (
             <Button
               variant="outline"
-              size="sm"
               className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
               onClick={handleRegenerate}
               disabled={isRegenerating}
               data-testid="button-regenerate">
               <RotateCcw className="mr-2 h-4 w-4" />
-              {isRegenerating ? "Regenerating..." : "Regenerate with latest template"}
+              {isRegenerating ? "Regenerating..." : "Regenerate"}
             </Button>
           )}
           <Button

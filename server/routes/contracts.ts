@@ -1053,11 +1053,13 @@ router.post("/contracts/:id/regenerate", requireAuth, async (req, res) => {
   const client = await pool.connect();
   try {
     // 1. Fetch the contract to get templateId
+    // Note: contracts.organization_id is nullable (not set at INSERT time), so we
+    // rely on the contract ID alone — matching the pattern of GET /contracts/:id.
     const contractResult = await client.query(
       `SELECT id, template_id, project_id, contract_type
        FROM contracts
-       WHERE id = $1 AND organization_id = $2`,
-      [contractId, req.organizationId]
+       WHERE id = $1`,
+      [contractId]
     );
     if (contractResult.rowCount === 0) {
       return res.status(404).json({ error: "Contract not found" });
@@ -1111,9 +1113,9 @@ router.post("/contracts/:id/regenerate", requireAuth, async (req, res) => {
     const updateResult = await client.query(
       `UPDATE contracts
        SET template_version = $1, generated_at = now()
-       WHERE id = $2 AND organization_id = $3
+       WHERE id = $2
        RETURNING *`,
-      [currentVersion, contractId, req.organizationId]
+      [currentVersion, contractId]
     );
 
     await client.query("COMMIT");

@@ -475,6 +475,7 @@ export default function TemplateEditor() {
 
       // Step 5: Invalidate + reset draft
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [`/api/contract-templates/${id}`] }),
         queryClient.invalidateQueries({ queryKey: [`/api/contract-templates/${id}/clauses`] }),
         queryClient.invalidateQueries({ queryKey: [`/api/contract-templates/${id}/exhibits`] }),
       ]);
