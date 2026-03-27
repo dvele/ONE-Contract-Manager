@@ -470,7 +470,10 @@ export default function TemplateEditor() {
 
       await Promise.all(reorderJobs);
 
-      // Step 4: Invalidate + reset draft
+      // Step 4: Bump template version
+      await apiRequest("PATCH", `/api/contract-templates/${id}/version`);
+
+      // Step 5: Invalidate + reset draft
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: [`/api/contract-templates/${id}/clauses`] }),
         queryClient.invalidateQueries({ queryKey: [`/api/contract-templates/${id}/exhibits`] }),
