@@ -782,13 +782,21 @@ router.post("/contracts", async (req, res) => {
     }
     
     console.log("🚀 STARTING GENERATION. TemplateID:", templateId, "ProjectID:", projectId, "ContractType:", contractType);
-    
+
     // Normalize status to ensure consistency
     const normalizedStatus = status === "draft" ? "Draft" : status;
     const contractData = { ...req.body, status: normalizedStatus };
-    
+
     const client = await pool.connect();
     try {
+      // Fetch current template version for snapshot
+      const templateVersionResult = await client.query(
+        `SELECT version FROM contract_templates WHERE id = $1`,
+        [templateId]
+      );
+      const templateVersionAtGeneration: number | null =
+        templateVersionResult.rows[0]?.version ?? null;
+
       // Fetch playlist from template_clauses
       const playlistResult = await client.query(
         `SELECT tc.*, c.header_text, c.body_html, c.level 
@@ -849,7 +857,7 @@ router.post("/contracts", async (req, res) => {
           contractData.generatedAt || new Date(),
           contractData.generatedBy || null,
           templateId,
-          contractData.templateVersion || null,
+          templateVersionAtGeneration,
           contractData.filePath || null,
           contractData.fileName || null,
           contractData.notes || null
