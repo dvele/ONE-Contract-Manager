@@ -798,8 +798,8 @@ router.post("/contracts", async (req, res) => {
     try {
       // Fetch current template version for snapshot
       const templateVersionResult = await client.query(
-        `SELECT version FROM contract_templates WHERE id = $1`,
-        [templateId]
+        `SELECT version FROM contract_templates WHERE id = $1 AND organization_id = $2`,
+        [templateId, req.organizationId]
       );
       const templateVersionAtGeneration: number | null =
         templateVersionResult.rows[0]?.version ?? null;
@@ -1068,6 +1068,8 @@ router.post("/contracts/:id/regenerate", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Contract has no linked template" });
     }
 
+    await client.query("BEGIN");
+
     // 2. Fetch the template's current version
     const templateResult = await client.query(
       `SELECT version FROM contract_templates
@@ -1092,8 +1094,6 @@ router.post("/contracts/:id/regenerate", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Template has no clauses" });
     }
 
-    await client.query("BEGIN");
-
     // 4. Replace clause snapshot
     await client.query(
       `DELETE FROM contract_clauses WHERE contract_id = $1`,
@@ -1111,9 +1111,9 @@ router.post("/contracts/:id/regenerate", requireAuth, async (req, res) => {
     const updateResult = await client.query(
       `UPDATE contracts
        SET template_version = $1, generated_at = now()
-       WHERE id = $2
+       WHERE id = $2 AND organization_id = $3
        RETURNING *`,
-      [currentVersion, contractId]
+      [currentVersion, contractId, req.organizationId]
     );
 
     await client.query("COMMIT");
