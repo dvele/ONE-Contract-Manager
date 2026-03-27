@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "../db/index";
 import { pool } from "../db";
+import { requireAuth } from "../middleware/auth";
 import { contracts, projects, clauses, financials, projectUnits, homeModels } from "../../shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { getProjectWithRelations } from "./helpers";
@@ -1031,6 +1032,90 @@ router.patch("/contracts/:id", async (req, res) => {
   } catch (error) {
     console.error("Failed to update contract:", error);
     res.status(500).json({ error: "Failed to update contract" });
+  }
+});
+
+router.post("/contracts/:id/regenerate", requireAuth, async (req, res) => {
+  const contractId = parseInt(req.params.id as string, 10);
+  if (isNaN(contractId)) {
+    return res.status(400).json({ error: "Invalid contract id" });
+  }
+
+  const client = await pool.connect();
+  try {
+    // 1. Fetch the contract to get templateId
+    const contractResult = await client.query(
+      `SELECT id, template_id, project_id, contract_type
+       FROM contracts
+       WHERE id = $1 AND organization_id = $2`,
+      [contractId, req.organizationId]
+    );
+    if (contractResult.rowCount === 0) {
+      return res.status(404).json({ error: "Contract not found" });
+    }
+    const contract = contractResult.rows[0];
+
+    if (!contract.template_id) {
+      return res.status(400).json({ error: "Contract has no linked template" });
+    }
+
+    // 2. Fetch the template's current version
+    const templateResult = await client.query(
+      `SELECT version FROM contract_templates
+       WHERE id = $1 AND organization_id = $2`,
+      [contract.template_id, req.organizationId]
+    );
+    if (templateResult.rowCount === 0) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+    const currentVersion: number = templateResult.rows[0].version;
+
+    // 3. Fetch the template's current clause playlist
+    const playlistResult = await client.query(
+      `SELECT tc.clause_id, tc.order_index, c.header_text, c.body_html, c.level
+       FROM template_clauses tc
+       JOIN clauses c ON c.id = tc.clause_id
+       WHERE tc.template_id = $1
+       ORDER BY tc.order_index ASC`,
+      [contract.template_id]
+    );
+    if (playlistResult.rowCount === 0) {
+      return res.status(400).json({ error: "Template has no clauses" });
+    }
+
+    await client.query("BEGIN");
+
+    // 4. Replace clause snapshot
+    await client.query(
+      `DELETE FROM contract_clauses WHERE contract_id = $1`,
+      [contractId]
+    );
+    for (const row of playlistResult.rows) {
+      await client.query(
+        `INSERT INTO contract_clauses (contract_id, clause_id, header_text, body_html, level, "order")
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [contractId, row.clause_id, row.header_text, row.body_html, row.level, row.order_index]
+      );
+    }
+
+    // 5. Update contract metadata
+    const updateResult = await client.query(
+      `UPDATE contracts
+       SET template_version = $1, generated_at = now()
+       WHERE id = $2
+       RETURNING *`,
+      [currentVersion, contractId]
+    );
+
+    await client.query("COMMIT");
+
+    res.json(updateResult.rows[0]);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("Failed to regenerate contract:", err);
+    res.status(500).json({ error: "Failed to regenerate contract" });
+  } finally {
+    client.release();
   }
 });
 
