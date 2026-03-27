@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { Pool } from "pg";
-import { requireAuth } from "../middleware/auth";
+import { requireAuth, requireAdmin } from "../middleware/auth";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const router = Router();
@@ -315,6 +315,34 @@ router.put("/contract-templates/:id/exhibits/reorder", async (req: Request, res:
   } catch (error: any) {
     console.error("Error reordering template exhibits:", error);
     res.status(500).json({ error: "Failed to reorder exhibits" });
+  }
+});
+
+// Bump version counter — called by template editor Save
+router.patch("/:id/version", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const templateId = parseInt(id as string);
+    if (isNaN(templateId)) {
+      return res.status(400).json({ error: "Invalid template id" });
+    }
+
+    const result = await pool.query(
+      `UPDATE contract_templates
+       SET version = version + 1, updated_at = now()
+       WHERE id = $1 AND organization_id = $2
+       RETURNING version`,
+      [templateId, req.organizationId]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+
+    res.json({ version: result.rows[0].version });
+  } catch (error: any) {
+    console.error("Error updating template version:", error);
+    res.status(500).json({ error: "Failed to update template version" });
   }
 });
 
