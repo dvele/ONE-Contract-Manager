@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npm run check",
+            "cwd": "/Users/work/Documents/dev/contract-manager/ONE-Contract-Manager"
+          }
+        ]
+      }
+    ]
+  }
+}
