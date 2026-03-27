@@ -296,6 +296,7 @@ export default function ContractDetail() {
   const { data: contract, isLoading: contractLoading } = useQuery<Contract>({
     queryKey: ["/api/contracts", contractId],
     enabled: contractId > 0,
+    staleTime: 0,
   });
 
   const { data: clauses, isLoading: clausesLoading } = useQuery<Clause[]>({
