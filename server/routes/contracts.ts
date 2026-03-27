@@ -1640,13 +1640,63 @@ router.post("/contracts/draft-preview", async (req, res) => {
       console.warn('Pricing enrichment failed for preview, using base values:', pricingError);
     }
     
+    // Use the saved contract's clause snapshot so the preview reflects the same
+    // clause content and order as the generated document (mirrors download-pdf logic).
+    const savedContractForPreview = await pool.query(
+      `SELECT id, template_id FROM contracts
+       WHERE project_id = $1 AND UPPER(contract_type) = UPPER($2)
+       ORDER BY generated_at DESC LIMIT 1`,
+      [projectId, contractType]
+    );
+
+    let previewSnapshotClauses: any[] | undefined;
+    let previewTemplateId: number | undefined;
+
+    if (savedContractForPreview.rows.length > 0) {
+      const saved = savedContractForPreview.rows[0];
+      previewTemplateId = saved.template_id ?? undefined;
+
+      const snapshotResult = await pool.query(
+        `SELECT cc.clause_id AS id, c.slug AS clause_code, cc.header_text AS name,
+                cc.body_html AS content, c.contract_types, cc.level AS hierarchy_level,
+                cc."order" AS sort_order, c.tags
+         FROM contract_clauses cc
+         LEFT JOIN clauses c ON c.id = cc.clause_id
+         WHERE cc.contract_id = $1
+         ORDER BY cc."order" ASC`,
+        [saved.id]
+      );
+
+      if (snapshotResult.rows.length > 0) {
+        previewSnapshotClauses = snapshotResult.rows.map((r: any) => ({
+          id: r.id,
+          clause_code: r.clause_code || '',
+          name: r.name || '',
+          content: r.content || '',
+          contract_type: Array.isArray(r.contract_types) ? r.contract_types[0] : r.contract_types,
+          hierarchy_level: r.hierarchy_level,
+          sort_order: r.sort_order,
+          parent_clause_id: null,
+          conditions: null,
+          block_type: null,
+          disclosure_code: null,
+          category: '',
+          variables_used: [],
+          service_model_condition: null,
+        }));
+        console.log(`📄 Preview using clause snapshot (${previewSnapshotClauses.length} clauses) from contract ${saved.id}`);
+      }
+    }
+
     // Generate HTML (not PDF)
     const { generateContract } = await import('../lib/contractGenerator');
-    
+
     const buffer = await generateContract({
       contractType: contractType as 'ONE' | 'MANUFACTURING' | 'ONSITE' | 'MASTER_EF',
       projectData,
-      format: 'html'
+      format: 'html',
+      snapshotClauses: previewSnapshotClauses,
+      templateId: previewTemplateId,
     });
     
     const html = buffer.toString('utf-8');
