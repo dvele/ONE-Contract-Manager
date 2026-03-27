@@ -119,7 +119,7 @@ export const contractTemplates = pgTable("contract_templates", {
   name: text("name").notNull(),
   displayName: text("display_name"),
   contractType: text("contract_type").notNull(), // one_agreement, manufacturing_sub, onsite_sub
-  version: text("version").default("1.0"),
+  version: integer("version").default(1),
   status: text("status").default("active"),
   content: text("content"), // HTML/template content
   baseClauseIds: jsonb("base_clause_ids"), // integer[] stored as jsonb
@@ -566,7 +566,7 @@ export const contracts = pgTable("contracts", {
   generatedAt: timestamp("generated_at").defaultNow(),
   generatedBy: text("generated_by"),
   templateId: integer("template_id").references(() => contractTemplates.id),
-  templateVersion: text("template_version"),
+  templateVersion: integer("template_version"),
   
   // File Storage
   filePath: text("file_path"),
