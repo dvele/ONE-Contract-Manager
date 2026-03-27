@@ -290,6 +290,7 @@ export default function ContractDetail() {
     new Set()
   );
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   const contractId = parseInt(params.id || "0");
 
@@ -461,6 +462,7 @@ export default function ContractDetail() {
     (contract?.currentTemplateVersion ?? 0) > (contract?.templateVersion ?? 0);
 
   const handleRegenerate = async () => {
+    setIsRegenerating(true);
     try {
       await apiRequest("POST", `/api/contracts/${contractId}/regenerate`);
       queryClient.invalidateQueries({ queryKey: ["/api/contracts", contractId] });
@@ -472,6 +474,8 @@ export default function ContractDetail() {
         description: "Could not regenerate contract.",
         variant: "destructive",
       });
+    } finally {
+      setIsRegenerating(false);
     }
   };
 
@@ -542,7 +546,7 @@ export default function ContractDetail() {
               Template v{contract.templateVersion} → v{contract.currentTemplateVersion}
             </span>
           )}
-          {!isStale && contract.currentTemplateVersion !== null && (
+          {!isStale && contract.templateVersion !== null && contract.currentTemplateVersion !== null && (
             <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
               Template v{contract.currentTemplateVersion}
             </span>
@@ -553,9 +557,10 @@ export default function ContractDetail() {
               size="sm"
               className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
               onClick={handleRegenerate}
+              disabled={isRegenerating}
               data-testid="button-regenerate">
               <RotateCcw className="mr-2 h-4 w-4" />
-              Regenerate with latest template
+              {isRegenerating ? "Regenerating..." : "Regenerate with latest template"}
             </Button>
           )}
           <Button

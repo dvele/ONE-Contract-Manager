@@ -419,7 +419,7 @@ export default function Contracts() {
                                           Template v{contract.templateVersion} → v{contract.currentTemplateVersion}
                                         </span>
                                       )}
-                                      {!isStale(contract) && contract.currentTemplateVersion !== null && (
+                                      {!isStale(contract) && contract.templateVersion !== null && contract.currentTemplateVersion !== null && (
                                         <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
                                           Template v{contract.currentTemplateVersion}
                                         </span>
