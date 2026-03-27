@@ -30,6 +30,8 @@ import {
   FileCheck,
   Edit3,
   Code,
+  RotateCcw,
+  AlertTriangle,
 } from "lucide-react";
 import { useState, useCallback } from "react";
 import { Eye } from "lucide-react";
@@ -171,7 +173,9 @@ interface Contract {
   status: string;
   generatedAt: string;
   generatedBy: string;
-  templateVersion: string;
+  templateId: number | null;
+  templateVersion: number | null;
+  currentTemplateVersion: number | null;
   fileName: string;
   filePath: string;
   notes: string;
@@ -451,6 +455,26 @@ export default function ContractDetail() {
     updateStatusMutation.mutate(newStatus);
   };
 
+  const isStale =
+    (contract?.templateVersion ?? null) !== null &&
+    (contract?.currentTemplateVersion ?? null) !== null &&
+    (contract?.currentTemplateVersion ?? 0) > (contract?.templateVersion ?? 0);
+
+  const handleRegenerate = async () => {
+    try {
+      await apiRequest("POST", `/api/contracts/${contractId}/regenerate`);
+      queryClient.invalidateQueries({ queryKey: ["/api/contracts", contractId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
+      toast({ title: "Contract regenerated with latest template" });
+    } catch {
+      toast({
+        title: "Regeneration failed",
+        description: "Could not regenerate contract.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (contractLoading) {
     return (
       <div className="space-y-6 p-6">
@@ -513,6 +537,27 @@ export default function ContractDetail() {
             data-testid="badge-status">
             {getStatusDisplayLabel(contract.status)}
           </Badge>
+          {isStale && (
+            <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+              Template v{contract.templateVersion} → v{contract.currentTemplateVersion}
+            </span>
+          )}
+          {!isStale && contract.currentTemplateVersion !== null && (
+            <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
+              Template v{contract.currentTemplateVersion}
+            </span>
+          )}
+          {isStale && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+              onClick={handleRegenerate}
+              data-testid="button-regenerate">
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Regenerate with latest template
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={handleHtmlPreview}
@@ -538,6 +583,19 @@ export default function ContractDetail() {
           </Button>
         </div>
       </div>
+
+      {isStale && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+          <p className="text-sm text-amber-800">
+            This contract was generated with template{" "}
+            <strong>v{contract.templateVersion}</strong>. The template has since
+            been updated to{" "}
+            <strong>v{contract.currentTemplateVersion}</strong>. Regenerating
+            will apply the latest clauses.
+          </p>
+        </div>
+      )}
 
       <Card>
         <CardHeader>
