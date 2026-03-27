@@ -2215,7 +2215,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           templateId,
           status: 'Draft',
           generatedBy: 'wizard',
-          templateVersion: '1.0',
+          templateVersion: 1,
           fileName: `${pd.projectName?.replace(/\s+/g, '_') || 'Project'}_${contractType}_${pd.projectNumber}.docx`,
         };
         
