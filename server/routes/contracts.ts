@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "../db/index";
 import { pool } from "../db";
 import { requireAuth } from "../middleware/auth";
-import { contracts, projects, clauses, financials, projectUnits, homeModels } from "../../shared/schema";
+import { contracts, projects, clauses, financials, projectUnits, homeModels, contractTemplates } from "../../shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { getProjectWithRelations } from "./helpers";
 import path from "path";
@@ -640,14 +640,17 @@ router.get("/contracts", async (req, res) => {
         status: contracts.status,
         generatedAt: contracts.generatedAt,
         generatedBy: contracts.generatedBy,
+        templateId: contracts.templateId,
         templateVersion: contracts.templateVersion,
         fileName: contracts.fileName,
         notes: contracts.notes,
         projectName: projects.name,
         projectNumber: projects.projectNumber,
+        currentTemplateVersion: contractTemplates.version,
       })
       .from(contracts)
       .leftJoin(projects, eq(contracts.projectId, projects.id))
+      .leftJoin(contractTemplates, eq(contracts.templateId, contractTemplates.id))
       .orderBy(contracts.generatedAt);
     
     const draftProjects = await db
@@ -699,6 +702,8 @@ router.get("/contracts", async (req, res) => {
         fileName: string;
         status: string;
         generatedAt: string;
+        templateVersion: number | null;
+        currentTemplateVersion: number | null;
       }>;
     }>();
     
@@ -729,6 +734,8 @@ router.get("/contracts", async (req, res) => {
         fileName: c.fileName || '',
         status: normalizeStatus(c.status),
         generatedAt: c.generatedAt?.toISOString() || '',
+        templateVersion: c.templateVersion ?? null,
+        currentTemplateVersion: c.currentTemplateVersion ?? null,
       };
       
       if (existing) {
@@ -916,15 +923,18 @@ router.get("/contracts/:id", async (req, res) => {
         status: contracts.status,
         generatedAt: contracts.generatedAt,
         generatedBy: contracts.generatedBy,
+        templateId: contracts.templateId,
         templateVersion: contracts.templateVersion,
         fileName: contracts.fileName,
         filePath: contracts.filePath,
         notes: contracts.notes,
         projectName: projects.name,
         projectNumber: projects.projectNumber,
+        currentTemplateVersion: contractTemplates.version,
       })
       .from(contracts)
       .leftJoin(projects, eq(contracts.projectId, projects.id))
+      .leftJoin(contractTemplates, eq(contracts.templateId, contractTemplates.id))
       .where(eq(contracts.id, contractId));
     if (!contract) {
       return res.status(404).json({ error: "Contract not found" });
