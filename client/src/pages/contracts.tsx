@@ -37,6 +37,7 @@ import {
   Download,
   Code,
   Trash2,
+  RotateCcw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
@@ -48,6 +49,8 @@ interface ContractInfo {
   fileName: string;
   status: string;
   generatedAt: string;
+  templateVersion: number | null;
+  currentTemplateVersion: number | null;
 }
 
 interface ContractPackage {
@@ -171,6 +174,28 @@ export default function Contracts() {
       setTimeout(() => setGeneratingContract(null), 2000);
     }
   };
+
+  const handleRegenerate = async (contractId: number) => {
+    setGeneratingContract(contractId);
+    try {
+      await apiRequest("POST", `/api/contracts/${contractId}/regenerate`);
+      queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
+      toast({ title: "Contract regenerated with latest template" });
+    } catch {
+      toast({
+        title: "Regeneration failed",
+        description: "Could not regenerate contract.",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingContract(null);
+    }
+  };
+
+  const isStale = (contract: ContractInfo): boolean =>
+    contract.templateVersion !== null &&
+    contract.currentTemplateVersion !== null &&
+    contract.currentTemplateVersion > contract.templateVersion;
 
   const togglePackage = (packageId: number) => {
     setExpandedPackages((prev) => {
@@ -385,11 +410,21 @@ export default function Contracts() {
                                 <div className="flex min-w-0 items-center gap-3">
                                   <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                                   <div className="min-w-0">
-                                    <p className="text-sm font-medium">
-                                      {formatContractType(
-                                        contract.contractType
+                                    <div className="flex items-center gap-2">
+                                      <p className="text-sm font-medium">
+                                        {formatContractType(contract.contractType)}
+                                      </p>
+                                      {isStale(contract) && (
+                                        <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                                          Template v{contract.templateVersion} → v{contract.currentTemplateVersion}
+                                        </span>
                                       )}
-                                    </p>
+                                      {!isStale(contract) && contract.currentTemplateVersion !== null && (
+                                        <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                                          Template v{contract.currentTemplateVersion}
+                                        </span>
+                                      )}
+                                    </div>
                                     <p className="truncate text-xs text-muted-foreground">
                                       {contract.fileName}
                                     </p>
@@ -400,6 +435,21 @@ export default function Contracts() {
                                     status={contract.status}
                                     size="sm"
                                   />
+                                  {isStale(contract) && (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRegenerate(contract.id);
+                                      }}
+                                      disabled={generatingContract === contract.id}
+                                      data-testid={`button-regenerate-${contract.id}`}>
+                                      <RotateCcw className="mr-1 h-3 w-3" />
+                                      Regenerate
+                                    </Button>
+                                  )}
                                   <Button
                                     variant="ghost"
                                     size="icon"
