@@ -640,7 +640,6 @@ router.get("/contracts", async (req, res) => {
         status: contracts.status,
         generatedAt: contracts.generatedAt,
         generatedBy: contracts.generatedBy,
-        templateId: contracts.templateId,
         templateVersion: contracts.templateVersion,
         fileName: contracts.fileName,
         notes: contracts.notes,
