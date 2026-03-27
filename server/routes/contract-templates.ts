@@ -319,10 +319,10 @@ router.put("/contract-templates/:id/exhibits/reorder", async (req: Request, res:
 });
 
 // Bump version counter — called by template editor Save
-router.patch("/:id/version", requireAdmin, async (req, res) => {
+router.patch("/contract-templates/:id/version", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const templateId = parseInt(id as string);
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const templateId = parseInt(id, 10);
     if (isNaN(templateId)) {
       return res.status(400).json({ error: "Invalid template id" });
     }
