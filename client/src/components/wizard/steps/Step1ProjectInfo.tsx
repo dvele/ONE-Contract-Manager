@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useWizard, US_STATES } from '../WizardContext';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -50,11 +50,13 @@ export const Step1ProjectInfo: React.FC = () => {
   });
 
   useEffect(() => {
-    if (odooError) {
+    if (odooError && mode === 'dropdown') {
       setMode('manual');
       setFallbackNotice('Could not load projects — enter manually');
     }
-  }, [odooError]);
+  }, [odooError, mode]);
+
+  const queryClient = useQueryClient();
 
   const { projectData, validationErrors } = wizardState;
 
@@ -151,6 +153,7 @@ export const Step1ProjectInfo: React.FC = () => {
                 type="button"
                 className="text-xs text-muted-foreground underline hover:text-foreground"
                 onClick={() => {
+                  queryClient.resetQueries({ queryKey: ['/api/odoo/projects'] });
                   setMode('dropdown');
                   setFallbackNotice(undefined);
                 }}
