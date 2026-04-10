@@ -30,7 +30,7 @@ function parseOdooProjectName(name: string): { projectNumber: string; projectNam
   };
 }
 
-router.get('/odoo/projects', async (req, res) => {
+router.get('/odoo/projects', async (_req, res) => {
   const apiKey = process.env.VITE_ONEDOT_API_KEY;
   if (!apiKey) {
     console.error('[OdooProxy] VITE_ONEDOT_API_KEY is not set');
@@ -39,7 +39,7 @@ router.get('/odoo/projects', async (req, res) => {
 
   try {
     const response = await fetch('https://one-api.dvele.com/odoo/projects', {
-      headers: { Authorization: apiKey },
+      headers: { Authorization: `Api-Key ${apiKey}` },
     });
 
     if (!response.ok) {
