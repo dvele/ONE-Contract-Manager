@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { HelpCircle, RefreshCw, AlertTriangle, CheckCircle, Home, MapPin } from 'lucide-react';
+import { OdooProjectCombobox, type OdooProject } from '../OdooProjectCombobox';
 
 interface ProjectUnit {
   id: number;
@@ -38,7 +39,23 @@ export const Step1ProjectInfo: React.FC = () => {
   
   const [projectNumberStatus, setProjectNumberStatus] = useState<'idle' | 'checking' | 'exists' | 'available'>('idle');
   const checkTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
+  const [mode, setMode] = useState<'dropdown' | 'manual'>('dropdown');
+  const [fallbackNotice, setFallbackNotice] = useState<string | undefined>();
+
+  const { data: odooProjects = [], isLoading: odooLoading, isError: odooError } = useQuery<OdooProject[]>({
+    queryKey: ['/api/odoo/projects'],
+    enabled: mode === 'dropdown',
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (odooError) {
+      setMode('manual');
+      setFallbackNotice('Could not load projects — enter manually');
+    }
+  }, [odooError]);
+
   const { projectData, validationErrors } = wizardState;
 
   const { data: projectUnits = [] } = useQuery<ProjectUnit[]>({
@@ -80,7 +97,7 @@ export const Step1ProjectInfo: React.FC = () => {
           return;
         }
         const data = await response.json();
-        setProjectNumberStatus(data.exists ? 'exists' : 'available');
+        setProjectNumberStatus(!data.isUnique ? 'exists' : 'available');
       } catch (error) {
         console.error('Failed to check project number:', error);
         setProjectNumberStatus('idle');
@@ -104,89 +121,129 @@ export const Step1ProjectInfo: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="projectNumber" className="flex items-center gap-2">
-              Project Number <span className="text-red-500">*</span>
-              <Tooltip>
-                <TooltipTrigger>
-                  <HelpCircle className="h-4 w-4 text-muted-foreground" />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Format: YYYY-### (e.g., 2025-042)</p>
-                </TooltipContent>
-              </Tooltip>
-            </Label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Input
-                  id="projectNumber"
-                  value={projectData.projectNumber}
-                  onChange={(e) => updateProjectData({ projectNumber: e.target.value })}
-                  placeholder="2025-042"
-                  className={`${validationErrors.projectNumber || projectNumberStatus === 'exists' ? 'border-red-500' : projectNumberStatus === 'available' ? 'border-green-500' : ''} pr-10`}
-                  data-testid="input-project-number"
-                />
-                {projectNumberStatus === 'checking' && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+          {/* Project selection: dropdown or manual */}
+          {mode === 'dropdown' ? (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                Project <span className="text-red-500">*</span>
+              </Label>
+              <OdooProjectCombobox
+                projects={odooProjects}
+                isLoading={odooLoading}
+                onSelect={(projectNumber, projectName) => {
+                  updateProjectData({ projectNumber, projectName });
+                }}
+                onManualEntry={() => setMode('manual')}
+              />
+              {validationErrors.projectNumber && (
+                <p className="text-sm text-red-500">{validationErrors.projectNumber}</p>
+              )}
+              {validationErrors.projectName && (
+                <p className="text-sm text-red-500">{validationErrors.projectName}</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {fallbackNotice && (
+                <p className="text-sm text-muted-foreground">{fallbackNotice}</p>
+              )}
+              <button
+                type="button"
+                className="text-xs text-muted-foreground underline hover:text-foreground"
+                onClick={() => {
+                  setMode('dropdown');
+                  setFallbackNotice(undefined);
+                }}
+                data-testid="link-select-from-list"
+              >
+                Select from project list
+              </button>
+
+              {/* Project Number */}
+              <div className="space-y-2">
+                <Label htmlFor="projectNumber" className="flex items-center gap-2">
+                  Project Number <span className="text-red-500">*</span>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Format: YYYY-### (e.g., 2025-042)</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      id="projectNumber"
+                      value={projectData.projectNumber}
+                      onChange={(e) => updateProjectData({ projectNumber: e.target.value })}
+                      placeholder="2025-042"
+                      className={`${validationErrors.projectNumber || projectNumberStatus === 'exists' ? 'border-red-500' : projectNumberStatus === 'available' ? 'border-green-500' : ''} pr-10`}
+                      data-testid="input-project-number"
+                    />
+                    {projectNumberStatus === 'checking' && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                    {projectNumberStatus === 'exists' && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <AlertTriangle className="h-4 w-4 text-red-500" />
+                      </div>
+                    )}
+                    {projectNumberStatus === 'available' && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      </div>
+                    )}
                   </div>
-                )}
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => updateProjectData({ projectNumber: generateProjectNumber() })}
+                    data-testid="button-regenerate-number"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                </div>
                 {projectNumberStatus === 'exists' && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <AlertTriangle className="h-4 w-4 text-red-500" />
-                  </div>
+                  <p className="text-sm text-red-500 flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3" />
+                    This project number already exists. Please use a different number or resume the existing draft.
+                  </p>
                 )}
                 {projectNumberStatus === 'available' && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                  </div>
+                  <p className="text-sm text-green-600 flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3" />
+                    Project number is available
+                  </p>
+                )}
+                {validationErrors.projectNumber && (
+                  <p className="text-sm text-red-500">{validationErrors.projectNumber}</p>
                 )}
               </div>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => updateProjectData({ projectNumber: generateProjectNumber() })}
-                data-testid="button-regenerate-number"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </Button>
+
+              {/* Project Name */}
+              <div className="space-y-2">
+                <Label htmlFor="projectName" className="flex items-center gap-2">
+                  Project Name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="projectName"
+                  value={projectData.projectName}
+                  onChange={(e) => updateProjectData({ projectName: e.target.value })}
+                  placeholder="e.g., Smith Residence"
+                  className={validationErrors.projectName ? 'border-red-500' : ''}
+                  data-testid="input-project-name"
+                />
+                {validationErrors.projectName && (
+                  <p className="text-sm text-red-500">{validationErrors.projectName}</p>
+                )}
+                <p className="text-xs text-muted-foreground">A descriptive name for the project</p>
+              </div>
             </div>
-            {projectNumberStatus === 'exists' && (
-              <p className="text-sm text-red-500 flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                This project number already exists. Please use a different number or resume the existing draft.
-              </p>
-            )}
-            {projectNumberStatus === 'available' && (
-              <p className="text-sm text-green-600 flex items-center gap-1">
-                <CheckCircle className="h-3 w-3" />
-                Project number is available
-              </p>
-            )}
-            {validationErrors.projectNumber && (
-              <p className="text-sm text-red-500">{validationErrors.projectNumber}</p>
-            )}
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="projectName" className="flex items-center gap-2">
-              Project Name <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="projectName"
-              value={projectData.projectName}
-              onChange={(e) => updateProjectData({ projectName: e.target.value })}
-              placeholder="e.g., Smith Residence"
-              className={validationErrors.projectName ? 'border-red-500' : ''}
-              data-testid="input-project-name"
-            />
-            {validationErrors.projectName && (
-              <p className="text-sm text-red-500">{validationErrors.projectName}</p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              A descriptive name for the project
-            </p>
-          </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="projectType" className="flex items-center gap-2">
