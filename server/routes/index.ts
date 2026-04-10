@@ -13,6 +13,7 @@ import llcsRouter from "./llcs";
 import adminImportRouter from "./admin-import";
 import componentsRouter from "./components";
 import variableMappingsRouter from "./variable-mappings";
+import odooRouter from "./odoo";
 
 const router = Router();
 
@@ -31,5 +32,6 @@ router.use(llcsRouter);
 router.use(adminImportRouter);
 router.use(componentsRouter);
 router.use(variableMappingsRouter);
+router.use(odooRouter);
 
 export default router;
