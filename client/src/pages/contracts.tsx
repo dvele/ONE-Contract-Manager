@@ -159,10 +159,21 @@ export default function Contracts() {
     setGeneratingContract(contractId);
     try {
       const apiType = getContractTypeForApi(contractType);
-      window.open(
-        `/api/contracts/download-pdf/${projectId}/${apiType}`,
-        "_blank"
-      );
+      // Use a token-aware POST (apiRequest attaches the Cognito Bearer token);
+      // a direct window.open GET cannot send the auth header and would 401.
+      const response = await apiRequest("POST", "/api/contracts/download-pdf", {
+        contractType: apiType,
+        projectId,
+      });
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${projectNumber || "Contract"}_${apiType}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (error) {
       console.error("Download error:", error);
       toast({

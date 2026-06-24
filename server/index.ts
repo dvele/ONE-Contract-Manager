@@ -92,13 +92,19 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  // Sync catalog nightly at 2am
-  cron.schedule("0 2 * * *", () => {
-    log("Running scheduled catalog sync", "cron");
-    syncCatalogAllOrgs().catch((err) =>
-      console.error("[CatalogSync] Scheduled sync failed:", err)
-    );
-  });
+  // Sync catalog nightly at 2am. Gated behind ENABLE_SCHEDULED_JOBS so that,
+  // when running multiple instances, the job fires on exactly one of them.
+  if (process.env.ENABLE_SCHEDULED_JOBS === "true") {
+    log("Scheduled jobs enabled: nightly catalog sync registered", "cron");
+    cron.schedule("0 2 * * *", () => {
+      log("Running scheduled catalog sync", "cron");
+      syncCatalogAllOrgs().catch((err) =>
+        console.error("[CatalogSync] Scheduled sync failed:", err)
+      );
+    });
+  } else {
+    log("Scheduled jobs disabled (set ENABLE_SCHEDULED_JOBS=true to enable)", "cron");
+  }
 
   const port = parseInt(process.env.PORT || "5000", 10);
   httpServer.listen(port, () => {

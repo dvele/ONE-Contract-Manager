@@ -222,6 +222,16 @@ export const Step9ReviewGenerate: React.FC = () => {
 
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
 
+  const getContractTypeForApi = (type: string): string => {
+    const typeMap: Record<string, string> = {
+      master_ef: "MASTER_EF",
+      one_agreement: "ONE",
+      manufacturing_sub: "MANUFACTURING",
+      onsite_sub: "ONSITE",
+    };
+    return typeMap[type] || type.toUpperCase();
+  };
+
   const handleDownload = async (contractType: string, contractName: string) => {
     if (!draftProjectId) {
       console.error("No project ID available for download");
@@ -229,10 +239,21 @@ export const Step9ReviewGenerate: React.FC = () => {
     }
     try {
       setIsDownloading(contractType);
-      window.open(
-        `/api/contracts/download-pdf/${draftProjectId}/${contractType}`,
-        "_blank"
-      );
+      // Use a token-aware POST (apiRequest attaches the Cognito Bearer token);
+      // a direct window.open GET cannot send the auth header and would 401.
+      const response = await apiRequest("POST", "/api/contracts/download-pdf", {
+        contractType: getContractTypeForApi(contractType),
+        projectId: draftProjectId,
+      });
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${contractName.replace(/\s+/g, "_")}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
     } catch (error) {
       console.error("Download error:", error);
     } finally {

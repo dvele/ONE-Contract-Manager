@@ -43,6 +43,3 @@ waitForPort = 5000
 integrations = ["javascript_database:1.0.0"]
 
 [userenv]
-
-[userenv.production]
-SKIP_AUTH = "true"

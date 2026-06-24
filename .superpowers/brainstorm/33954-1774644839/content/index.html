@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Template Versioning — UI Mockup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f4f8; }
+    .badge-stale { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    .badge-current { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+    .card { background: white; border: 1px solid #e2e8f0; border-radius: 8px; }
+    .btn-primary { background: #0f172a; color: white; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; }
+    .btn-outline { background: white; color: #0f172a; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid #e2e8f0; }
+    .btn-regen { background: #fffbeb; color: #92400e; padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid #fde68a; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+    .section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin-bottom: 10px; }
+    .view-divider { display: flex; align-items: center; gap: 12px; margin: 32px 0 20px; }
+    .view-divider span { font-size: 12px; font-weight: 600; color: #475569; white-space: nowrap; background: #e2e8f0; padding: 3px 10px; border-radius: 4px; }
+    .view-divider hr { flex: 1; border: none; border-top: 1px solid #cbd5e1; }
+  </style>
+</head>
+<body class="p-8">
+<div class="max-w-3xl mx-auto space-y-4">
+
+  <!-- ── VIEW 1: /contracts list ── -->
+  <div class="view-divider">
+    <hr/>
+    <span>View 1 — /contracts (list)</span>
+    <hr/>
+  </div>
+
+  <!-- table header -->
+  <div class="card overflow-hidden">
+    <div class="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+      <h2 class="text-sm font-semibold text-slate-800">Contracts</h2>
+      <button class="btn-primary text-xs">New Contract</button>
+    </div>
+
+    <!-- row: stale -->
+    <div class="px-4 py-4 border-b border-slate-100 flex items-center justify-between gap-4">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-sm font-medium text-slate-900">Lot 47 — ONE Contract</span>
+          <span class="badge-stale text-xs px-2 py-0.5 rounded-full font-medium shrink-0">Template v3 → v5</span>
+        </div>
+        <p class="text-xs text-slate-400 mt-0.5">Generated Mar 12, 2026 · Signed</p>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button class="btn-regen">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 .49-3"/></svg>
+          Regenerate
+        </button>
+        <button class="btn-outline">Edit</button>
+      </div>
+    </div>
+
+    <!-- row: current -->
+    <div class="px-4 py-4 border-b border-slate-100 flex items-center justify-between gap-4">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-sm font-medium text-slate-900">Lot 47 — Manufacturing</span>
+          <span class="badge-current text-xs px-2 py-0.5 rounded-full font-medium shrink-0">Template v5</span>
+        </div>
+        <p class="text-xs text-slate-400 mt-0.5">Generated Mar 27, 2026 · Pending</p>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button class="btn-outline">Edit</button>
+      </div>
+    </div>
+
+    <!-- row: no version (legacy) -->
+    <div class="px-4 py-4 flex items-center justify-between gap-4">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-sm font-medium text-slate-900">Lot 23 — ONE Contract</span>
+          <!-- no badge for legacy -->
+        </div>
+        <p class="text-xs text-slate-400 mt-0.5">Generated Jan 5, 2026 · Signed</p>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button class="btn-outline">Edit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── VIEW 2: /contracts/:id/edit ── -->
+  <div class="view-divider">
+    <hr/>
+    <span>View 2 — /contracts/8/edit</span>
+    <hr/>
+  </div>
+
+  <!-- edit page shell -->
+  <div class="card overflow-hidden">
+    <!-- page header bar -->
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2">
+          <h2 class="text-sm font-semibold text-slate-900">Lot 47 — ONE Contract</h2>
+          <span class="badge-stale text-xs px-2 py-0.5 rounded-full font-medium">Template v3 → v5</span>
+        </div>
+        <p class="text-xs text-slate-400 mt-0.5">Generated Mar 12, 2026</p>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button class="btn-regen">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 .49-3"/></svg>
+          Regenerate with latest template
+        </button>
+        <button class="btn-primary">Download PDF</button>
+      </div>
+    </div>
+
+    <!-- stale banner -->
+    <div class="px-5 py-3 bg-amber-50 border-b border-amber-200 flex items-start gap-2">
+      <svg class="mt-0.5 shrink-0" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <p class="text-xs text-amber-800">This contract was generated with template <strong>v3</strong>. The template has since been updated to <strong>v5</strong>. Regenerating will apply the latest clauses and mark this contract as current.</p>
+    </div>
+
+    <!-- form body (simplified) -->
+    <div class="px-5 py-4 space-y-3 text-xs text-slate-400 italic">
+      [ contract edit form fields … ]
+    </div>
+  </div>
+
+  <!-- Design notes -->
+  <div class="view-divider">
+    <hr/>
+    <span>Design Notes</span>
+    <hr/>
+  </div>
+  <div class="grid grid-cols-2 gap-3 text-xs text-slate-600">
+    <div class="bg-amber-50 border border-amber-200 rounded p-3">
+      <strong class="block text-amber-900 mb-1">Stale — list row</strong>
+      Badge only (compact). Inline Regenerate button so user can act without opening the record.
+    </div>
+    <div class="bg-amber-50 border border-amber-200 rounded p-3">
+      <strong class="block text-amber-900 mb-1">Stale — edit page</strong>
+      Badge in header + amber banner with plain-English explanation. Regenerate button in header (labelled "with latest template" for clarity).
+    </div>
+    <div class="bg-emerald-50 border border-emerald-200 rounded p-3">
+      <strong class="block text-emerald-900 mb-1">Current</strong>
+      Green badge on list row. No banner, no Regenerate button on edit page — no noise.
+    </div>
+    <div class="bg-slate-50 border border-slate-200 rounded p-3">
+      <strong class="block text-slate-700 mb-1">Legacy (null template_version)</strong>
+      No badge at all. Existing contracts generated before this feature ship are silently grandfathered — no false alarms.
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

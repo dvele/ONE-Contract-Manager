@@ -22,7 +22,7 @@ All monetary values are stored as **integers in cents** (e.g. `designFee: 150000
 
 Always apply `requireAuth` from `server/middleware/auth.ts` to new routes. Use `requireAdmin` for admin-only endpoints. Do not write custom auth logic in route handlers.
 
-When `SKIP_AUTH=true` and no Bearer token is present, `requireAuth` sets `req.organizationId = 1` and `req.user = { email: "dev@dvele.com", role: "admin" }` automatically — no special dev handling needed in routes.
+Auth is always enforced: a request without a valid Cognito `Bearer` token gets a `401`. `requireAuth` validates the JWT against Cognito JWKS and sets `req.user` and `req.organizationId` (currently hardcoded to org 1). Sign in through the app to call authenticated endpoints, including in local dev.
 
 ## Error Response Shape
 

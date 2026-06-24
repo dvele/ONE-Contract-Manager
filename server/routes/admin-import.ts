@@ -18,7 +18,7 @@ const clauseSchema = z.object({
 
 const saveTemplateSchema = z.object({
   templateName: z.string().min(1, "Template name is required"),
-  contractType: z.enum(["ONE", "CMOS", "CRC", "ONSITE", "MFG"]),
+  contractType: z.enum(["MASTER_EF", "ONE", "ONSITE", "MANUFACTURING"]),
   clauses: z.array(clauseSchema).min(1, "At least one clause is required"),
 });
 

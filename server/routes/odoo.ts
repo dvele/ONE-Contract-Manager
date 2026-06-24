@@ -19,10 +19,13 @@ interface OdooProjectShaped {
   displayName: string;
 }
 
-function parseOdooProjectName(name: string): { projectNumber: string; projectName: string } {
-  const separatorIndex = name.indexOf(' - ');
+function parseOdooProjectName(name: string): {
+  projectNumber: string;
+  projectName: string;
+} {
+  const separatorIndex = name.indexOf(" - ");
   if (separatorIndex === -1) {
-    return { projectNumber: name, projectName: '' };
+    return { projectNumber: name, projectName: "" };
   }
   return {
     projectNumber: name.slice(0, separatorIndex),
@@ -30,21 +33,23 @@ function parseOdooProjectName(name: string): { projectNumber: string; projectNam
   };
 }
 
-router.get('/odoo/projects', async (_req, res) => {
-  const apiKey = process.env.VITE_ONEDOT_API_KEY;
+router.get("/odoo/projects", async (_req, res) => {
+  const apiKey = process.env.ONEDOT_API_KEY;
   if (!apiKey) {
-    console.error('[OdooProxy] VITE_ONEDOT_API_KEY is not set');
-    return res.status(500).json({ error: 'Odoo API key not configured' });
+    console.error("[OdooProxy] ONEDOT_API_KEY is not set");
+    return res.status(500).json({ error: "Odoo API key not configured" });
   }
 
   try {
-    const response = await fetch('https://one-api.dvele.com/odoo/projects', {
+    const response = await fetch("https://one-api.dvele.com/odoo/projects", {
       headers: { Authorization: `Api-Key ${apiKey}` },
     });
 
     if (!response.ok) {
       console.error(`[OdooProxy] Odoo API returned ${response.status}`);
-      return res.status(500).json({ error: 'Failed to fetch projects from Odoo' });
+      return res
+        .status(500)
+        .json({ error: "Failed to fetch projects from Odoo" });
     }
 
     const raw: OdooProject[] = await response.json();
@@ -55,8 +60,8 @@ router.get('/odoo/projects', async (_req, res) => {
 
     res.json(projects);
   } catch (err) {
-    console.error('[OdooProxy] Fetch failed:', err);
-    res.status(500).json({ error: 'Failed to reach Odoo API' });
+    console.error("[OdooProxy] Fetch failed:", err);
+    res.status(500).json({ error: "Failed to reach Odoo API" });
   }
 });
 

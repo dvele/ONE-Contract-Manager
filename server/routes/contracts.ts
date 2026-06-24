@@ -5,8 +5,15 @@ import { requireAuth } from "../middleware/auth";
 import { contracts, projects, clauses, financials, projectUnits, homeModels, contractTemplates } from "../../shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { getProjectWithRelations } from "./helpers";
+import {
+  uploadTemplate,
+  listTemplates,
+  deleteTemplate,
+  templateExists,
+} from "../lib/s3";
 import path from "path";
 import fs from "fs";
+import os from "os";
 import multer from "multer";
 import { exec } from "child_process";
 import { promisify } from "util";
@@ -17,26 +24,18 @@ const execAsync = promisify(exec);
 
 const router = Router();
 
-// Configure multer for template uploads
-const templateStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const templatesDir = path.join(process.cwd(), "server", "templates");
-    if (!fs.existsSync(templatesDir)) {
-      fs.mkdirSync(templatesDir, { recursive: true });
-    }
-    cb(null, templatesDir);
-  },
-  filename: (req, file, cb) => {
-    // Sanitize filename: remove special chars, keep only alphanumeric, underscores, hyphens
-    const safeName = file.originalname
-      .replace(/[^a-zA-Z0-9_\-\.]/g, "_")
-      .replace(/_+/g, "_");
-    cb(null, safeName);
-  },
-});
+// Sanitize an uploaded filename: keep only alphanumerics, underscores,
+// hyphens and dots, and collapse runs of underscores.
+function sanitizeTemplateName(originalName: string): string {
+  return originalName
+    .replace(/[^a-zA-Z0-9_\-\.]/g, "_")
+    .replace(/_+/g, "_");
+}
 
+// Templates are persisted in S3, so uploads are buffered in memory and the
+// original .docx is streamed straight to S3 after ingestion succeeds.
 const templateUpload = multer({
-  storage: templateStorage,
+  storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
     if (file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
         file.originalname.endsWith(".docx")) {
@@ -58,43 +57,44 @@ router.post("/contracts/upload-template", templateUpload.single("template"), asy
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    const filePath = req.file.path;
-    const fileName = req.file.filename;
+    const buffer = req.file.buffer;
+    const fileName = sanitizeTemplateName(req.file.originalname);
     const objectType = req.body.objectType || "contract";
-    
+
     console.log(`\n📤 Template uploaded: ${fileName}`);
-    console.log(`   Path: ${filePath}`);
     console.log(`   Object type: ${objectType}`);
-    
+
     try {
-      let itemsCreated = 0;
-      
+      let responsePayload: Record<string, any>;
+
       if (objectType === "exhibit") {
         // Process as Exhibit Library
-        itemsCreated = await ingestExhibitsFromDocument(filePath);
-        
-        res.json({
+        const itemsCreated = await ingestExhibitsFromDocument(buffer);
+
+        responsePayload = {
           success: true,
           message: `Successfully ingested ${itemsCreated} exhibits`,
           objectType: "exhibit",
           itemsCreated,
           fileName,
-        });
-        
+        };
+
       } else if (objectType === "state_disclosure") {
         // Process as State Disclosure Library
-        itemsCreated = await ingestStateDisclosuresFromDocument(filePath);
-        
-        res.json({
+        const itemsCreated = await ingestStateDisclosuresFromDocument(buffer);
+
+        responsePayload = {
           success: true,
           message: `Successfully ingested ${itemsCreated} state disclosures`,
           objectType: "state_disclosure",
           itemsCreated,
           fileName,
-        });
-        
+        };
+
       } else {
-        // Default: Process as Contract Agreement (clauses)
+        // Default: Process as Contract Agreement (clauses).
+        // The ingestion script reads a file path, so write the buffer to a
+        // temp file for the duration of the run and clean it up afterwards.
         const contractType = fileName
           .replace(/\.docx$/i, "")
           .replace(/^Template[_-]?/i, "")
@@ -102,28 +102,36 @@ router.post("/contracts/upload-template", templateUpload.single("template"), asy
           .toUpperCase()
           .replace(/_+/g, "_")
           .replace(/^_|_$/g, "");
-        
-        console.log(`   Contract type: ${contractType}`);
-        console.log(`\n🔄 Running ingestion script for: ${filePath}`);
-        
-        const { stdout, stderr } = await execAsync(
-          `npx tsx scripts/ingest_standard_contracts.ts "${filePath}"`,
-          { cwd: process.cwd(), timeout: 120000 }
-        );
-        
-        console.log("Ingestion output:", stdout);
-        if (stderr) console.error("Ingestion stderr:", stderr);
-        
+
+        const tempPath = path.join(os.tmpdir(), `template-${Date.now()}-${fileName}`);
+        try {
+          fs.writeFileSync(tempPath, buffer);
+
+          console.log(`   Contract type: ${contractType}`);
+          console.log(`\n🔄 Running ingestion script for: ${tempPath}`);
+
+          const { stdout, stderr } = await execAsync(
+            `npx tsx scripts/ingest_standard_contracts.ts "${tempPath}"`,
+            { cwd: process.cwd(), timeout: 120000 }
+          );
+
+          console.log("Ingestion output:", stdout);
+          if (stderr) console.error("Ingestion stderr:", stderr);
+        } finally {
+          if (fs.existsSync(tempPath)) {
+            fs.unlinkSync(tempPath);
+          }
+        }
+
         // Count the blocks created for this contract type
         const countResult = await db
           .select({ count: sql<number>`count(*)::int` })
           .from(clauses)
           .where(sql`${clauses.contractTypes} @> ${JSON.stringify([contractType])}`);
 
-        
-        itemsCreated = countResult[0]?.count || 0;
-        
-        res.json({
+        const itemsCreated = countResult[0]?.count || 0;
+
+        responsePayload = {
           success: true,
           message: `Successfully ingested ${itemsCreated} clauses`,
           objectType: "contract",
@@ -131,17 +139,17 @@ router.post("/contracts/upload-template", templateUpload.single("template"), asy
           itemsCreated,
           blocksCreated: itemsCreated, // Backwards compatibility
           fileName,
-        });
+        };
       }
-      
+
+      // Persist the original template in S3 only after ingestion succeeds.
+      await uploadTemplate(fileName, buffer);
+
+      res.json(responsePayload);
+
     } catch (execError: any) {
       console.error("Ingestion failed:", execError);
-      
-      // Clean up the uploaded file on failure
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-      
+
       return res.status(500).json({
         error: "Ingestion failed",
         message: execError.message || "Failed to process template",
@@ -149,7 +157,7 @@ router.post("/contracts/upload-template", templateUpload.single("template"), asy
         stderr: execError.stderr,
       });
     }
-    
+
   } catch (error: any) {
     console.error("Template upload failed:", error);
     res.status(500).json({ 
@@ -238,18 +246,18 @@ function determineLevel(styleName: string, text: string): number {
   return 5;
 }
 
-async function ingestExhibitsFromDocument(filePath: string): Promise<number> {
-  console.log(`\n📑 Ingesting Exhibits from: ${filePath}`);
-  
+async function ingestExhibitsFromDocument(buffer: Buffer): Promise<number> {
+  console.log(`\n📑 Ingesting Exhibits from uploaded document`);
+
   interface StyledParagraph {
     style: string;
     text: string;
   }
-  
+
   const styledParagraphs: StyledParagraph[] = [];
-  
+
   await mammoth.convertToHtml(
-    { path: filePath },
+    { buffer },
     {
       transformDocument: (document: any) => {
         const stack: any[] = [document];
@@ -377,18 +385,18 @@ async function ingestExhibitsFromDocument(filePath: string): Promise<number> {
   return 0;
 }
 
-async function ingestStateDisclosuresFromDocument(filePath: string): Promise<number> {
-  console.log(`\n📑 Ingesting State Disclosures from: ${filePath}`);
-  
+async function ingestStateDisclosuresFromDocument(buffer: Buffer): Promise<number> {
+  console.log(`\n📑 Ingesting State Disclosures from uploaded document`);
+
   interface StyledParagraph {
     style: string;
     text: string;
   }
-  
+
   const styledParagraphs: StyledParagraph[] = [];
-  
+
   await mammoth.convertToHtml(
-    { path: filePath },
+    { buffer },
     {
       transformDocument: (document: any) => {
         const stack: any[] = [document];
@@ -501,35 +509,21 @@ async function ingestStateDisclosuresFromDocument(filePath: string): Promise<num
 router.delete("/contracts/templates/:fileName", async (req, res) => {
   try {
     const rawFileName = req.params.fileName;
-    const templatesDir = path.join(process.cwd(), "server", "templates");
-    
+
     // Security: Sanitize fileName to prevent path traversal attacks
     // Only allow the base filename, reject any path components
     const fileName = path.basename(rawFileName);
-    
+
     // Validate it's a .docx file
     if (!fileName.endsWith(".docx")) {
       return res.status(400).json({ error: "Invalid file type. Only .docx files can be deleted." });
     }
-    
-    // Validate against existing templates (allowlist approach)
-    const existingFiles = fs.existsSync(templatesDir) 
-      ? fs.readdirSync(templatesDir).filter(f => f.endsWith(".docx") && !f.startsWith("~$"))
-      : [];
-    
-    if (!existingFiles.includes(fileName)) {
+
+    // Confirm the template exists in S3 before deleting
+    if (!(await templateExists(fileName))) {
       return res.status(404).json({ error: "Template not found" });
     }
-    
-    const filePath = path.join(templatesDir, fileName);
-    
-    // Double-check the resolved path is within templatesDir (defense in depth)
-    const resolvedPath = path.resolve(filePath);
-    const resolvedTemplatesDir = path.resolve(templatesDir);
-    if (!resolvedPath.startsWith(resolvedTemplatesDir)) {
-      return res.status(400).json({ error: "Invalid file path" });
-    }
-    
+
     // Derive contract type
     const contractType = fileName
       .replace(/\.docx$/i, "")
@@ -538,10 +532,10 @@ router.delete("/contracts/templates/:fileName", async (req, res) => {
       .toUpperCase()
       .replace(/_+/g, "_")
       .replace(/^_|_$/g, "");
-    
-    // Delete the file
-    fs.unlinkSync(filePath);
-    
+
+    // Delete the template object from S3
+    await deleteTemplate(fileName);
+
     // Delete associated clauses that have this contract type in their array
     await pool.query(`
       DELETE FROM clauses 
@@ -566,21 +560,10 @@ router.delete("/contracts/templates/:fileName", async (req, res) => {
 
 router.get("/contracts/templates", async (req, res) => {
   try {
-    const templatesDir = path.join(process.cwd(), "server", "templates");
-
-    if (!fs.existsSync(templatesDir)) {
-      return res.json({ templates: [] });
-    }
-
-    const files = fs.readdirSync(templatesDir).filter(
-      (f) => f.endsWith(".docx") && !f.startsWith("~$")
-    );
+    const objects = await listTemplates();
 
     const templates = await Promise.all(
-      files.map(async (fileName) => {
-        const filePath = path.join(templatesDir, fileName);
-        const stats = fs.statSync(filePath);
-
+      objects.map(async ({ fileName, size, lastModified }) => {
         const contractType = fileName
           .replace(/\.docx$/i, "")
           .replace(/^Template[_-]?/i, "")
@@ -597,8 +580,8 @@ router.get("/contracts/templates", async (req, res) => {
         return {
           fileName,
           contractType,
-          uploadedAt: stats.mtime.toISOString(),
-          size: stats.size,
+          uploadedAt: (lastModified ?? new Date(0)).toISOString(),
+          size,
           clauseCount: countResult[0]?.count || 0,
         };
       })

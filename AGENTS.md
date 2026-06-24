@@ -9,7 +9,7 @@ Enterprise contract management platform for modular home construction (Dvele). A
 - **Frontend:** React 18 + Vite, TypeScript, Tailwind CSS, Shadcn UI, TanStack Query v5, wouter, react-hook-form + zod
 - **Backend:** Express 5, TypeScript, Node.js 20
 - **Database:** PostgreSQL + Drizzle ORM
-- **Auth:** AWS Cognito (JWT/JWKS); set `SKIP_AUTH=true` to bypass in dev
+- **Auth:** AWS Cognito (JWT/JWKS); enforced on every `/api` request (sign in through the app, including in dev)
 - **PDF:** Puppeteer Core
 - **Docs:** docxtemplater, mammoth (DOCX ingestion)
 - **Port:** 5000 (serves both API and client)
@@ -43,7 +43,7 @@ npx tsx scripts/seed-components.ts
 npm run dev                 # starts on port 5000
 ```
 
-Key env vars: `DATABASE_URL`, `NODE_ENV`, `PORT` (default 5000), `SKIP_AUTH`, `PUPPETEER_EXECUTABLE_PATH`
+Key env vars: `DATABASE_URL`, `NODE_ENV`, `PORT` (default 5000), `AWS_S3_BUCKET`, `AWS_REGION`, `ENABLE_SCHEDULED_JOBS`, `PUPPETEER_EXECUTABLE_PATH`
 
 ## Database
 

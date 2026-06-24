@@ -856,6 +856,7 @@ async function fetchClausesForContract(
       'one_agreement': 'ONE',
       'Manufacturing Subcontract': 'MANUFACTURING',
       'manufacturing_sub': 'MANUFACTURING',
+      'MFG': 'MANUFACTURING',
       'OnSite Subcontract': 'ONSITE',
       'onsite_sub': 'ONSITE',
       'Master EF Agreement': 'MASTER_EF',

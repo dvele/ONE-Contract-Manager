@@ -83,7 +83,10 @@ Copy `.env.example` to `.env` and configure:
 | `DATABASE_URL`              | Yes      | -                  | PostgreSQL connection string (e.g., `postgresql://user:pass@localhost:5432/dvele`) |
 | `NODE_ENV`                  | No       | `development`      | Environment mode. Set to `production` for production builds   |
 | `PORT`                      | No       | `5000`             | Port the server listens on                                    |
-| `SKIP_AUTH`                 | No       | `false`            | Set to `true` to bypass authentication (auto-skipped in dev)  |
+| `AWS_S3_BUCKET`             | Yes      | -                  | S3 bucket for contract template storage (e.g., `dvele-contract-manager`) |
+| `AWS_REGION`                | No       | `us-west-1`        | AWS region for the S3 bucket / SDK default                    |
+| `AWS_S3_PATH`               | No       | -                  | Public base URL for shared media; not used by template storage |
+| `ENABLE_SCHEDULED_JOBS`     | No       | `false`            | Set to `true` on exactly one instance to run the nightly catalog sync |
 | `ADMIN_SYNC_KEY`            | Yes (prod) | Weak default     | Security key for admin sync endpoints. **Must override in production** |
 | `PUPPETEER_EXECUTABLE_PATH` | No       | Auto-detected      | Path to Chrome/Chromium binary for PDF generation             |
 | `PROD_DATABASE_URL`         | No       | Same as DATABASE_URL | Production DB connection for sync scripts                   |
