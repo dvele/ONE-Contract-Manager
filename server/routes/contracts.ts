@@ -24,6 +24,31 @@ const execAsync = promisify(exec);
 
 const router = Router();
 
+// Exhibits are fetched via the template_exhibits junction keyed by templateId, so
+// every generation path MUST pass templateId or exhibits are silently omitted
+// (the generator logs "No templateId provided ... no exhibits will be included").
+// There is one active template per contract_type, so resolve it from contractType
+// unless the caller passes an explicit templateId.
+async function resolveTemplateId(
+  contractType: string,
+  explicit?: number,
+): Promise<number | undefined> {
+  if (explicit) return explicit;
+  const r = await pool.query(
+    `SELECT id FROM contract_templates
+     WHERE contract_type = $1 AND is_active = true
+     ORDER BY id DESC LIMIT 1`,
+    [contractType],
+  );
+  const id = r.rows[0]?.id as number | undefined;
+  if (!id) {
+    console.warn(
+      `⚠️ No active contract_template for contractType "${contractType}" — exhibits will be omitted`,
+    );
+  }
+  return id;
+}
+
 // Sanitize an uploaded filename: keep only alphanumerics, underscores,
 // hyphens and dots, and collapse runs of underscores.
 function sanitizeTemplateName(originalName: string): string {
@@ -1245,10 +1270,12 @@ router.post("/contracts/download-all-zip", async (req, res) => {
           ? projectData
           : mapProjectToVariables(fullProject, pricingSummary || undefined, contractFilterType);
         
+        const templateId = await resolveTemplateId(contractFilterType);
         const buffer = await generateContract({
           contractType: contractFilterType,
           projectData: contractProjectData,
-          format: 'pdf'
+          format: 'pdf',
+          templateId,
         });
         const filename = getContractFilename(contractType, contractProjectData, 'pdf');
         generatedContracts.push({ buffer, filename });
@@ -1422,10 +1449,12 @@ router.post("/contracts/download-pdf", async (req, res) => {
 
     const { generateContract, getContractFilename } = await import('../lib/contractGenerator');
     
+    const templateId = await resolveTemplateId(contractType, req.body.templateId);
     const buffer = await generateContract({
       contractType: contractType as 'ONE' | 'MANUFACTURING' | 'ONSITE' | 'MASTER_EF',
       projectData,
-      format: 'pdf'
+      format: 'pdf',
+      templateId,
     });
 
     const filename = getContractFilename(contractType, projectData, 'pdf');
