@@ -12,5 +12,8 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "additionalDirectories": ["/Users/work/Documents/dev/oneDot/One-Dvele"]
   }
 }

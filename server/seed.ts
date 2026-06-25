@@ -4,7 +4,8 @@ import seedData from "./seed-data.json";
 const JSONB_COLUMNS: Record<string, Set<string>> = {
   clauses: new Set(["contract_types", "tags"]),
   contract_templates: new Set(["conditional_rules", "base_clause_ids"]),
-  table_definitions: new Set(["columns", "rows"]),
+  table_definitions: new Set(["columns"]),
+  exhibits: new Set(["contract_types"]),
 };
 
 const SQL_RESERVED_WORDS = new Set([
@@ -27,8 +28,8 @@ export async function seedProductionData() {
     { name: "table_definitions", data: seedData.table_definitions },
     { name: "contract_templates", data: seedData.contract_templates },
     { name: "template_clauses", data: seedData.template_clauses },
-    { name: "contractors", data: seedData.contractors },
-    { name: "warranty_terms", data: seedData.warranty_terms },
+    // contractors and warranty_terms are project-scoped (FK to projects) and are
+    // not seeded as production defaults — there are no seeded projects to attach to.
   ];
 
   for (const table of tables) {

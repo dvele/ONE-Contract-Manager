@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest, getAuthHeaders } from "@/lib/queryClient";
+import { queryClient, apiRequest, getAuthHeaders, API_BASE } from "@/lib/queryClient";
 import {
   Upload,
   FileText,
@@ -104,7 +104,7 @@ export default function TemplatesUpload() {
 
       const authHeaders = await getAuthHeaders() as Record<string, string>;
       const { "Content-Type": _, ...uploadHeaders } = authHeaders;
-      const response = await fetch("/api/contracts/upload-template", {
+      const response = await fetch(API_BASE + "/api/contracts/upload-template", {
         method: "POST",
         headers: uploadHeaders,
         body: formData,

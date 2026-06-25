@@ -15,18 +15,6 @@ export const organizations = pgTable("organizations", {
   updatedAt: timestamp("updated_at"),
 });
 
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  organizationId: integer("organization_id")
-    .references(() => organizations.id)
-    .notNull(),
-  email: text("email").unique().notNull(),
-  name: text("name"),
-  role: text("role").default("user"), // admin, user
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at"),
-});
-
 // =============================================================================
 // HOME MODELS (Multi-Tenant)
 // =============================================================================
@@ -697,7 +685,6 @@ export const componentLibrary = pgTable("component_library", {
 // =============================================================================
 
 export const organizationsRelations = relations(organizations, ({ many }) => ({
-  users: many(users),
   projects: many(projects),
   homeModels: many(homeModels),
   llcs: many(llcs),
@@ -706,13 +693,6 @@ export const organizationsRelations = relations(organizations, ({ many }) => ({
   exhibits: many(exhibits),
   stateDisclosures: many(stateDisclosures),
   contractorEntities: many(contractorEntities),
-}));
-
-export const usersRelations = relations(users, ({ one }) => ({
-  organization: one(organizations, {
-    fields: [users.organizationId],
-    references: [organizations.id],
-  }),
 }));
 
 export const homeModelsRelations = relations(homeModels, ({ one, many }) => ({
@@ -878,9 +858,6 @@ export const clausesRelations = relations(clauses, ({ one, many }) => ({
 export type Organization = typeof organizations.$inferSelect;
 export type NewOrganization = typeof organizations.$inferInsert;
 
-export type User = typeof users.$inferSelect;
-export type NewUser = typeof users.$inferInsert;
-
 export type HomeModel = typeof homeModels.$inferSelect;
 export type NewHomeModel = typeof homeModels.$inferInsert;
 
@@ -957,13 +934,6 @@ export const insertOrganizationSchema = createInsertSchema(organizations).omit({
   updatedAt: true,
 });
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
-
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-export type InsertUser = z.infer<typeof insertUserSchema>;
 
 export const insertHomeModelSchema = createInsertSchema(homeModels).omit({
   id: true,

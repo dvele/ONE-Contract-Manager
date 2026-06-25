@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
-import { serveStatic } from "./static";
 import { createServer } from "http";
 import cron from "node-cron";
 import { syncCatalogAllOrgs } from "./services/catalogSync";
@@ -14,6 +14,28 @@ declare module "http" {
     rawBody: unknown;
   }
 }
+
+// The SPA is served separately (Amplify) in production, so allow that origin to
+// call this API cross-origin. FRONTEND_ORIGIN is a comma-separated allowlist;
+// when unset (local dev / same-origin), CORS is effectively a no-op.
+const corsOrigins = (process.env.FRONTEND_ORIGIN || "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+if (corsOrigins.length > 0) {
+  app.use(
+    cors({
+      origin: corsOrigins,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+    })
+  );
+}
+
+// Unauthenticated liveness probe for the load balancer / orchestrator.
+app.get("/healthz", (_req, res) => {
+  res.status(200).json({ status: "ok" });
+});
 
 app.use(
   express.json({
@@ -78,12 +100,11 @@ app.use((req, res, next) => {
     return res.status(status).json({ message });
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (process.env.NODE_ENV === "production") {
-    serveStatic(app);
-  } else {
+  // In production this process is API-only; the React SPA is built and served
+  // separately (Amplify Hosting). In development we keep the monolith: Vite
+  // middleware serves the client on the same origin for a one-command dev loop.
+  // (setupVite is registered after all routes so its catch-all doesn't shadow them.)
+  if (process.env.NODE_ENV !== "production") {
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
   }

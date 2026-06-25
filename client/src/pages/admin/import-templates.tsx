@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient, getAuthHeaders } from "@/lib/queryClient";
+import { apiRequest, queryClient, getAuthHeaders, API_BASE } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   Card,
@@ -72,11 +72,10 @@ export default function ImportTemplates() {
 
       const authHeaders = await getAuthHeaders() as Record<string, string>;
       const { "Content-Type": _, ...uploadHeaders } = authHeaders;
-      const response = await fetch("/api/admin/parse-docx", {
+      const response = await fetch(API_BASE + "/api/admin/parse-docx", {
         method: "POST",
         headers: uploadHeaders,
         body: formData,
-        credentials: "include",
       });
 
       if (!response.ok) {

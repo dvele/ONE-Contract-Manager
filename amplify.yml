@@ -1,0 +1,32 @@
+# AWS Amplify Hosting build spec — frontend (React SPA) only.
+# The backend (Express API) deploys separately to ECS.
+#
+# Set these as environment variables in the Amplify console (they are inlined
+# into the bundle at build time):
+#   VITE_API_URL            e.g. https://api.<domain>   (the ECS API origin)
+#   VITE_COGNITO_REGION
+#   VITE_COGNITO_USER_POOL_ID
+#   VITE_COGNITO_APP_ID
+#   VITE_COGNITO_IDENTITY_POOL_ID
+#   VITE_FRONTEND_URL       e.g. https://<app-domain>
+#
+# Also add a SPA rewrite in the Amplify console (App settings → Rewrites and
+# redirects) so client-side (wouter) routes resolve:
+#   Source: </^[^.]+$|\.(?!(css|gif|ico|jpg|js|png|txt|svg|woff2?|map)$)([^.]+$)/>
+#   Target: /index.html   Type: 200 (Rewrite)
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        - npx vite build
+  artifacts:
+    baseDirectory: dist/public
+    files:
+      - "**/*"
+  cache:
+    paths:
+      - node_modules/**/*

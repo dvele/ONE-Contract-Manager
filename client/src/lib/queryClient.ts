@@ -1,6 +1,11 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { fetchAuthSession } from "aws-amplify/auth";
 
+// Base URL for the API. Empty in local dev (same-origin monolith via Vite
+// middleware); set to the ECS API origin (e.g. https://api.<domain>) at build
+// time on Amplify so the SPA can call the cross-origin backend.
+export const API_BASE = import.meta.env.VITE_API_URL ?? "";
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -52,11 +57,10 @@ export async function apiRequest(
 ): Promise<Response> {
   const headers = await getAuthHeaders();
 
-  const res = await fetch(url, {
+  const res = await fetch(API_BASE + url, {
     method,
     headers,
     body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
   });
 
   await throwIfResNotOk(res);
@@ -70,9 +74,8 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const headers = await getAuthHeaders();
-    const res = await fetch(queryKey.join("/") as string, {
+    const res = await fetch(API_BASE + (queryKey.join("/") as string), {
       headers,
-      credentials: "include",
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

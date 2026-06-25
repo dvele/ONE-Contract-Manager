@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/resizable";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -84,13 +83,6 @@ interface Clause {
   tags: string[] | null;
   created_at: string;
   updated_at: string;
-}
-
-interface TableDefinition {
-  id: number;
-  variable_name: string;
-  display_name: string;
-  description: string | null;
 }
 
 interface ClauseStats {
@@ -221,10 +213,6 @@ export default function ClauseLibrary() {
       const response = await apiRequest("GET", `/api/clauses?${params.toString()}`);
       return response.json();
     },
-  });
-
-  const { data: tableDefs } = useQuery<TableDefinition[]>({
-    queryKey: ["/api/table-definitions"],
   });
 
   const { data: projects } = useQuery<{ id: number; project_number: string; name: string }[]>({
@@ -1055,19 +1043,6 @@ export default function ClauseLibrary() {
                                 <SelectItem value="PRICING_BREAKDOWN_TABLE">Pricing Breakdown</SelectItem>
                                 <SelectItem value="PAYMENT_SCHEDULE_TABLE">Payment Schedule</SelectItem>
                                 <SelectItem value="UNIT_SPEC_TABLE">Unit Spec Table</SelectItem>
-                                {tableDefs && tableDefs.length > 0 && (
-                                  <>
-                                    <Separator className="my-1" />
-                                    <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
-                                      Custom Tables
-                                    </div>
-                                    {tableDefs.map((table) => (
-                                      <SelectItem key={table.id} value={table.variable_name}>
-                                        {table.display_name}
-                                      </SelectItem>
-                                    ))}
-                                  </>
-                                )}
                               </SelectContent>
                             </Select>
                           </div>

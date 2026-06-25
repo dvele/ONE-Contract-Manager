@@ -6009,8 +6009,7 @@
       ],
       "is_active": true,
       "created_at": "2026-02-02T01:35:48.020Z",
-      "updated_at": "2026-02-02T04:09:46.017Z",
-      "rows": null
+      "updated_at": "2026-02-02T04:09:46.017Z"
     },
     {
       "id": 2,
@@ -6039,8 +6038,7 @@
       ],
       "is_active": true,
       "created_at": "2026-02-02T01:35:48.037Z",
-      "updated_at": "2026-02-02T04:09:46.061Z",
-      "rows": null
+      "updated_at": "2026-02-02T04:09:46.061Z"
     },
     {
       "id": 3,
@@ -6069,8 +6067,7 @@
       ],
       "is_active": true,
       "created_at": "2026-02-02T01:35:48.052Z",
-      "updated_at": "2026-02-02T04:09:46.065Z",
-      "rows": null
+      "updated_at": "2026-02-02T04:09:46.065Z"
     },
     {
       "id": 4,
@@ -6093,8 +6090,7 @@
       ],
       "is_active": true,
       "created_at": "2026-02-02T01:35:48.055Z",
-      "updated_at": "2026-02-02T04:09:46.070Z",
-      "rows": null
+      "updated_at": "2026-02-02T04:09:46.070Z"
     },
     {
       "id": 5,
@@ -6115,8 +6111,7 @@
       ],
       "is_active": true,
       "created_at": "2026-02-02T01:35:48.059Z",
-      "updated_at": "2026-02-02T01:35:48.059Z",
-      "rows": null
+      "updated_at": "2026-02-02T01:35:48.059Z"
     },
     {
       "id": 6,
@@ -6126,8 +6121,7 @@
       "columns": [],
       "is_active": true,
       "created_at": "2026-02-02T01:35:48.067Z",
-      "updated_at": "2026-02-02T01:35:48.067Z",
-      "rows": null
+      "updated_at": "2026-02-02T01:35:48.067Z"
     },
     {
       "id": 7,
@@ -6150,15 +6144,14 @@
       ],
       "is_active": true,
       "created_at": "2026-02-02T04:34:11.782Z",
-      "updated_at": "2026-02-02T04:34:11.782Z",
-      "rows": null
+      "updated_at": "2026-02-02T04:34:11.782Z"
     }
   ],
   "contract_templates": [
     {
       "id": 24,
       "contract_type": "ONE",
-      "version": "1.0",
+      "version": 1,
       "display_name": "ONE Agreement",
       "base_clause_ids": [
         2049,
@@ -6409,7 +6402,7 @@
     {
       "id": 26,
       "contract_type": "MASTER_EF",
-      "version": "1.0",
+      "version": 1,
       "display_name": "Master EF Agreement",
       "base_clause_ids": [],
       "conditional_rules": null,
@@ -9351,7 +9344,6 @@
       "id": 8,
       "contractor_type": "onsite",
       "legal_name": "CRC Test Contractor",
-      "formation_state": "CA",
       "entity_type": "LLC",
       "address": "123 California Blvd",
       "city": "Los Angeles",
@@ -9369,13 +9361,13 @@
       "insurance_carrier": "Ohmaha",
       "is_active": true,
       "created_at": "2026-01-31T16:59:18.806Z",
-      "organization_id": null
+      "organization_id": 1,
+      "state_address": "CA"
     },
     {
       "id": 9,
       "contractor_type": "manufacturer",
       "legal_name": "Dvele Montana, LLC",
-      "formation_state": "MT",
       "entity_type": "LLC",
       "address": "123 billings Ave",
       "city": "Billings",
@@ -9393,13 +9385,13 @@
       "insurance_carrier": null,
       "is_active": true,
       "created_at": "2026-01-31T17:20:16.655Z",
-      "organization_id": null
+      "organization_id": 1,
+      "state_address": "MT"
     },
     {
       "id": 10,
       "contractor_type": "onsite",
       "legal_name": "Test CMOS Contractor",
-      "formation_state": "CA",
       "entity_type": "LLC",
       "address": "123 CMOS Lane",
       "city": "LA",
@@ -9417,39 +9409,15 @@
       "insurance_carrier": null,
       "is_active": true,
       "created_at": "2026-01-31T17:21:14.992Z",
-      "organization_id": null
+      "organization_id": 1,
+      "state_address": "CA"
     },
     {
       "id": 11,
       "contractor_type": "manufacturer",
       "legal_name": "Dvele AZ, LLC",
-      "formation_state": null,
       "entity_type": "LLC",
       "address": null,
-      "city": null,
-      "state": "AZ",
-      "zip": null,
-      "license_number": null,
-      "license_state": null,
-      "license_expiration": null,
-      "contact_name": null,
-      "contact_email": null,
-      "contact_phone": null,
-      "bond_amount": null,
-      "insurance_amount": null,
-      "insurance_expiration": null,
-      "insurance_carrier": null,
-      "is_active": true,
-      "created_at": "2026-02-02T06:39:08.410Z",
-      "organization_id": 1
-    },
-    {
-      "id": 12,
-      "contractor_type": "manufacturer",
-      "legal_name": "Dvele Everywhere",
-      "formation_state": "AL",
-      "entity_type": "Corporation",
-      "address": "124 alabama street",
       "city": null,
       "state": null,
       "zip": null,
@@ -9464,14 +9432,38 @@
       "insurance_expiration": null,
       "insurance_carrier": null,
       "is_active": true,
+      "created_at": "2026-02-02T06:39:08.410Z",
+      "organization_id": 1,
+      "state_address": "AZ"
+    },
+    {
+      "id": 12,
+      "contractor_type": "manufacturer",
+      "legal_name": "Dvele Everywhere",
+      "entity_type": "Corporation",
+      "address": "124 alabama street",
+      "city": null,
+      "state": "AL",
+      "zip": null,
+      "license_number": null,
+      "license_state": null,
+      "license_expiration": null,
+      "contact_name": null,
+      "contact_email": null,
+      "contact_phone": null,
+      "bond_amount": null,
+      "insurance_amount": null,
+      "insurance_expiration": null,
+      "insurance_carrier": null,
+      "is_active": true,
       "created_at": "2026-02-04T00:01:06.246Z",
-      "organization_id": 1
+      "organization_id": 1,
+      "state_address": null
     },
     {
       "id": 13,
       "contractor_type": "onsite",
       "legal_name": "test",
-      "formation_state": null,
       "entity_type": null,
       "address": null,
       "city": null,
@@ -9489,7 +9481,8 @@
       "insurance_carrier": null,
       "is_active": true,
       "created_at": "2026-02-04T00:01:21.098Z",
-      "organization_id": 1
+      "organization_id": 1,
+      "state_address": null
     }
   ],
   "warranty_terms": [
