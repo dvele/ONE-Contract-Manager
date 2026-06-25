@@ -5,7 +5,7 @@ name: Deploy backend (ECS)
 
 on:
   push:
-    branches: [main]
+    branches: [dev]
     paths:
       - "server/**"
       - "shared/**"
