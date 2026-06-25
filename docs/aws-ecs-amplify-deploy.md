@@ -17,6 +17,19 @@ api.<domain>  →  ALB (ACM TLS)  →  ECS Fargate service (API-only container)
                                       └─ VPC → RDS PostgreSQL
 ```
 
+## Current staging environment
+
+AWS account `522879564192`, region `us-west-1` (CLI: `aws --profile nick-work …`).
+
+| | |
+|---|---|
+| API (ECS) | `https://contracts-api-dev.dvele.com` — cluster `contract-manager-cluster-dev`, service `contract-manager-service`, task family `contract-manager-task`, behind shared ALB `onedot-lb-dev` (host rule on :443) |
+| SPA (Amplify) | `https://dev.d2rywzszecoj4r.amplifyapp.com` (`dev` branch) |
+| RDS | `contract-manager-dev-db` (postgres, private; `DATABASE_URL` needs `?sslmode=no-verify`) |
+| ECR / image | `522879564192.dkr.ecr.us-west-1.amazonaws.com/contract-manager` |
+| Cognito | pool `us-west-1_sdqeeKkT8` (DveleIQ), app client `43p1d9dhrkn5bau9t1s49l7096` |
+| Deploy trigger | push to `dev` → GitHub Actions (scoped to the `development` GitHub Environment) |
+
 ## Frontend — Amplify
 1. Create an Amplify Hosting app connected to this GitHub repo. It uses
    [`amplify.yml`](../amplify.yml) (runs `vite build`, publishes `dist/public`).
@@ -31,33 +44,50 @@ api.<domain>  →  ALB (ACM TLS)  →  ECS Fargate service (API-only container)
 **One-time AWS setup (your side):**
 - **ECR** repo (e.g. `contract-manager`).
 - **RDS PostgreSQL** in private subnets.
-- **Secrets Manager:** `DATABASE_URL`, `ADMIN_SYNC_KEY`.
-- **IAM:** task **execution** role (ECR pull, CloudWatch logs, read the secrets) and
-  task **role** (S3 `Get/Put/Delete/ListBucket` on `dvele-contract-manager`; the
-  AWS SDK uses it automatically — no static keys).
+- **IAM:** task **execution** role (`ecsTaskExecutionRole` — ECR pull + CloudWatch
+  logs) and task **role** (`contract-manager-task-role` — S3
+  `Get/Put/Delete/ListBucket` on `dvele-contract-manager`; the AWS SDK uses it
+  automatically, no static keys). **No Secrets Manager** — config is injected as plain
+  task-def env (below).
 - **ALB + ACM** cert for `api.<domain>`; target group health check path **`/healthz`**.
-- **Task definition** — container port `5000`; env:
+- **Task definition** — container port `5000`; **all env is plain (no secrets store):**
   - `NODE_ENV=production`, `AWS_REGION=us-west-1`, `AWS_S3_BUCKET=dvele-contract-manager`
+  - `DATABASE_URL=postgresql://…/contract_manager?sslmode=no-verify`  — the `sslmode`
+    is **required**: RDS enforces TLS and the app's `pg` pools set no SSL otherwise
+    (without it the container crash-loops on `no pg_hba.conf entry … no encryption`).
   - `FRONTEND_ORIGIN=https://<app-domain>`  (CORS allowlist; comma-separate multiple)
-  - `ENABLE_SCHEDULED_JOBS` — see caveat
-  - secrets: `DATABASE_URL`, `ADMIN_SYNC_KEY` (from Secrets Manager)
+  - `VITE_COGNITO_REGION`, `VITE_COGNITO_USER_POOL_ID`  (server validates JWTs against this pool)
+  - `ONEDOT_API_KEY`, `ENABLE_SCHEDULED_JOBS` — see caveat
+  - (`ADMIN_SYNC_KEY` appears in `.env.example` but is currently unused by the code.)
 - **Service** behind the ALB; **VPC/subnets/SG** that can reach RDS (RDS SG allows the task SG on 5432).
 
 **CI/CD:** [`.github/workflows/deploy-backend.yml`](../.github/workflows/deploy-backend.yml)
-builds/pushes the image to ECR and deploys a new task-def revision on push to
-`main`. Configure repo **Variables** (`AWS_REGION`, `ECR_REPOSITORY`,
-`ECS_CLUSTER`, `ECS_SERVICE`, `ECS_TASK_DEF_FAMILY`, `ECS_CONTAINER_NAME`) and a
-**Secret** `AWS_DEPLOY_ROLE_ARN` (OIDC deploy role trusting GitHub).
+builds/pushes the image to ECR and deploys a new task-def revision on **push to `dev`**
+(staging). The deploy job is scoped to the **`development` GitHub Environment** — its
+**Secret** `AWS_DEPLOY_ROLE_ARN` (OIDC deploy role trusting GitHub) and **Variables**
+(`AWS_REGION`, `ECR_REPOSITORY`, `ECS_CLUSTER`, `ECS_SERVICE`, `ECS_TASK_DEF_FAMILY`,
+`ECS_CONTAINER_NAME`) live under that environment, so the job declares
+`environment: development`. The workflow inherits the existing task-def env and swaps
+only the image (tagged with the commit SHA), so **production runs committed code** —
+manual image pushes get overwritten by the next CI run; ship by commit + push.
+
+**Schema migrations are automatic:** the container entrypoint
+([`docker-entrypoint.sh`](../docker-entrypoint.sh)) runs `drizzle-kit push` against
+`DATABASE_URL` on startup before the server boots, reconciling the DB to
+`shared/schema.ts`. `drizzle-kit` is a runtime dependency for this. No manual
+production migration step.
 
 ## DNS
 - `<app-domain>` → Amplify (custom domain in the Amplify console).
 - `api.<domain>` → ALB (Route 53 alias).
 
 ## Post-deploy
-1. Run the schema migration once against RDS from a host that can reach it
-   (`DATABASE_URL=… npm run db:push`).
+1. Schema is applied automatically by the container entrypoint on boot
+   (`drizzle-kit push`) — no manual migration. Default reference data is seeded by
+   `server/seed.ts` on startup (skips tables that already have rows; project-scoped
+   tables like `contractors`/`warranty_terms` are intentionally not seeded).
 2. Smoke test: load the Amplify URL, sign in (Cognito), and **generate a PDF**
-   (exercises in-container Chromium + the cross-origin API call + CORS).
+   (exercises in-container Chromium + the cross-origin API call + CORS + exhibits).
 3. Confirm `/healthz` is green on the ALB target group.
 
 ## Caveats

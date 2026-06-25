@@ -13,6 +13,7 @@ Enterprise contract management platform for modular home construction (Dvele). A
 - **PDF:** Puppeteer Core
 - **Docs:** docxtemplater, mammoth (DOCX ingestion)
 - **Port:** 5000 (serves both API and client)
+- **Deployment (staging):** Backend → AWS ECS Fargate (`us-west-1`) via GitHub Actions on push to `dev`; Frontend → AWS Amplify Hosting (`dev` branch). See [Deployment & CI/CD](#deployment--cicd).
 
 ## Key Files
 
@@ -57,6 +58,14 @@ npm run db:migrate     # run migrations
 
 All tables have `organizationId` for multi-tenancy. Currently hardcoded to org 1.
 
+**On deploy, schema is applied automatically.** The container entrypoint
+(`docker-entrypoint.sh`) runs `drizzle-kit push` against `DATABASE_URL` on startup,
+reconciling the deployed DB to `shared/schema.ts`. So a schema change ships to staging
+by committing `shared/schema.ts` and pushing to `dev` — there is **no manual production
+migration step**. (`drizzle-kit` is therefore a runtime dependency, not dev-only.)
+Locally, run `npm run db:push` yourself to sync your dev DB. `shared/schema.ts` is the
+source of truth on deploy; the files in `migrations/` are stale and not used by `push`.
+
 ## Critical Business Logic
 
 ### 1. Service Model (CRC vs CMOS)
@@ -78,6 +87,14 @@ Project Data → Variable Mapper → Contract Generator
   → Exhibit injection ({{EXHIBIT_A}} through {{EXHIBIT_G}})
   → PDF via Puppeteer → File storage
 ```
+
+**Exhibits require a `templateId`.** `fetchExhibitsForContract` selects exhibits via
+the `template_exhibits` junction keyed by `templateId` (contract types no longer drive
+inclusion). Every generation entry point — `POST /contracts`, `download-pdf`,
+`download-all-zip`, preview, regenerate — MUST pass `templateId` or the document is
+produced with **no exhibits**. There is one active `contract_templates` row per
+contract type, so resolve it from `contractType` when no explicit id is available
+(see `resolveTemplateId` in `server/routes/contracts.ts`).
 
 ### 4. Atomic Clause Architecture
 Clauses have separate `headerText` and `bodyHtml` fields. They are hierarchical (level 1–8, parentId for nesting) and tagged with contract types and tags (JSONB). This enables flexible composition — never merge header and body into a single field.
@@ -102,6 +119,28 @@ Clauses have separate `headerText` and `bodyHtml` fields. They are hierarchical 
 - Routing: wouter (not react-router)
 - UI: Shadcn UI primitives only — do not add new component libraries
 - Styling: Tailwind CSS classes; see `design_guidelines.md` for the design system
+
+## Deployment & CI/CD
+
+Staging runs on AWS (account `522879564192`, region `us-west-1`). Full runbook and
+concrete resource names: [`docs/aws-ecs-amplify-deploy.md`](docs/aws-ecs-amplify-deploy.md).
+
+- **Backend → ECS Fargate.** `.github/workflows/deploy-backend.yml` builds the
+  API-only Docker image, pushes to ECR, and deploys a new ECS task-def revision on
+  **push to `dev`**. The job is scoped to the `development` GitHub Environment, where
+  its `AWS_DEPLOY_ROLE_ARN` secret and the `AWS_*` / `ECS_*` / `ECR_*` variables live.
+- **Frontend → Amplify Hosting** (`dev` branch), built via `amplify.yml`
+  (`vite build` → `dist/public`). `VITE_*` vars are inlined at build time (set in the
+  Amplify console); changing one requires a rebuild. Needs an SPA rewrite (regex `200`
+  rule → `/index.html`).
+- **Production = committed code.** Pushing to `dev` IS the deploy. Manual ECS image
+  pushes get overwritten by the next CI run — ship by commit + push, not by hand.
+- **Schema migrates on container start** via `drizzle-kit push` (see Database above).
+- **Config is plain task-def env** (no Secrets Manager). `DATABASE_URL` must include
+  `?sslmode=no-verify` (RDS enforces TLS). `FRONTEND_ORIGIN` is the CORS allowlist and
+  must equal the Amplify origin exactly (scheme + host, no trailing slash).
+- The deployed API and SPA are **different origins**; the SPA calls the API via
+  `VITE_API_URL`, the API allows it via `FRONTEND_ORIGIN`. Auth is JWT Bearer (no cookies).
 
 ## Common Patterns
 
