@@ -1288,8 +1288,14 @@ function renderBlockTreeHTML(nodes: BlockNode[], projectData: Record<string, any
     html += renderBlockNode(node);
   }
   
-  // Add signature blocks at the end only if no component-based signature was resolved
-  if (!signatureComponentResolved) {
+  // Add a signature block at the end only if the document doesn't already contain one.
+  // Both the {{SIGNATURE_BLOCK_TABLE}} variable (resolved by the mapper) and
+  // TABLE_SIGNATURE component tags render a `signature-section` div, so guarding on the
+  // rendered output dedups *every* inline signature source — not just component tags,
+  // which is all `signatureComponentResolved` tracked. Without this, a clause that embeds
+  // {{SIGNATURE_BLOCK_TABLE}} (e.g. "SIGNATURES; COUNTERPARTS; AUTHORITY") produced two
+  // signature tables: one inline + one auto-appended here.
+  if (!signatureComponentResolved && !html.includes('signature-section')) {
     html += renderSignatureBlocks(projectData);
   }
   
