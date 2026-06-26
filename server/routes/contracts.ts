@@ -1617,7 +1617,7 @@ router.post("/contracts/draft-preview", async (req, res) => {
       const snapshotResult = await pool.query(
         `SELECT cc.clause_id AS id, c.slug AS clause_code, cc.header_text AS name,
                 cc.body_html AS content, c.contract_types, cc.level AS hierarchy_level,
-                cc."order" AS sort_order, c.tags
+                cc."order" AS sort_order, c.tags, c.parent_id AS parent_clause_id
          FROM contract_clauses cc
          LEFT JOIN clauses c ON c.id = cc.clause_id
          WHERE cc.contract_id = $1
@@ -1634,7 +1634,12 @@ router.post("/contracts/draft-preview", async (req, res) => {
           contract_type: Array.isArray(r.contract_types) ? r.contract_types[0] : r.contract_types,
           hierarchy_level: r.hierarchy_level,
           sort_order: r.sort_order,
-          parent_clause_id: null,
+          // Restore hierarchy from the live clause's parent_id so buildBlockTree nests
+          // the snapshot the same way the PDF path does. The contract_clauses snapshot
+          // table doesn't store parent_clause_id; without this the tree is flat and
+          // applyMasterEFNumbering numbers every clause as a top-level section
+          // (5) 6) 7)… instead of 1) / a. / i.).
+          parent_clause_id: r.parent_clause_id ?? null,
           conditions: null,
           block_type: null,
           disclosure_code: null,
