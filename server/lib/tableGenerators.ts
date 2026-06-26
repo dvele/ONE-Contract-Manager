@@ -532,7 +532,13 @@ export function generateResponsibilityMatrixHtml(
     return '<p style="font-style: italic; color: #666;">Responsibility matrix not configured.</p>';
   }
 
-  const checkMark = '&#10003;';
+  // Inline SVG check mark — does not depend on a font having the U+2713 glyph,
+  // which the slim PDF-rendering container lacks (renders as tofu boxes otherwise).
+  const checkMark =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" ' +
+    'xmlns="http://www.w3.org/2000/svg" style="display:inline-block;vertical-align:middle;">' +
+    '<path d="M5 13l4 4L19 7" stroke="#1a73e8" stroke-width="3" ' +
+    'stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const categories = new Map<string, ResponsibilityMatrixItem[]>();
   for (const item of matrixItems) {
     const cat = item.category || 'General';
