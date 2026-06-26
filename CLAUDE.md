@@ -52,8 +52,15 @@ router.use(requireAuth); // applies to all routes in the file
 ## Drizzle Commands
 
 Only `db:push` is in `package.json`. For other Drizzle Kit commands:
+
 ```bash
 npm run db:push           # dev: push schema directly
 npx drizzle-kit generate  # generate migration files
 npx drizzle-kit migrate   # run migrations
 ```
+
+# Git Commit Rules
+
+- NEVER add "Co-Authored-By" trailers to commits
+- NEVER mention Claude, Claude Code, or Anthropic in commit messages
+- NEVER add any AI attribution to git history
