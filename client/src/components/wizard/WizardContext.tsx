@@ -1523,8 +1523,8 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
       case 1:
         if (!data.projectNumber.trim()) {
           errors.projectNumber = 'Project number is required';
-        } else if (!/^\d{4}-\d{3}$/.test(data.projectNumber)) {
-          errors.projectNumber = 'Project number must be in format YYYY-### (e.g., 2026-001)';
+        } else if (!/^\d{2,4}-\d{3}$/.test(data.projectNumber)) {
+          errors.projectNumber = 'Project number must be in format YY-### or YYYY-### (e.g., 23-004 or 2026-001)';
         } else if (numberIsUnique === false) {
           errors.projectNumber = 'This project number already exists';
         }

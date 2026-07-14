@@ -188,8 +188,8 @@ router.get("/projects/next-number", async (req, res) => {
     
     const nextNumber = String(maxNumber + 1).padStart(3, '0');
     const nextProjectNumber = `${yearPrefix}${nextNumber}`;
-    
-    res.json({ nextProjectNumber });
+
+    res.json({ projectNumber: nextProjectNumber });
   } catch (error) {
     console.error("Failed to get next project number:", error);
     res.status(500).json({ error: "Failed to get next project number" });

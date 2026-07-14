@@ -171,7 +171,7 @@ export const Step1ProjectInfo: React.FC = () => {
                       <HelpCircle className="h-4 w-4 text-muted-foreground" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Format: YYYY-### (e.g., 2025-042)</p>
+                      <p>Format: YY-### or YYYY-### (e.g., 23-004 or 2025-042)</p>
                     </TooltipContent>
                   </Tooltip>
                 </Label>
