@@ -223,6 +223,7 @@ export const contractorEntities = pgTable("contractor_entities", {
   legalName: text("legal_name").notNull(),
   contractorType: text("contractor_type").notNull(), // manufacturer, onsite_general, onsite_sub
   entityType: text("entity_type"), // LLC, Corporation
+  formationState: text("formation_state"), // State where entity was formed
   state: text("state"),
   address: text("address"),
   city: text("city"),
