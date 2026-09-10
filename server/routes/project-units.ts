@@ -102,12 +102,26 @@ async function roleConflict(
     : null;
 }
 
+async function propertyAccessible(
+  propertyId: number,
+  organizationId: number,
+): Promise<boolean> {
+  const result = await pool.query(
+    `SELECT id FROM properties WHERE id = $1 AND (organization_id = $2 OR organization_id IS NULL)`,
+    [propertyId, organizationId],
+  );
+  return result.rows.length > 0;
+}
+
 router.post("/project-units", async (req: Request, res: Response) => {
   try {
     const { projectId, modelId, unitLabel, quantity, basePriceSnapshot,
             customizationTotal, notes, propertyId, unitRole } = req.body;
 
     if (propertyId != null) {
+      if (!(await propertyAccessible(propertyId, req.organizationId))) {
+        return res.status(404).json({ error: "Property not found" });
+      }
       if (!UNIT_ROLES.includes(unitRole)) {
         return res.status(400).json({ error: "unitRole must be 'home' or 'adu'" });
       }
@@ -138,6 +152,9 @@ router.patch("/project-units/:id", async (req: Request, res: Response) => {
             customizationTotal, notes, propertyId, unitRole } = req.body;
 
     if (propertyId != null) {
+      if (!(await propertyAccessible(propertyId, req.organizationId))) {
+        return res.status(404).json({ error: "Property not found" });
+      }
       if (!UNIT_ROLES.includes(unitRole)) {
         return res.status(400).json({ error: "unitRole must be 'home' or 'adu'" });
       }
