@@ -64,7 +64,9 @@ export const projectUnits = pgTable("project_units", {
   unitRole: text("unit_role"), // 'home' | 'adu'
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => [
+  unique().on(t.propertyId, t.unitRole),
+]);
 
 // =============================================================================
 // PHASES & PROPERTIES (Multi-Tenant)
