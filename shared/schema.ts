@@ -60,9 +60,59 @@ export const projectUnits = pgTable("project_units", {
   quantity: integer("quantity").default(1).notNull(),
   basePriceSnapshot: integer("base_price_snapshot"), // cents - locked price
   customizationTotal: integer("customization_total").default(0), // cents
+  propertyId: integer("property_id").references(() => properties.id),
+  unitRole: text("unit_role"), // 'home' | 'adu'
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// =============================================================================
+// PHASES & PROPERTIES (Multi-Tenant)
+// =============================================================================
+
+export const phases = pgTable("phases", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id")
+    .references(() => organizations.id)
+    .notNull(),
+  projectId: integer("project_id")
+    .references(() => projects.id)
+    .notNull(),
+  phaseNumber: integer("phase_number").notNull(),
+  name: text("name"),
+  startOffsetDays: integer("start_offset_days").default(0),
+  manufacturingDays: integer("manufacturing_days"),
+  onsiteDays: integer("onsite_days"),
+  deliveryLagDays: integer("delivery_lag_days").default(0),
+  factoryStartOverride: text("factory_start_override"),
+  factoryCompleteOverride: text("factory_complete_override"),
+  deliveryWindowOverride: text("delivery_window_override"),
+  targetCoOverride: text("target_co_override"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  unique().on(t.projectId, t.phaseNumber),
+]);
+
+export const properties = pgTable("properties", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id")
+    .references(() => organizations.id)
+    .notNull(),
+  projectId: integer("project_id")
+    .references(() => projects.id)
+    .notNull(),
+  phaseId: integer("phase_id").references(() => phases.id),
+  propertyCode: text("property_code").notNull(),
+  apn: text("apn"),
+  lotNumber: text("lot_number"),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zip: text("zip"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  unique().on(t.projectId, t.propertyCode),
+]);
 
 // =============================================================================
 // LLCs (Multi-Tenant)
@@ -717,6 +767,38 @@ export const projectUnitsRelations = relations(projectUnits, ({ one }) => ({
     fields: [projectUnits.modelId],
     references: [homeModels.id],
   }),
+  property: one(properties, {
+    fields: [projectUnits.propertyId],
+    references: [properties.id],
+  }),
+}));
+
+export const phasesRelations = relations(phases, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [phases.organizationId],
+    references: [organizations.id],
+  }),
+  project: one(projects, {
+    fields: [phases.projectId],
+    references: [projects.id],
+  }),
+  properties: many(properties),
+}));
+
+export const propertiesRelations = relations(properties, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [properties.organizationId],
+    references: [organizations.id],
+  }),
+  project: one(projects, {
+    fields: [properties.projectId],
+    references: [projects.id],
+  }),
+  phase: one(phases, {
+    fields: [properties.phaseId],
+    references: [phases.id],
+  }),
+  projectUnits: many(projectUnits),
 }));
 
 export const llcsRelations = relations(llcs, ({ one }) => ({
@@ -864,6 +946,12 @@ export type NewHomeModel = typeof homeModels.$inferInsert;
 
 export type ProjectUnit = typeof projectUnits.$inferSelect;
 export type NewProjectUnit = typeof projectUnits.$inferInsert;
+
+export type Phase = typeof phases.$inferSelect;
+export type NewPhase = typeof phases.$inferInsert;
+
+export type Property = typeof properties.$inferSelect;
+export type NewProperty = typeof properties.$inferInsert;
 
 export type Llc = typeof llcs.$inferSelect;
 export type NewLlc = typeof llcs.$inferInsert;
