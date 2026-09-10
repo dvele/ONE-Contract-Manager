@@ -14,6 +14,7 @@ const selectFields = `
   pu.base_price_snapshot as "basePriceSnapshot",
   pu.customization_total as "customizationTotal",
   pu.notes, pu.created_at as "createdAt",
+  pu.property_id as "propertyId", pu.unit_role as "unitRole",
   hm.name as "modelName", hm.model_code as "modelCode",
   p.name as "projectName"
 `;
@@ -73,20 +74,56 @@ const returningFields = `
   quantity,
   base_price_snapshot as "basePriceSnapshot",
   customization_total as "customizationTotal",
-  notes, created_at as "createdAt"
+  notes, created_at as "createdAt",
+  property_id as "propertyId", unit_role as "unitRole"
 `;
+
+const UNIT_ROLES = ["home", "adu"] as const;
+type UnitRole = (typeof UNIT_ROLES)[number];
+
+/**
+ * A property holds at most one home and one ADU. Returns an error message when
+ * the requested role is already taken, or null when the attachment is allowed.
+ *
+ * @param excludeUnitId - unit being updated, so it does not conflict with itself
+ */
+async function roleConflict(
+  propertyId: number,
+  unitRole: UnitRole,
+  excludeUnitId: number | null,
+): Promise<string | null> {
+  const result = await pool.query(
+    `SELECT id FROM project_units
+     WHERE property_id = $1 AND unit_role = $2 AND ($3::int IS NULL OR id <> $3)`,
+    [propertyId, unitRole, excludeUnitId],
+  );
+  return result.rows.length > 0
+    ? `This property already has a ${unitRole}`
+    : null;
+}
 
 router.post("/project-units", async (req: Request, res: Response) => {
   try {
-    const { projectId, modelId, unitLabel, quantity, basePriceSnapshot, customizationTotal, notes } = req.body;
-    
+    const { projectId, modelId, unitLabel, quantity, basePriceSnapshot,
+            customizationTotal, notes, propertyId, unitRole } = req.body;
+
+    if (propertyId != null) {
+      if (!UNIT_ROLES.includes(unitRole)) {
+        return res.status(400).json({ error: "unitRole must be 'home' or 'adu'" });
+      }
+      const conflict = await roleConflict(propertyId, unitRole, null);
+      if (conflict) return res.status(409).json({ error: conflict });
+    }
+
     const result = await pool.query(
-      `INSERT INTO project_units (organization_id, project_id, model_id, unit_label, quantity, base_price_snapshot, customization_total, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO project_units (organization_id, project_id, model_id, unit_label, quantity, base_price_snapshot, customization_total, notes, property_id, unit_role)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING ${returningFields}`,
-      [req.organizationId, projectId, modelId, unitLabel, quantity || 1, basePriceSnapshot, customizationTotal, notes]
+      [req.organizationId, projectId, modelId, unitLabel, quantity || 1,
+       basePriceSnapshot, customizationTotal, notes,
+       propertyId ?? null, unitRole ?? null]
     );
-    
+
     res.status(201).json(result.rows[0]);
   } catch (error: any) {
     console.error("Error creating project unit:", error);
@@ -97,25 +134,40 @@ router.post("/project-units", async (req: Request, res: Response) => {
 router.patch("/project-units/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { modelId, unitLabel, quantity, basePriceSnapshot, customizationTotal, notes } = req.body;
-    
+    const { modelId, unitLabel, quantity, basePriceSnapshot,
+            customizationTotal, notes, propertyId, unitRole } = req.body;
+
+    if (propertyId != null) {
+      if (!UNIT_ROLES.includes(unitRole)) {
+        return res.status(400).json({ error: "unitRole must be 'home' or 'adu'" });
+      }
+      const conflict = await roleConflict(
+        propertyId, unitRole, parseInt(String(id), 10)
+      );
+      if (conflict) return res.status(409).json({ error: conflict });
+    }
+
     const result = await pool.query(
-      `UPDATE project_units SET 
+      `UPDATE project_units SET
        model_id = COALESCE($3, model_id),
        unit_label = COALESCE($4, unit_label),
        quantity = COALESCE($5, quantity),
        base_price_snapshot = COALESCE($6, base_price_snapshot),
        customization_total = COALESCE($7, customization_total),
-       notes = COALESCE($8, notes)
+       notes = COALESCE($8, notes),
+       property_id = COALESCE($9, property_id),
+       unit_role = COALESCE($10, unit_role)
        WHERE id = $1 AND organization_id = $2
        RETURNING ${returningFields}`,
-      [id, req.organizationId, modelId, unitLabel, quantity, basePriceSnapshot, customizationTotal, notes]
+      [id, req.organizationId, modelId, unitLabel, quantity,
+       basePriceSnapshot, customizationTotal, notes,
+       propertyId ?? null, unitRole ?? null]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Project unit not found" });
     }
-    
+
     res.json(result.rows[0]);
   } catch (error: any) {
     console.error("Error updating project unit:", error);
