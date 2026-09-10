@@ -1,6 +1,7 @@
 import { Router } from "express";
 import projectsRouter from "./projects";
 import financialsRouter from "./financials";
+import phasesRouter from "./phases";
 import contractsRouter from "./contracts";
 import systemRouter from "./system";
 import homeModelsRouter from "./home-models";
@@ -19,6 +20,7 @@ const router = Router();
 
 router.use(projectsRouter);
 router.use(financialsRouter);
+router.use(phasesRouter);
 router.use(contractsRouter);
 router.use(systemRouter);
 
