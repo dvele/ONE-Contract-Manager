@@ -31,6 +31,9 @@ function parseId(raw: string | string[]): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+const UNIQUE_VIOLATION = "23505";
+const MAX_PROPERTY_CODE_ASSIGNMENT_RETRIES = 3;
+
 router.get("/projects/:projectId/properties", async (req: Request, res: Response) => {
   try {
     const projectId = parseId(req.params.projectId);
@@ -82,27 +85,42 @@ router.post("/projects/:projectId/properties", async (req: Request, res: Respons
       return res.status(404).json({ error: "Project not found" });
     }
 
-    const existing = await db
-      .select({ propertyCode: properties.propertyCode })
-      .from(properties)
-      .where(eq(properties.projectId, projectId));
+    // `propertyCode` is derived from the current max suffix, then inserted separately,
+    // so two concurrent POSTs for the same project can compute the same code and
+    // collide on the (projectId, propertyCode) unique constraint. Retry on that specific
+    // violation, recomputing the code against the now-current state each time.
+    let created: typeof properties.$inferSelect | undefined;
+    for (let attempt = 0; ; attempt++) {
+      const existing = await db
+        .select({ propertyCode: properties.propertyCode })
+        .from(properties)
+        .where(eq(properties.projectId, projectId));
 
-    // Codes are P-<n>; derive the next n from the highest existing suffix so a
-    // deleted P-3 does not cause the next property to reuse its code.
-    const highest = existing.reduce((max, row) => {
-      const suffix = parseInt((row.propertyCode || "").replace(/^P-/, ""), 10);
-      return Number.isNaN(suffix) ? max : Math.max(max, suffix);
-    }, 0);
+      // Codes are P-<n>; derive the next n from the highest existing suffix so a
+      // deleted P-3 does not cause the next property to reuse its code.
+      const highest = existing.reduce((max, row) => {
+        const suffix = parseInt((row.propertyCode || "").replace(/^P-/, ""), 10);
+        return Number.isNaN(suffix) ? max : Math.max(max, suffix);
+      }, 0);
 
-    const [created] = await db
-      .insert(properties)
-      .values({
-        organizationId: req.organizationId,
-        projectId,
-        propertyCode: `P-${highest + 1}`,
-        ...parsed.data,
-      })
-      .returning();
+      try {
+        [created] = await db
+          .insert(properties)
+          .values({
+            organizationId: req.organizationId,
+            projectId,
+            propertyCode: `P-${highest + 1}`,
+            ...parsed.data,
+          })
+          .returning();
+        break;
+      } catch (error: any) {
+        if (error?.code === UNIQUE_VIOLATION && attempt < MAX_PROPERTY_CODE_ASSIGNMENT_RETRIES) {
+          continue;
+        }
+        throw error;
+      }
+    }
 
     res.status(201).json(created);
   } catch (error) {

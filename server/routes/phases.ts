@@ -29,6 +29,9 @@ function parseId(raw: string | string[]): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+const UNIQUE_VIOLATION = "23505";
+const MAX_PHASE_NUMBER_ASSIGNMENT_RETRIES = 3;
+
 router.get("/projects/:projectId/phases", async (req: Request, res: Response) => {
   try {
     const projectId = parseId(req.params.projectId);
@@ -80,23 +83,38 @@ router.post("/projects/:projectId/phases", async (req: Request, res: Response) =
       return res.status(404).json({ error: "Project not found" });
     }
 
-    const existing = await db
-      .select({ phaseNumber: phases.phaseNumber })
-      .from(phases)
-      .where(eq(phases.projectId, projectId));
+    // `phaseNumber` is derived from the current max, then inserted separately, so two
+    // concurrent POSTs for the same project can compute the same number and collide on
+    // the (projectId, phaseNumber) unique constraint. Retry on that specific violation,
+    // recomputing the number against the now-current state each time.
+    let created: typeof phases.$inferSelect | undefined;
+    for (let attempt = 0; ; attempt++) {
+      const existing = await db
+        .select({ phaseNumber: phases.phaseNumber })
+        .from(phases)
+        .where(eq(phases.projectId, projectId));
 
-    const nextNumber =
-      existing.reduce((max, row) => Math.max(max, row.phaseNumber), 0) + 1;
+      const nextNumber =
+        existing.reduce((max, row) => Math.max(max, row.phaseNumber), 0) + 1;
 
-    const [created] = await db
-      .insert(phases)
-      .values({
-        organizationId: req.organizationId,
-        projectId,
-        phaseNumber: nextNumber,
-        ...parsed.data,
-      })
-      .returning();
+      try {
+        [created] = await db
+          .insert(phases)
+          .values({
+            organizationId: req.organizationId,
+            projectId,
+            phaseNumber: nextNumber,
+            ...parsed.data,
+          })
+          .returning();
+        break;
+      } catch (error: any) {
+        if (error?.code === UNIQUE_VIOLATION && attempt < MAX_PHASE_NUMBER_ASSIGNMENT_RETRIES) {
+          continue;
+        }
+        throw error;
+      }
+    }
 
     res.status(201).json(created);
   } catch (error) {
