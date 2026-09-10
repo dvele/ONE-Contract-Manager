@@ -204,6 +204,24 @@ production milestone so amounts sum to `phaseValue` exactly — the same reconci
 A CMOS phase's retainage percentage will be small and non-round (0.70% above). That is
 a direct consequence of withholding against on-site value rather than phase value.
 
+### Partially-attached projects
+
+**Decision, open to revision before Plan B is written.** Step 4 now renders the
+property editor directly above the legacy quantity-based unit list on the same screen,
+so a project can hold both legacy quantity-based units and property-attached units at
+once — not an edge case but the default path this branch creates. In that state the
+project-level rollup (which sums every unit row × quantity) and Plan B's per-phase
+rollup (which will sum only units reachable through phase → properties → units)
+disagree, and `Σ phaseValue ≠ contractValue` with nothing reconciling them.
+
+Generation must fail loudly rather than silently produce a contract with inconsistent
+totals. Plan B adds a reconciliation check that refuses to generate when
+`Σ phaseValue ≠ contractValue − designFee`, naming the unattached units in the error.
+
+The alternative considered — falling back to the project-level rollup whenever any
+unit is unattached — was rejected because it would quietly emit a contract whose phase
+tables and total disagree.
+
 ### Route
 
 ```
@@ -379,12 +397,13 @@ Recorded because they were not explicitly confirmed:
 
 ## Known Gaps
 
-- `web-design-guidelines` is now installed at `.agents/skills/web-design-guidelines`
-  (tracked in `skills-lock.json`) and must be invoked before building any of the three
-  new wizard surfaces: property/phase entry, per-phase timeline cards, and the
-  per-phase milestone editor. Note that skill discovery in this project reads
-  `.claude/skills/`, so the skill may need symlinking there — or reinstalling with
-  `-g` — before an agent can actually load it.
+- `web-design-guidelines` is now installed locally at
+  `.agents/skills/web-design-guidelines` but **not** committed — both `.agents/` and
+  `skills-lock.json` are untracked, so a fresh checkout will not have the skill.
+  Committing `skills-lock.json` and `.agents/skills/` is a prerequisite for Plans C and
+  D, which both need it for their wizard surfaces. Note that skill discovery in this
+  project reads `.claude/skills/`, so the skill may need symlinking there — or
+  reinstalling with `-g` — before an agent can actually load it.
 
 ## Out of Scope
 

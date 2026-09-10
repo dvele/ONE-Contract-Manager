@@ -1098,6 +1098,8 @@ Zaca Preserve's 7 properties in 3 phases are representable and persist. The gene
 |---|---|
 | `unit_configurations` table and `project_units.configurationId` | B |
 | Per-phase pricing subtotals (`phases[]` on `calculateProjectPricing`) | B |
+| Unit-to-property attachment UI. `POST /api/project-units` (extended by Task 4) is **not** where the wizard creates units — the wizard uses `POST /api/projects/:projectId/units` (`server/routes/projects.ts:587`) and reads through `GET /api/projects/:projectId/units` (`:555`), and neither knows about `property_id` or `unit_role`; the GET's explicit column list omits both. Plan B must either extend those two handlers or migrate the wizard onto `/api/project-units`. | B |
+| Phase delete and rename UI. `DELETE /api/phases/:id` and `PATCH /api/phases/:id` both exist and are unreachable from the UI, so a misclick on "Add Phase" is currently unrecoverable. By Plan D a stray empty phase becomes a milestone block billing 100% of $0 in Exhibit A.5. | B |
 | Timeline derivation, `phases` date overrides becoming live, Step 6 restructure | C |
 | `milestones.phaseId`, the milestones route, per-phase editor in Step 7 | D |
 | Exhibit rewiring script and the twelve document defects | E |
