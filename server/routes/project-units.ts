@@ -107,7 +107,7 @@ async function propertyAccessible(
   organizationId: number,
 ): Promise<boolean> {
   const result = await pool.query(
-    `SELECT id FROM properties WHERE id = $1 AND (organization_id = $2 OR organization_id IS NULL)`,
+    `SELECT id FROM properties WHERE id = $1 AND organization_id = $2`,
     [propertyId, organizationId],
   );
   return result.rows.length > 0;
