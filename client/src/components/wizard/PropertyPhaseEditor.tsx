@@ -43,10 +43,7 @@ export const PropertyPhaseEditor: React.FC<{ projectId: number }> = ({ projectId
   };
 
   const addPhase = useMutation({
-    mutationFn: () =>
-      apiRequest("POST", `/api/projects/${projectId}/phases`, {
-        name: `Phase ${phases.length + 1}`,
-      }),
+    mutationFn: () => apiRequest("POST", `/api/projects/${projectId}/phases`, {}),
     onSuccess: () => {
       invalidate();
       setErrorMessage(null);
@@ -224,11 +221,9 @@ export const PropertyPhaseEditor: React.FC<{ projectId: number }> = ({ projectId
           })
         )}
 
-        {errorMessage && (
-          <p className="text-sm text-destructive" aria-live="polite" data-testid="text-editor-error">
-            {errorMessage}
-          </p>
-        )}
+        <p className="text-sm text-destructive" aria-live="polite" data-testid="text-editor-error">
+          {errorMessage}
+        </p>
       </CardContent>
 
       <DeleteConfirmDialog
