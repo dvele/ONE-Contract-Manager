@@ -102,13 +102,19 @@ async function roleConflict(
     : null;
 }
 
+/**
+ * A unit may only attach to a property in its own project and organization.
+ * Returns false when the property is missing, belongs to another organization,
+ * or belongs to a different project.
+ */
 async function propertyAccessible(
   propertyId: number,
   organizationId: number,
+  projectId: number,
 ): Promise<boolean> {
   const result = await pool.query(
-    `SELECT id FROM properties WHERE id = $1 AND organization_id = $2`,
-    [propertyId, organizationId],
+    `SELECT id FROM properties WHERE id = $1 AND organization_id = $2 AND project_id = $3`,
+    [propertyId, organizationId, projectId],
   );
   return result.rows.length > 0;
 }
@@ -119,7 +125,7 @@ router.post("/project-units", async (req: Request, res: Response) => {
             customizationTotal, notes, propertyId, unitRole } = req.body;
 
     if (propertyId != null) {
-      if (!(await propertyAccessible(propertyId, req.organizationId))) {
+      if (!(await propertyAccessible(propertyId, req.organizationId, projectId))) {
         return res.status(404).json({ error: "Property not found" });
       }
       if (!UNIT_ROLES.includes(unitRole)) {
@@ -152,7 +158,14 @@ router.patch("/project-units/:id", async (req: Request, res: Response) => {
             customizationTotal, notes, propertyId, unitRole } = req.body;
 
     if (propertyId != null) {
-      if (!(await propertyAccessible(propertyId, req.organizationId))) {
+      const existingUnit = await pool.query(
+        `SELECT project_id FROM project_units WHERE id = $1 AND organization_id = $2`,
+        [id, req.organizationId],
+      );
+      if (existingUnit.rows.length === 0) {
+        return res.status(404).json({ error: "Project unit not found" });
+      }
+      if (!(await propertyAccessible(propertyId, req.organizationId, existingUnit.rows[0].project_id))) {
         return res.status(404).json({ error: "Property not found" });
       }
       if (!UNIT_ROLES.includes(unitRole)) {
