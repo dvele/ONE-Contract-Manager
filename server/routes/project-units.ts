@@ -157,24 +157,36 @@ router.patch("/project-units/:id", async (req: Request, res: Response) => {
     const { modelId, unitLabel, quantity, basePriceSnapshot,
             customizationTotal, notes, propertyId, unitRole } = req.body;
 
-    if (propertyId != null) {
+    if (propertyId != null || unitRole != null) {
       const existingUnit = await pool.query(
-        `SELECT project_id FROM project_units WHERE id = $1 AND organization_id = $2`,
+        `SELECT project_id, property_id FROM project_units WHERE id = $1 AND organization_id = $2`,
         [id, req.organizationId],
       );
       if (existingUnit.rows.length === 0) {
         return res.status(404).json({ error: "Project unit not found" });
       }
-      if (!(await propertyAccessible(propertyId, req.organizationId, existingUnit.rows[0].project_id))) {
+
+      if (propertyId != null &&
+          !(await propertyAccessible(propertyId, req.organizationId, existingUnit.rows[0].project_id))) {
         return res.status(404).json({ error: "Property not found" });
       }
-      if (!UNIT_ROLES.includes(unitRole)) {
+
+      if (unitRole != null) {
+        if (!UNIT_ROLES.includes(unitRole)) {
+          return res.status(400).json({ error: "unitRole must be 'home' or 'adu'" });
+        }
+        // The property this role is being checked against: the incoming propertyId
+        // when one is given, otherwise the unit's current property.
+        const effectivePropertyId = propertyId ?? existingUnit.rows[0].property_id;
+        if (effectivePropertyId != null) {
+          const conflict = await roleConflict(
+            effectivePropertyId, unitRole, parseInt(String(id), 10)
+          );
+          if (conflict) return res.status(409).json({ error: conflict });
+        }
+      } else if (propertyId != null) {
         return res.status(400).json({ error: "unitRole must be 'home' or 'adu'" });
       }
-      const conflict = await roleConflict(
-        propertyId, unitRole, parseInt(String(id), 10)
-      );
-      if (conflict) return res.status(409).json({ error: conflict });
     }
 
     const result = await pool.query(

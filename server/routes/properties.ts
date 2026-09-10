@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index";
-import { properties, projectUnits, projects } from "../../shared/schema";
+import { phases, properties, projectUnits, projects } from "../../shared/schema";
 import { requireAuth } from "../middleware/auth";
 
 /**
@@ -27,8 +27,32 @@ const PropertyInputSchema = z.object({
 
 function parseId(raw: string | string[]): number | null {
   const value = Array.isArray(raw) ? raw[0] : raw;
-  const parsed = parseInt(value, 10);
-  return Number.isNaN(parsed) ? null : parsed;
+  if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) return null;
+  return parseInt(value, 10);
+}
+
+/**
+ * A property may only be assigned to a phase in its own project and organization.
+ * Returns false when the phase is missing, belongs to another organization, or
+ * belongs to a different project. Mirrors `propertyAccessible` in
+ * `server/routes/project-units.ts`.
+ */
+async function phaseAccessible(
+  phaseId: number,
+  organizationId: number,
+  projectId: number,
+): Promise<boolean> {
+  const [phase] = await db
+    .select({ id: phases.id })
+    .from(phases)
+    .where(
+      and(
+        eq(phases.id, phaseId),
+        eq(phases.organizationId, organizationId),
+        eq(phases.projectId, projectId),
+      ),
+    );
+  return !!phase;
 }
 
 const UNIQUE_VIOLATION = "23505";
@@ -139,13 +163,32 @@ router.patch("/properties/:id", async (req: Request, res: Response) => {
       return res.status(400).json({ error: parsed.error.issues[0].message });
     }
 
+    if (Object.keys(parsed.data).length === 0) {
+      return res.status(400).json({ error: "No fields to update" });
+    }
+
+    if (typeof parsed.data.phaseId === "number") {
+      const [property] = await db
+        .select({ projectId: properties.projectId })
+        .from(properties)
+        .where(and(eq(properties.id, id), eq(properties.organizationId, req.organizationId)));
+
+      if (!property) {
+        return res.status(404).json({ error: "Property not found" });
+      }
+
+      if (!(await phaseAccessible(parsed.data.phaseId, req.organizationId, property.projectId))) {
+        return res.status(404).json({ error: "Phase not found" });
+      }
+    }
+
     const [updated] = await db
       .update(properties)
       .set(parsed.data)
-      .where(eq(properties.id, id))
+      .where(and(eq(properties.id, id), eq(properties.organizationId, req.organizationId)))
       .returning();
 
-    if (!updated || updated.organizationId !== req.organizationId) {
+    if (!updated) {
       return res.status(404).json({ error: "Property not found" });
     }
 

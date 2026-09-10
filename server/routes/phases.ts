@@ -25,8 +25,8 @@ const PhaseInputSchema = z.object({
 
 function parseId(raw: string | string[]): number | null {
   const value = Array.isArray(raw) ? raw[0] : raw;
-  const parsed = parseInt(value, 10);
-  return Number.isNaN(parsed) ? null : parsed;
+  if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) return null;
+  return parseInt(value, 10);
 }
 
 const UNIQUE_VIOLATION = "23505";
@@ -133,13 +133,17 @@ router.patch("/phases/:id", async (req: Request, res: Response) => {
       return res.status(400).json({ error: parsed.error.issues[0].message });
     }
 
+    if (Object.keys(parsed.data).length === 0) {
+      return res.status(400).json({ error: "No fields to update" });
+    }
+
     const [updated] = await db
       .update(phases)
       .set(parsed.data)
-      .where(eq(phases.id, id))
+      .where(and(eq(phases.id, id), eq(phases.organizationId, req.organizationId)))
       .returning();
 
-    if (!updated || updated.organizationId !== req.organizationId) {
+    if (!updated) {
       return res.status(404).json({ error: "Phase not found" });
     }
 
