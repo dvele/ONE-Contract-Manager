@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import { Layers, Plus, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -27,6 +28,8 @@ interface Property {
 export const PropertyPhaseEditor: React.FC<{ projectId: number }> = ({ projectId }) => {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Property | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const phasesKey = ["/api/projects", projectId, "phases"];
   const propertiesKey = ["/api/projects", projectId, "properties"];
@@ -44,29 +47,49 @@ export const PropertyPhaseEditor: React.FC<{ projectId: number }> = ({ projectId
       apiRequest("POST", `/api/projects/${projectId}/phases`, {
         name: `Phase ${phases.length + 1}`,
       }),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      setErrorMessage(null);
+    },
+    onError: () => setErrorMessage("Could not add the phase. Try again."),
   });
 
   const addProperty = useMutation({
     mutationFn: () => apiRequest("POST", `/api/projects/${projectId}/properties`, {}),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      setErrorMessage(null);
+    },
+    onError: () => setErrorMessage("Could not add the property. Try again."),
   });
 
   const assignPhase = useMutation({
     mutationFn: ({ propertyId, phaseId }: { propertyId: number; phaseId: number | null }) =>
       apiRequest("PATCH", `/api/properties/${propertyId}`, { phaseId }),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      setErrorMessage(null);
+    },
+    onError: () => setErrorMessage("Could not update the phase assignment. Try again."),
   });
 
   const patchProperty = useMutation({
     mutationFn: ({ propertyId, field, value }: { propertyId: number; field: string; value: string }) =>
       apiRequest("PATCH", `/api/properties/${propertyId}`, { [field]: value }),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      setErrorMessage(null);
+    },
+    onError: () => setErrorMessage("Could not save the change. Try again."),
   });
 
   const removeProperty = useMutation({
     mutationFn: (propertyId: number) => apiRequest("DELETE", `/api/properties/${propertyId}`),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      setErrorMessage(null);
+    },
+    onError: () => setErrorMessage("Remove the units attached to this property before deleting it."),
   });
 
   return (
@@ -160,7 +183,7 @@ export const PropertyPhaseEditor: React.FC<{ projectId: number }> = ({ projectId
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => removeProperty.mutate(property.id)}
+                      onClick={() => setDeleteTarget(property)}
                       disabled={removeProperty.isPending}
                       aria-label={`Delete property ${property.propertyCode}`}
                       data-testid={`button-delete-property-${property.id}`}
@@ -178,6 +201,9 @@ export const PropertyPhaseEditor: React.FC<{ projectId: number }> = ({ projectId
                           {field === "apn" ? "APN" : field === "lotNumber" ? "Lot Number" : "Address"}
                         </Label>
                         <Input
+                          // Remount when the server value changes (e.g. trimmed on save) so
+                          // defaultValue re-syncs instead of showing the stale typed input.
+                          key={`${field}-${property.id}-${property[field] ?? ""}`}
                           id={`${field}-${property.id}`}
                           defaultValue={property[field] || ""}
                           onBlur={(e) =>
@@ -198,12 +224,23 @@ export const PropertyPhaseEditor: React.FC<{ projectId: number }> = ({ projectId
           })
         )}
 
-        {removeProperty.isError && (
-          <p className="text-sm text-destructive" role="alert" data-testid="text-delete-property-error">
-            Remove the units attached to this property before deleting it.
+        {errorMessage && (
+          <p className="text-sm text-destructive" aria-live="polite" data-testid="text-editor-error">
+            {errorMessage}
           </p>
         )}
       </CardContent>
+
+      <DeleteConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete Property"
+        description={`Are you sure you want to delete ${deleteTarget?.propertyCode}? This action cannot be undone.`}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          removeProperty.mutate(deleteTarget.id, { onSettled: () => setDeleteTarget(null) });
+        }}
+      />
     </Card>
   );
 };
