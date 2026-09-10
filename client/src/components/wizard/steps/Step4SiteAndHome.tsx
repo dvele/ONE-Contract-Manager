@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Home, Plus, Trash2, AlertTriangle, Package } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
+import { PropertyPhaseEditor } from '../PropertyPhaseEditor';
 
 interface HomeModel {
   id: number;
@@ -130,6 +131,7 @@ export const Step4SiteAndHome: React.FC = () => {
   
   return (
     <div className="space-y-6">
+      {draftProjectId && <PropertyPhaseEditor projectId={draftProjectId} />}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
