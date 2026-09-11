@@ -61,6 +61,7 @@ export const projectUnits = pgTable("project_units", {
   basePriceSnapshot: integer("base_price_snapshot"), // cents - locked price
   customizationTotal: integer("customization_total").default(0), // cents
   propertyId: integer("property_id").references(() => properties.id),
+  configurationId: integer("configuration_id").references(() => unitConfigurations.id),
   unitRole: text("unit_role"), // 'home' | 'adu'
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -115,6 +116,22 @@ export const properties = pgTable("properties", {
 }, (t) => [
   unique().on(t.projectId, t.propertyCode),
 ]);
+
+export const unitConfigurations = pgTable("unit_configurations", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id")
+    .references(() => organizations.id)
+    .notNull(),
+  projectId: integer("project_id")
+    .references(() => projects.id)
+    .notNull(),
+  name: text("name").notNull(),
+  sqFt: integer("sq_ft").notNull(),
+  pricePerSqFtLow: integer("price_per_sq_ft_low").notNull(),
+  pricePerSqFtHigh: integer("price_per_sq_ft_high").notNull(),
+  derivedOffsitePrice: integer("derived_offsite_price").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
 // =============================================================================
 // LLCs (Multi-Tenant)
@@ -773,6 +790,10 @@ export const projectUnitsRelations = relations(projectUnits, ({ one }) => ({
     fields: [projectUnits.propertyId],
     references: [properties.id],
   }),
+  configuration: one(unitConfigurations, {
+    fields: [projectUnits.configurationId],
+    references: [unitConfigurations.id],
+  }),
 }));
 
 export const phasesRelations = relations(phases, ({ one, many }) => ({
@@ -799,6 +820,18 @@ export const propertiesRelations = relations(properties, ({ one, many }) => ({
   phase: one(phases, {
     fields: [properties.phaseId],
     references: [phases.id],
+  }),
+  projectUnits: many(projectUnits),
+}));
+
+export const unitConfigurationsRelations = relations(unitConfigurations, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [unitConfigurations.organizationId],
+    references: [organizations.id],
+  }),
+  project: one(projects, {
+    fields: [unitConfigurations.projectId],
+    references: [projects.id],
   }),
   projectUnits: many(projectUnits),
 }));
@@ -954,6 +987,9 @@ export type NewPhase = typeof phases.$inferInsert;
 
 export type Property = typeof properties.$inferSelect;
 export type NewProperty = typeof properties.$inferInsert;
+
+export type UnitConfiguration = typeof unitConfigurations.$inferSelect;
+export type NewUnitConfiguration = typeof unitConfigurations.$inferInsert;
 
 export type Llc = typeof llcs.$inferSelect;
 export type NewLlc = typeof llcs.$inferInsert;
