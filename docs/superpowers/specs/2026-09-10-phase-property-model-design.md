@@ -159,27 +159,10 @@ appears once in A.5 as its own row at Execution. This is what fixes today's
 double-count, where the $14,596,900 base already contained the $200,000 design fee and
 Signing Deposit billed 20% of it on top of the separate Design Fee row.
 
-### Retainage
+### Default template
 
-Retainage is withheld against the on-site scope only:
-
-```
-onsiteInScope   = serviceModel === 'CMOS' ? phaseOnsite : 0
-retainageAmount = 0.05 × onsiteInScope
-retainagePct    = onsiteInScope > 0 ? (retainageAmount ÷ phaseValue) × 100 : 0
-```
-
-The gate is the **completion model**, not `phaseOnsite`. Units carry an
-`onsiteEstPrice` under CRC too, so testing `phaseOnsite > 0` would wrongly produce a
-retainage row on CRC projects for on-site work Dvele is not performing. With the gate
-on `serviceModel`, CRC yields 0 and the row is omitted entirely — Zaca's contract has
-no retainage row.
-
-### Default templates
-
-Defaults only. Once a user edits, the sole rule is that the phase totals 100%.
-
-**CRC phase** — no on-site scope, so five round milestones:
+One schedule, the same under both completion models. Defaults only — once a user
+edits, the sole rule is that the phase totals 100%.
 
 | Milestone | Trigger | % |
 |---|---|---|
@@ -187,22 +170,31 @@ Defaults only. Once a user edits, the sole rule is that the phase totals 100%.
 | Green Light | Green Light Notice | 20 |
 | Production Start | First module fabrication | 20 |
 | Production Midpoint | Midpoint certification | 20 |
-| Delivery / Set | Delivery and set complete | 20 |
+| Delivery | Delivery and set complete | 15 |
+| Retainage | CO/Equivalent | 5 |
 
-**CMOS phase** — the five production milestones carry weights 20:20:20:20:15 and
-normalize to `100 − retainagePct`, with retainage appended.
+Taken from the payment schedule in the September 2026 Zaca Preserve agreement, which
+is the shape the business already issues. Retainage is a flat 5% of phase value and is
+present under **both** CRC and CMOS — Zaca is a CRC project and carries it.
 
-Worked example (phaseOffsite $12,300,000, phaseOnsite $2,000,000,
-phaseValue $14,300,000): `retainageAmount` = $100,000, `retainagePct` = 0.70%. The
-remaining 99.30% splits 20:20:20:20:15 → 20.91 / 20.91 / 20.91 / 20.91 / 15.66,
-where Delivery absorbs the rounding so the column totals exactly 100.00.
+**This supersedes an earlier decision** that retainage should be withheld against
+on-site scope only (`5% × phaseOnsite ÷ phaseValue`, yielding 0 and no row under CRC).
+The issued contract shows otherwise. The earlier rule also produced a small non-round
+retainage percentage under CMOS — 0.70% in the worked example it carried — which the
+flat 5% avoids.
 
-Percentages display to two decimal places. Amount residuals are applied to the last
-production milestone so amounts sum to `phaseValue` exactly — the same reconciliation
-`pricingEngine.ts:186` already performs.
+The percentages are model-independent; **`phaseValue` is not**, since it includes
+on-site cost only under CMOS. So a CRC and a CMOS phase with identical units bill the
+same percentages against different bases, which is the correct behaviour.
 
-A CMOS phase's retainage percentage will be small and non-round (0.70% above). That is
-a direct consequence of withholding against on-site value rather than phase value.
+Amounts are `phaseValue × percentage`, with the rounding residual applied to the
+Delivery milestone so amounts sum to `phaseValue` exactly — the same reconciliation
+`pricingEngine.ts:186` already performs. Retainage's amount stays exact.
+
+Note the Zaca table's own amounts are 20% of $14,596,900, a figure that **includes**
+the $200,000 design fee. Those percentages are adopted; that base is not. The design
+fee is excluded from the milestone base and billed once on its own Execution row, per
+the section above — otherwise it is collected twice.
 
 ### Partially-attached projects
 
