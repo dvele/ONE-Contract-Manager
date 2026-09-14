@@ -117,7 +117,9 @@ all read `breakdown.*` and `paymentSchedule`; those keys survive as project roll
 calculateProjectPricing(projectId) → {
   phases: [{
     phaseId, phaseNumber, name,
-    properties: [{ propertyCode, units: [...] }],
+    properties: [{ id, propertyCode, address, units: [
+      { id, unitLabel, sourceName, squareFootage, bedrooms, bathrooms, quantity },
+    ] }],
     breakdown: { offsite, shipping, onsite, customizations },
     phaseValue,
     milestones: [{ name, trigger, percentage, amount }],
@@ -139,9 +141,16 @@ phaseShipping       = Σ shippingSetPrice × quantity
 phaseOnsite         = Σ onsiteEstPrice × quantity
 phaseCustomizations = Σ customizationTotal × quantity
 
-phaseValue = phaseOffsite + phaseShipping + phaseCustomizations
+phaseValue = phaseOffsite + phaseShipping
            + (serviceModel === 'CMOS' ? phaseOnsite : 0)
 ```
+
+`phaseCustomizations` is reported in the phase's `breakdown` but is **not** billed in
+`phaseValue`, because the project-level `contractValue` does not bill
+`totalCustomizations` either. Billing it per phase would make the per-phase milestone
+rows sum to more than the project total on the same document. Whether customizations
+should bill at all is an open commercial question; until it is answered, the two sides
+agree by both excluding it.
 
 Summed over the units of the phase's properties. `financials.prelimOnsite`
 (additional site work) is project-level and pro-rates across phases by each phase's
@@ -209,6 +218,18 @@ disagree, and `Σ phaseValue ≠ contractValue` with nothing reconciling them.
 Generation must fail loudly rather than silently produce a contract with inconsistent
 totals. Plan B adds a reconciliation check that refuses to generate when
 `Σ phaseValue ≠ contractValue − designFee`, naming the unattached units in the error.
+
+**The identity and its one exception.** `Σ phaseValue = contractValue − designFee`
+holds under **both** completion models, but only when every unit sits on a property
+that carries a phase. Customizations are excluded from `phaseValue` exactly as they are
+from `contractValue`, and `financials.prelimOnsite` pro-rates across phases, so neither
+is a source of divergence. Units on an unphased property — or on no property at all —
+are the sole exception: they are excluded from every phase while still counting at the
+project level, which is precisely the state this check exists to refuse. The check to
+encode is therefore the bare equality **plus** an enumeration of the unattached and
+unphased units that explain any shortfall; it must not tolerate a difference on the
+grounds that customizations or site work "always differ", because after Plan B they do
+not.
 
 The alternative considered — falling back to the project-level rollup whenever any
 unit is unattached — was rejected because it would quietly emit a contract whose phase
@@ -360,6 +381,12 @@ cleanly:
 Stages 1–3 are invisible in the generated contract. Stage 7 is where the document
 changes, which makes it the right point to regenerate the Zaca contract and diff it
 against the September PDF.
+
+**As built, stages 3 and 4 were reversed.** Plan B landed `unit_configurations` and its
+entry path *before* the pricing engine's `phases[]`, because a configuration changes how
+a unit's offsite price resolves and the per-phase rollup reads that same resolution —
+writing the rollup first would have meant rewriting it one task later. Nothing else
+about this order changed.
 
 ---
 
