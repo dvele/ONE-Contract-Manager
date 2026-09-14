@@ -60,11 +60,16 @@ export async function getProjectWithRelations(projectId: number): Promise<Projec
   }
 
   const unitsWithModels = await pool.query(
-    `SELECT pu.id, pu.project_id, pu.model_id, pu.unit_label, pu.quantity,
+    `SELECT pu.id, pu.project_id, pu.model_id, pu.configuration_id, pu.unit_label, pu.quantity,
             pu.base_price_snapshot, pu.customization_total,
-            hm.id as hm_id, hm.name as hm_name, hm.sq_ft, hm.bedrooms, hm.bathrooms
+            COALESCE(hm.id, uc.id) as source_id,
+            COALESCE(hm.name, uc.name) as source_name,
+            COALESCE(hm.sq_ft, uc.sq_ft) as sq_ft,
+            hm.bedrooms, hm.bathrooms,
+            uc.price_per_sq_ft_low, uc.price_per_sq_ft_high
      FROM project_units pu
      LEFT JOIN home_models hm ON pu.model_id = hm.id
+     LEFT JOIN unit_configurations uc ON pu.configuration_id = uc.id
      WHERE pu.project_id = $1
      ORDER BY pu.id`,
     [projectId]
@@ -77,12 +82,14 @@ export async function getProjectWithRelations(projectId: number): Promise<Projec
     quantity: row.quantity || 1,
     basePriceSnapshot: row.base_price_snapshot || 0,
     onsiteEstimateSnapshot: row.customization_total || 0,
-    homeModel: row.hm_id ? {
-      id: row.hm_id,
-      modelName: row.hm_name || 'Unknown',
+    homeModel: row.source_id ? {
+      id: row.source_id,
+      modelName: row.source_name || 'Unknown',
       squareFootage: row.sq_ft || 0,
       bedrooms: row.bedrooms || 0,
       bathrooms: row.bathrooms || 0,
+      pricePerSqFtLow: row.price_per_sq_ft_low ?? null,
+      pricePerSqFtHigh: row.price_per_sq_ft_high ?? null,
     } : undefined,
   }));
 

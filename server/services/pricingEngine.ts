@@ -50,19 +50,20 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
 
   // STEP 1: Query project_units + home_models to calculate pricing from units
   const unitsResult = await pool.query(
-    `SELECT 
+    `SELECT
       pu.id as unit_id,
       pu.quantity,
       pu.base_price_snapshot,
       pu.customization_total,
+      pu.property_id,
       hm.id as model_id,
-      hm.name as model_name,
-      hm.design_fee,
-      hm.offsite_base_price,
+      COALESCE(hm.name, uc.name) as model_name,
+      COALESCE(hm.offsite_base_price, uc.derived_offsite_price) as offsite_base_price,
       hm.onsite_est_price,
       hm.shipping_set_price
      FROM project_units pu
      LEFT JOIN home_models hm ON pu.model_id = hm.id
+     LEFT JOIN unit_configurations uc ON pu.configuration_id = uc.id
      WHERE pu.project_id = $1`,
     [projectId]
   );
