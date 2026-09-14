@@ -93,16 +93,20 @@ export interface PhaseRollup {
  * percentages to each phase's own value (`buildMilestoneSchedule` above).
  *
  * `phaseValue` excludes the design fee (billed once, project-level) and
- * excludes on-site cost except under CMOS, mirroring `contractValue` in
- * `pricingEngine.ts`.
+ * excludes on-site cost except under CMOS — the same rule `contractValue`
+ * uses. It does not reconcile to `contractValue` exactly: customizations are
+ * added into every `phaseValue` even though the project side never bills
+ * them, and units whose property carries no phase are excluded from every
+ * phase but still counted at the project level.
  */
 export function buildPhaseRollups(
   phaseRows: PhaseRow[],
   propertyRows: PropertyRow[],
   unitRows: UnitRow[],
-  serviceModel: "CRC" | "CMOS"
+  serviceModel: "CRC" | "CMOS",
+  additionalSiteWork = 0
 ): PhaseRollup[] {
-  return phaseRows.map((phase) => {
+  const grouped = phaseRows.map((phase) => {
     const properties = propertyRows.filter((p) => p.phaseId === phase.id);
     const propertyIds = new Set(properties.map((p) => p.id));
     const units = unitRows.filter((u) => u.propertyId !== null && propertyIds.has(u.propertyId));
@@ -119,18 +123,38 @@ export function buildPhaseRollups(
       { offsite: 0, onsite: 0, shipping: 0, customizations: 0 }
     );
 
+    return { phase, properties, breakdown };
+  });
+
+  // additionalSiteWork (project-level, e.g. financials.prelimOnsite) is not
+  // itself attached to any property, so it has no natural home in a phase.
+  // Distribute it in proportion to each phase's share of total on-site cost,
+  // and give the last phase any rounding residual — the same discipline
+  // buildMilestoneSchedule uses for its own residual — so the per-phase
+  // shares always sum to exactly additionalSiteWork.
+  const totalOnsite = grouped.reduce((sum, g) => sum + g.breakdown.onsite, 0);
+  const siteWorkShares = grouped.map((g) =>
+    totalOnsite > 0 ? Math.round((additionalSiteWork * g.breakdown.onsite) / totalOnsite) : 0
+  );
+  if (siteWorkShares.length > 0) {
+    const allocated = siteWorkShares.reduce((sum, s) => sum + s, 0);
+    siteWorkShares[siteWorkShares.length - 1] += additionalSiteWork - allocated;
+  }
+
+  return grouped.map(({ phase, properties, breakdown }, i) => {
+    const onsite = breakdown.onsite + siteWorkShares[i];
     const phaseValue =
       breakdown.offsite +
       breakdown.shipping +
       breakdown.customizations +
-      (serviceModel === "CMOS" ? breakdown.onsite : 0);
+      (serviceModel === "CMOS" ? onsite : 0);
 
     return {
       phaseId: phase.id,
       phaseNumber: phase.phaseNumber,
       name: phase.name,
       properties: properties.map((p) => ({ propertyCode: p.propertyCode })),
-      breakdown,
+      breakdown: { ...breakdown, onsite },
       phaseValue,
       milestones: buildMilestoneSchedule(phaseValue),
     };

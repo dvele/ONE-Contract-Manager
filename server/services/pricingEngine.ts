@@ -33,6 +33,20 @@ export interface PricingSummary {
   phases: PhaseRollup[];
 }
 
+/**
+ * The subset of the raw snake_case `pool.query` units row (below) that feeds
+ * the camelCase `UnitRow` mapping — typed so a renamed or misspelled column
+ * fails `npm run check` instead of silently pricing every phase at zero.
+ */
+interface RawUnitRow {
+  property_id: number | null;
+  quantity: number | null;
+  offsite_base_price: number | null;
+  onsite_est_price: number | null;
+  shipping_set_price: number | null;
+  customization_total: number | null;
+}
+
 export async function calculateProjectPricing(projectId: number): Promise<PricingSummary> {
   const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
   
@@ -77,7 +91,7 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
   // Mapped explicitly to the camelCase UnitRow shape buildPhaseRollups expects —
   // the raw query above returns snake_case, and letting that mismatch pass
   // silently through the `|| 0` guards would price every phase at zero.
-  const unitRows: UnitRow[] = units.map((u: any) => ({
+  const unitRows: UnitRow[] = units.map((u: RawUnitRow) => ({
     propertyId: u.property_id ?? null,
     quantity: u.quantity || 1,
     offsiteBasePrice: u.offsite_base_price || 0,
@@ -206,11 +220,21 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
   const finalSum = paymentSchedule.reduce((sum, m) => sum + m.amount, 0);
   console.log(`[PricingEngine] Payment schedule sum: ${finalSum} (contractValue: ${contractValue}, adjusted: ${discrepancy !== 0})`);
 
-  // Per-phase rollup (additive): a project with no phases yields phases: []
-  // and every field above keeps its existing project-rollup meaning.
-  const phaseRows: PhaseRow[] = await db.select().from(phases).where(eq(phases.projectId, projectId));
-  const propertyRows: PropertyRow[] = await db.select().from(properties).where(eq(properties.projectId, projectId));
-  const phaseRollups = buildPhaseRollups(phaseRows, propertyRows, unitRows, serviceModel);
+  // A project with no phases yields phases: [] and every field above keeps
+  // its existing project-rollup meaning.
+  const phaseRows: PhaseRow[] = await db
+    .select()
+    .from(phases)
+    .where(eq(phases.projectId, projectId))
+    .orderBy(phases.phaseNumber);
+  const propertyRows: PropertyRow[] = phaseRows.length > 0
+    ? await db
+        .select()
+        .from(properties)
+        .where(eq(properties.projectId, projectId))
+        .orderBy(properties.propertyCode)
+    : [];
+  const phaseRollups = buildPhaseRollups(phaseRows, propertyRows, unitRows, serviceModel, additionalSiteWork);
 
   return {
     breakdown: {
