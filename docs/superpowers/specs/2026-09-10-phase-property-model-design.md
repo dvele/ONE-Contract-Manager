@@ -141,16 +141,16 @@ phaseShipping       = Σ shippingSetPrice × quantity
 phaseOnsite         = Σ onsiteEstPrice × quantity
 phaseCustomizations = Σ customizationTotal × quantity
 
-phaseValue = phaseOffsite + phaseShipping
+phaseValue = phaseOffsite + phaseCustomizations + phaseShipping
            + (serviceModel === 'CMOS' ? phaseOnsite : 0)
 ```
 
-`phaseCustomizations` is reported in the phase's `breakdown` but is **not** billed in
-`phaseValue`, because the project-level `contractValue` does not bill
-`totalCustomizations` either. Billing it per phase would make the per-phase milestone
-rows sum to more than the project total on the same document. Whether customizations
-should bill at all is an open commercial question; until it is answered, the two sides
-agree by both excluding it.
+`phaseCustomizations` is billed in `phaseValue` and is also reported separately in the
+phase's `breakdown`. It is billed because every display path that renders a unit table
+already added `customization_total` to the Unit Price the client signs against — the
+document has been charging for customizations all along — and the project-level
+`contractValue` now bills `totalCustomizations` to match. Customizations are a property
+of the unit, not of the on-site scope, so they are billed under both completion models.
 
 Summed over the units of the phase's properties. `financials.prelimOnsite`
 (additional site work) is project-level and pro-rates across phases by each phase's
@@ -221,8 +221,8 @@ totals. Plan B adds a reconciliation check that refuses to generate when
 
 **The identity and its one exception.** `Σ phaseValue = contractValue − designFee`
 holds under **both** completion models, but only when every unit sits on a property
-that carries a phase. Customizations are excluded from `phaseValue` exactly as they are
-from `contractValue`, and `financials.prelimOnsite` pro-rates across phases, so neither
+that carries a phase. Customizations are billed in `phaseValue` exactly as they are in
+`contractValue`, and `financials.prelimOnsite` pro-rates across phases, so neither
 is a source of divergence. Units on an unphased property — or on no property at all —
 are the sole exception: they are excluded from every phase while still counting at the
 project level, which is precisely the state this check exists to refuse. The check to

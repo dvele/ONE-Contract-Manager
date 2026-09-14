@@ -24,7 +24,7 @@ export interface PricingBreakdown {
 export interface PricingSummary {
   breakdown: PricingBreakdown;
   grandTotal: number;
-  projectBudget: number;      // Full cost: design + offsite + onsite (always)
+  projectBudget: number;      // Full cost: design + offsite + customizations + shipping + onsite (always)
   contractValue: number;      // What Dvele charges: CRC excludes onsite, CMOS includes all
   serviceModel: 'CRC' | 'CMOS';
   paymentSchedule: PaymentScheduleItem[];
@@ -176,15 +176,18 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
     console.log(`[PricingEngine] Project ${projectId}: No units found, using financials fallback - designFee=${totalDesignFee}, offsite=${totalOffsite}, onsite=${totalOnsite}`);
   }
 
-  // projectBudget = full cost of the project (design + offsite + shipping + onsite)
-  const projectBudget = totalDesignFee + totalOffsite + totalShipping + totalOnsite;
-  
+  // projectBudget = full cost of the project (design + offsite + customizations + shipping + onsite)
+  const projectBudget = totalDesignFee + totalOffsite + totalCustomizations + totalShipping + totalOnsite;
+
   // contractValue = what Dvele charges the client
   // CRC: excludes onsite (client handles their own GC)
   // CMOS: includes everything (Dvele manages onsite)
-  const contractValue = serviceModel === 'CRC' 
-    ? totalDesignFee + totalOffsite + totalShipping
-    : totalDesignFee + totalOffsite + totalShipping + totalOnsite;
+  // Customizations are a property of the unit, not of the on-site scope, so they
+  // are billed under both models — every unit-table path already adds
+  // customization_total to the Unit Price column the client signs against.
+  const contractValue = serviceModel === 'CRC'
+    ? totalDesignFee + totalOffsite + totalCustomizations + totalShipping
+    : totalDesignFee + totalOffsite + totalCustomizations + totalShipping + totalOnsite;
   
   // grandTotal kept for backwards compatibility
   const grandTotal = projectBudget;

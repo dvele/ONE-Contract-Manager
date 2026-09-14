@@ -137,10 +137,10 @@ describe("buildPhaseRollups", () => {
     expect(siteWorkShares[2]).not.toBe(siteWorkShares[0]); // the residual landed somewhere
   });
 
-  it("keeps customizations out of phase value while still reporting them", () => {
-    // The project side leaves customizations out of `contractValue`; billing
-    // them per phase would make the milestone rows exceed the project total on
-    // the same document.
+  it("bills customizations in phase value while still reporting them separately", () => {
+    // Every unit-table path adds customization_total to the Unit Price column,
+    // and the project side bills it in `contractValue`; a phase that left it
+    // out would bill less than the same document's unit table charges.
     const withCustomizations = [
       unit({ id: 400, propertyId: 10, offsiteBasePrice: 600_000_00, onsiteEstPrice: 100_000_00, customizationTotal: 75_000_00 }),
       unit({ id: 401, propertyId: 11, offsiteBasePrice: 400_000_00, onsiteEstPrice: 100_000_00, customizationTotal: 25_000_00 }),
@@ -148,33 +148,38 @@ describe("buildPhaseRollups", () => {
     const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, withCustomizations, "CRC");
 
     expect(phase1.breakdown.customizations).toBe(100_000_00);
-    expect(phase1.phaseValue).toBe(1_000_000_00);
-    expect(phase1.milestones.find((m) => m.name === "Retainage")?.amount).toBe(50_000_00);
+    expect(phase1.phaseValue).toBe(1_100_000_00);
+    expect(phase1.milestones.find((m) => m.name === "Retainage")?.amount).toBe(55_000_00);
   });
 
-  it("multiplies customizations by quantity in the breakdown without billing them", () => {
+  it("multiplies customizations by quantity before billing them", () => {
     const legacyQuantityUnit = [
       unit({ id: 500, propertyId: 10, quantity: 3, offsiteBasePrice: 100_000_00, customizationTotal: 10_000_00 }),
     ];
     const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, legacyQuantityUnit, "CRC");
 
     expect(phase1.breakdown.customizations).toBe(30_000_00);
-    expect(phase1.phaseValue).toBe(300_000_00);
+    expect(phase1.phaseValue).toBe(330_000_00);
   });
 
   it("reconciles to contractValue minus the design fee when every property is phased", () => {
-    // contractValue under CRC is designFee + offsite + shipping; under CMOS it
-    // also carries on-site, including the project-level additional site work.
+    // contractValue under CRC is designFee + offsite + customizations +
+    // shipping; under CMOS it also carries on-site, including the
+    // project-level additional site work.
     const additionalSiteWork = 300_000_00;
     const offsite = 1_500_000_00;
     const shipping = 0;
     const onsite = 300_000_00 + additionalSiteWork;
+    const customizations = 150_000_00;
+    const customized = UNITS.map((u, i) =>
+      unit({ ...u, customizationTotal: [75_000_00, 25_000_00, 50_000_00][i] })
+    );
 
-    const crc = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC", additionalSiteWork);
-    expect(crc.reduce((s, p) => s + p.phaseValue, 0)).toBe(offsite + shipping);
+    const crc = buildPhaseRollups(PHASES, PROPERTIES, customized, "CRC", additionalSiteWork);
+    expect(crc.reduce((s, p) => s + p.phaseValue, 0)).toBe(offsite + customizations + shipping);
 
-    const cmos = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CMOS", additionalSiteWork);
-    expect(cmos.reduce((s, p) => s + p.phaseValue, 0)).toBe(offsite + shipping + onsite);
+    const cmos = buildPhaseRollups(PHASES, PROPERTIES, customized, "CMOS", additionalSiteWork);
+    expect(cmos.reduce((s, p) => s + p.phaseValue, 0)).toBe(offsite + customizations + shipping + onsite);
   });
 
   it("carries the property address and per-unit detail Exhibits A.2 and B.1 render", () => {

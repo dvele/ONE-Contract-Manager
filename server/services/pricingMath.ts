@@ -120,9 +120,9 @@ export interface PhaseRollup {
  * percentages to each phase's own value (`buildMilestoneSchedule` above).
  *
  * `phaseValue` matches what `contractValue` bills, minus the project-level
- * design fee: it excludes customizations, which the project side leaves out of
- * `contractValue` too, and excludes on-site cost except under CMOS. Additional
- * site work is pro-rated across phases below, so it carries through as well.
+ * design fee: it carries customizations, which the project side bills too, and
+ * excludes on-site cost except under CMOS. Additional site work is pro-rated
+ * across phases below, so it carries through as well.
  *
  * `Σ phaseValue = contractValue − designFee` therefore holds under both
  * completion models — except for units whose property carries no phase (or
@@ -130,10 +130,8 @@ export interface PhaseRollup {
  * the project level. That is the only remaining source of divergence, and it
  * is what Plan D's reconciliation check has to refuse generation over.
  *
- * Customizations stay in `breakdown` so the figure remains visible; whether
- * they should bill at all is an unanswered commercial question, and answering
- * it here would make the per-phase milestone rows sum to more than the project
- * total on the same document.
+ * Customizations also stay broken out in `breakdown` so the figure remains
+ * visible on its own.
  */
 export function buildPhaseRollups(
   phaseRows: PhaseRow[],
@@ -198,6 +196,7 @@ export function buildPhaseRollups(
     const onsite = breakdown.onsite + siteWorkShares[i];
     const phaseValue =
       breakdown.offsite +
+      breakdown.customizations +
       breakdown.shipping +
       (serviceModel === "CMOS" ? onsite : 0);
 
