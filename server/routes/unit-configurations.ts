@@ -18,6 +18,8 @@ const router = Router();
 
 router.use(requireAuth);
 
+const MAX_DERIVED_OFFSITE_PRICE = 2_147_483_647; // Postgres integer ceiling
+
 const ConfigurationInputSchema = z
   .object({
     name: z.string().trim().min(1).max(120),
@@ -27,11 +29,15 @@ const ConfigurationInputSchema = z
   })
   .refine((c) => c.pricePerSqFtHigh >= c.pricePerSqFtLow, {
     message: "pricePerSqFtHigh must be greater than or equal to pricePerSqFtLow",
+  })
+  .refine((c) => c.sqFt * c.pricePerSqFtHigh <= MAX_DERIVED_OFFSITE_PRICE, {
+    message: "Square footage times the high price per square foot exceeds the maximum storable price",
   });
 
 function parseId(raw: string | string[]): number | null {
   const value = Array.isArray(raw) ? raw[0] : raw;
-  return /^[1-9]\d*$/.test(value) ? parseInt(value, 10) : null;
+  if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) return null;
+  return parseInt(value, 10);
 }
 
 function derivePrice(sqFt: number, pricePerSqFtHigh: number): number {
