@@ -414,6 +414,16 @@ Recorded because they were not explicitly confirmed:
 3. A property must be assigned to a phase before a contract can be generated, but may
    exist unassigned while the wizard is being filled in.
 
+## Open items register
+
+[`docs/phase-property-model-open-items.md`](../../phase-property-model-open-items.md)
+carries the decisions made during implementation with their reasoning, the defects Plan
+E must fix in the exhibit generators before wiring them up, the latent issues that have
+no live data path, and the facts a future session needs (the `tsc` baseline, the
+hermetic test command, what has never been exercised). **Read it before writing Plan C,
+D or E.** It exists because the execution ledgers are git-ignored and everything in it
+would otherwise be re-derived from scratch.
+
 ## Known Gaps
 
 - `web-design-guidelines` is now installed locally at
