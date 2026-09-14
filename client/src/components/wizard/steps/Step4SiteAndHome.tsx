@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Home, Plus, Trash2, AlertTriangle, Package } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { PropertyPhaseEditor } from '../PropertyPhaseEditor';
+import { UnitAttachmentEditor } from '../UnitAttachmentEditor';
 
 interface HomeModel {
   id: number;
@@ -24,15 +25,23 @@ interface HomeModel {
   onsiteEstPrice: number;
 }
 
+interface UnitConfiguration {
+  id: number;
+  name: string;
+  sqFt: number;
+}
+
 interface ProjectUnit {
   id: number;
   projectId: number;
-  modelId: number;
+  modelId: number | null;
   unitLabel: string;
   quantity: number;
   basePriceSnapshot: number;
   customizationTotal: number;
-  model: HomeModel;
+  // Null on units priced from a configuration rather than the catalog.
+  model: HomeModel | null;
+  configuration: UnitConfiguration | null;
 }
 
 export const Step4SiteAndHome: React.FC = () => {
@@ -122,6 +131,10 @@ export const Step4SiteAndHome: React.FC = () => {
     deleteUnitMutation.mutate(unitId);
   };
 
+  // A configuration-priced unit has no catalog model, so it carries no onsite
+  // estimate: the catalog is the only source of one.
+  const onsiteEstimate = (unit: ProjectUnit) => unit.model?.onsiteEstPrice ?? 0;
+
   const handleQuantityChange = (unitId: number, value: string) => {
     const qty = parseInt(value);
     if (!isNaN(qty) && qty >= 1 && qty <= 999) {
@@ -132,6 +145,7 @@ export const Step4SiteAndHome: React.FC = () => {
   return (
     <div className="space-y-6">
       {draftProjectId && <PropertyPhaseEditor projectId={draftProjectId} />}
+      {draftProjectId && <UnitAttachmentEditor projectId={draftProjectId} />}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -200,11 +214,17 @@ export const Step4SiteAndHome: React.FC = () => {
                           <div className="flex items-center gap-2">
                             <Package className="h-4 w-4 text-primary" />
                             <CardTitle className="text-base">
-                              {unit.unitLabel}: {unit.model.name}
+                              {unit.unitLabel}: {unit.model?.name ?? unit.configuration?.name ?? 'Unassigned'}
                             </CardTitle>
-                            <Badge variant="outline" className="text-xs">
-                              {unit.model.bedrooms}BR / {unit.model.bathrooms}BA / {unit.model.sqFt.toLocaleString()} sqft
-                            </Badge>
+                            {unit.model ? (
+                              <Badge variant="outline" className="text-xs">
+                                {unit.model.bedrooms}BR / {unit.model.bathrooms}BA / {unit.model.sqFt.toLocaleString()} sqft
+                              </Badge>
+                            ) : unit.configuration ? (
+                              <Badge variant="outline" className="text-xs">
+                                Configuration / {unit.configuration.sqFt.toLocaleString()} sqft
+                              </Badge>
+                            ) : null}
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1">
@@ -239,13 +259,13 @@ export const Step4SiteAndHome: React.FC = () => {
                             </div>
                             <div className="flex justify-between gap-8">
                               <span className="text-muted-foreground">Unit Price (Est. Onsite):</span>
-                              <span className="font-mono text-muted-foreground">{formatCurrency(unit.model.onsiteEstPrice)}</span>
+                              <span className="font-mono text-muted-foreground">{formatCurrency(onsiteEstimate(unit))}</span>
                             </div>
                             {(unit.quantity || 1) > 1 && (
                               <div className="flex justify-between gap-8 pt-1 border-t">
                                 <span className="text-muted-foreground font-medium">x{unit.quantity} Subtotal:</span>
                                 <span className="font-mono font-medium">
-                                  {formatCurrency((unit.basePriceSnapshot + unit.model.onsiteEstPrice) * (unit.quantity || 1))}
+                                  {formatCurrency((unit.basePriceSnapshot + onsiteEstimate(unit)) * (unit.quantity || 1))}
                                 </span>
                               </div>
                             )}
@@ -255,7 +275,7 @@ export const Step4SiteAndHome: React.FC = () => {
                               {(unit.quantity || 1) > 1 ? `Total (x${unit.quantity})` : 'Total Unit Value'}
                             </span>
                             <span className="font-mono font-semibold text-primary" data-testid={`text-unit-total-${unit.id}`}>
-                              {formatCurrency((unit.basePriceSnapshot + unit.model.onsiteEstPrice) * (unit.quantity || 1))}
+                              {formatCurrency((unit.basePriceSnapshot + onsiteEstimate(unit)) * (unit.quantity || 1))}
                             </span>
                           </div>
                         </div>
@@ -279,10 +299,10 @@ export const Step4SiteAndHome: React.FC = () => {
                       Offsite (Manufacturing): {formatCurrency(projectUnits.reduce((sum, u) => sum + u.basePriceSnapshot * (u.quantity || 1), 0))}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Est. Onsite: {formatCurrency(projectUnits.reduce((sum, u) => sum + u.model.onsiteEstPrice * (u.quantity || 1), 0))}
+                      Est. Onsite: {formatCurrency(projectUnits.reduce((sum, u) => sum + onsiteEstimate(u) * (u.quantity || 1), 0))}
                     </div>
                     <div className="text-lg font-semibold text-primary" data-testid="text-grand-total">
-                      Grand Total: {formatCurrency(projectUnits.reduce((sum, u) => sum + (u.basePriceSnapshot + u.model.onsiteEstPrice) * (u.quantity || 1), 0))}
+                      Grand Total: {formatCurrency(projectUnits.reduce((sum, u) => sum + (u.basePriceSnapshot + onsiteEstimate(u)) * (u.quantity || 1), 0))}
                     </div>
                   </div>
                 )}
