@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPhaseRollups } from "../pricingEngine";
+import { buildPhaseRollups } from "../pricingMath";
 
 const PHASES = [
   { id: 1, phaseNumber: 1, name: "Phase 1" },
