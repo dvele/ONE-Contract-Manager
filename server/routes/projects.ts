@@ -635,8 +635,8 @@ router.post('/projects/:projectId/units', async (req, res) => {
 
     if (modelId != null) {
       const modelResult = await pool.query(
-        `SELECT * FROM home_models WHERE id = $1`,
-        [modelId]
+        `SELECT * FROM home_models WHERE id = $1 AND organization_id = $2`,
+        [modelId, req.organizationId]
       );
       if (modelResult.rows.length === 0) {
         return res.status(404).json({ error: "Home model not found" });
