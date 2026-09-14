@@ -48,7 +48,6 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
   // Additional site work (stored in financials.prelimOnsite)
   const additionalSiteWork = financial?.prelimOnsite || 0;
 
-  // STEP 1: Query project_units + home_models to calculate pricing from units
   const unitsResult = await pool.query(
     `SELECT
       pu.id as unit_id,

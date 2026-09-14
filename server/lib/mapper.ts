@@ -52,7 +52,7 @@ export interface ChildLlc {
 export interface ProjectUnit {
   id: number;
   projectId: number;
-  homeModelId: number;
+  homeModelId: number | null;
   unitLabel: string;
   quantity: number;
   basePriceSnapshot: number;
@@ -63,6 +63,8 @@ export interface ProjectUnit {
     squareFootage?: number;
     bedrooms?: number;
     bathrooms?: number;
+    pricePerSqFtLow: number | null;
+    pricePerSqFtHigh: number | null;
   };
 }
 
