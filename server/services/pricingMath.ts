@@ -62,10 +62,18 @@ export interface PropertyRow {
   id: number;
   phaseId: number | null;
   propertyCode: string;
+  address: string | null;
 }
 
 export interface UnitRow {
+  id: number;
   propertyId: number | null;
+  unitLabel: string | null;
+  /** The catalog model's name, or the configuration's, whichever priced the unit. */
+  sourceName: string | null;
+  squareFootage: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
   quantity: number;
   offsiteBasePrice: number;
   onsiteEstPrice: number;
@@ -73,11 +81,30 @@ export interface UnitRow {
   customizationTotal: number;
 }
 
+/** One unit as it appears under its property in a rollup: Exhibit B.1's row. */
+export interface RollupUnit {
+  id: number;
+  unitLabel: string | null;
+  sourceName: string | null;
+  squareFootage: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  quantity: number;
+}
+
+/** One property as it appears under its phase: Exhibit A.2's row. */
+export interface RollupProperty {
+  id: number;
+  propertyCode: string;
+  address: string | null;
+  units: RollupUnit[];
+}
+
 export interface PhaseRollup {
   phaseId: number;
   phaseNumber: number;
   name: string | null;
-  properties: { propertyCode: string }[];
+  properties: RollupProperty[];
   breakdown: {
     offsite: number;
     onsite: number;
@@ -92,12 +119,21 @@ export interface PhaseRollup {
  * Rolls units up to their property's phase, applying the same milestone
  * percentages to each phase's own value (`buildMilestoneSchedule` above).
  *
- * `phaseValue` excludes the design fee (billed once, project-level) and
- * excludes on-site cost except under CMOS — the same rule `contractValue`
- * uses. It does not reconcile to `contractValue` exactly: customizations are
- * added into every `phaseValue` even though the project side never bills
- * them, and units whose property carries no phase are excluded from every
- * phase but still counted at the project level.
+ * `phaseValue` matches what `contractValue` bills, minus the project-level
+ * design fee: it excludes customizations, which the project side leaves out of
+ * `contractValue` too, and excludes on-site cost except under CMOS. Additional
+ * site work is pro-rated across phases below, so it carries through as well.
+ *
+ * `Σ phaseValue = contractValue − designFee` therefore holds under both
+ * completion models — except for units whose property carries no phase (or
+ * none at all), which are excluded from every phase while still counting at
+ * the project level. That is the only remaining source of divergence, and it
+ * is what Plan D's reconciliation check has to refuse generation over.
+ *
+ * Customizations stay in `breakdown` so the figure remains visible; whether
+ * they should bill at all is an unanswered commercial question, and answering
+ * it here would make the per-phase milestone rows sum to more than the project
+ * total on the same document.
  */
 export function buildPhaseRollups(
   phaseRows: PhaseRow[],
@@ -107,9 +143,26 @@ export function buildPhaseRollups(
   additionalSiteWork = 0
 ): PhaseRollup[] {
   const grouped = phaseRows.map((phase) => {
-    const properties = propertyRows.filter((p) => p.phaseId === phase.id);
-    const propertyIds = new Set(properties.map((p) => p.id));
+    const phaseProperties = propertyRows.filter((p) => p.phaseId === phase.id);
+    const propertyIds = new Set(phaseProperties.map((p) => p.id));
     const units = unitRows.filter((u) => u.propertyId !== null && propertyIds.has(u.propertyId));
+
+    const properties: RollupProperty[] = phaseProperties.map((p) => ({
+      id: p.id,
+      propertyCode: p.propertyCode,
+      address: p.address,
+      units: units
+        .filter((u) => u.propertyId === p.id)
+        .map((u) => ({
+          id: u.id,
+          unitLabel: u.unitLabel,
+          sourceName: u.sourceName,
+          squareFootage: u.squareFootage,
+          bedrooms: u.bedrooms,
+          bathrooms: u.bathrooms,
+          quantity: u.quantity,
+        })),
+    }));
 
     const breakdown = units.reduce(
       (acc, u) => {
@@ -146,14 +199,13 @@ export function buildPhaseRollups(
     const phaseValue =
       breakdown.offsite +
       breakdown.shipping +
-      breakdown.customizations +
       (serviceModel === "CMOS" ? onsite : 0);
 
     return {
       phaseId: phase.id,
       phaseNumber: phase.phaseNumber,
       name: phase.name,
-      properties: properties.map((p) => ({ propertyCode: p.propertyCode })),
+      properties,
       breakdown: { ...breakdown, onsite },
       phaseValue,
       milestones: buildMilestoneSchedule(phaseValue),

@@ -1,10 +1,10 @@
 import { db } from "../db/index";
 import { pool } from "../db";
 import { projects, projectDetails, financials, milestones, phases, properties } from "../../shared/schema";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { buildPhaseRollups, type PhaseRow, type PropertyRow, type UnitRow, type PhaseRollup } from "./pricingMath";
 
-export type { PhaseRollup } from "./pricingMath";
+export type { PhaseRollup, RollupProperty, RollupUnit } from "./pricingMath";
 
 export interface PaymentScheduleItem {
   name: string;
@@ -35,11 +35,20 @@ export interface PricingSummary {
 
 /**
  * The subset of the raw snake_case `pool.query` units row (below) that feeds
- * the camelCase `UnitRow` mapping — typed so a renamed or misspelled column
- * fails `npm run check` instead of silently pricing every phase at zero.
+ * the camelCase `UnitRow` mapping.
+ *
+ * `pool.query` returns `any[]`, so this annotation constrains only the mapping
+ * expression, not the SQL: renaming a column in the query still compiles and
+ * still prices every phase at zero. Verifying the two agree is a runtime job.
  */
 interface RawUnitRow {
+  unit_id: number;
   property_id: number | null;
+  unit_label: string | null;
+  model_name: string | null;
+  sq_ft: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
   quantity: number | null;
   offsite_base_price: number | null;
   onsite_est_price: number | null;
@@ -73,15 +82,20 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
       pu.base_price_snapshot,
       pu.customization_total,
       pu.property_id,
+      pu.unit_label,
       hm.id as model_id,
       COALESCE(hm.name, uc.name) as model_name,
+      COALESCE(hm.sq_ft, uc.sq_ft) as sq_ft,
+      hm.bedrooms,
+      hm.bathrooms,
       COALESCE(hm.offsite_base_price, uc.derived_offsite_price) as offsite_base_price,
       hm.onsite_est_price,
       hm.shipping_set_price
      FROM project_units pu
      LEFT JOIN home_models hm ON pu.model_id = hm.id
      LEFT JOIN unit_configurations uc ON pu.configuration_id = uc.id
-     WHERE pu.project_id = $1`,
+     WHERE pu.project_id = $1
+     ORDER BY pu.id`,
     [projectId]
   );
 
@@ -92,7 +106,13 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
   // the raw query above returns snake_case, and letting that mismatch pass
   // silently through the `|| 0` guards would price every phase at zero.
   const unitRows: UnitRow[] = units.map((u: RawUnitRow) => ({
+    id: u.unit_id,
     propertyId: u.property_id ?? null,
+    unitLabel: u.unit_label ?? null,
+    sourceName: u.model_name ?? null,
+    squareFootage: u.sq_ft ?? null,
+    bedrooms: u.bedrooms ?? null,
+    bathrooms: u.bathrooms ?? null,
     quantity: u.quantity || 1,
     offsiteBasePrice: u.offsite_base_price || 0,
     onsiteEstPrice: u.onsite_est_price || 0,
@@ -232,7 +252,7 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
         .select()
         .from(properties)
         .where(eq(properties.projectId, projectId))
-        .orderBy(properties.propertyCode)
+        .orderBy(asc(properties.id))
     : [];
   const phaseRollups = buildPhaseRollups(phaseRows, propertyRows, unitRows, serviceModel, additionalSiteWork);
 
