@@ -127,9 +127,9 @@ export const unitConfigurations = pgTable("unit_configurations", {
     .notNull(),
   name: text("name").notNull(),
   sqFt: integer("sq_ft").notNull(),
-  pricePerSqFtLow: integer("price_per_sq_ft_low").notNull(),
-  pricePerSqFtHigh: integer("price_per_sq_ft_high").notNull(),
-  derivedOffsitePrice: integer("derived_offsite_price").notNull(),
+  pricePerSqFtLow: integer("price_per_sq_ft_low").notNull(), // cents per sq ft
+  pricePerSqFtHigh: integer("price_per_sq_ft_high").notNull(), // cents per sq ft
+  derivedOffsitePrice: integer("derived_offsite_price").notNull(), // cents; sqFt * pricePerSqFtHigh
   createdAt: timestamp("created_at").defaultNow(),
 });
 

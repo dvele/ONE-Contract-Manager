@@ -16,6 +16,7 @@ import adminImportRouter from "./admin-import";
 import componentsRouter from "./components";
 import variableMappingsRouter from "./variable-mappings";
 import odooRouter from "./odoo";
+import unitConfigurationsRouter from "./unit-configurations";
 
 const router = Router();
 
@@ -37,5 +38,6 @@ router.use(adminImportRouter);
 router.use(componentsRouter);
 router.use(variableMappingsRouter);
 router.use(odooRouter);
+router.use(unitConfigurationsRouter);
 
 export default router;
