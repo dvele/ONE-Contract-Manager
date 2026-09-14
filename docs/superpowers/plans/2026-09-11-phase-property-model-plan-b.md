@@ -25,7 +25,7 @@ The spec orders this work as stage 3 (per-phase pricing) then stage 4 (configura
 - **Every table carries `organizationId`**, every query filters on `req.organizationId`, and a client-supplied foreign key is verified to belong to the caller's organization *and* project before use. Plan A's `propertyAccessible` / `phaseAccessible` helpers are the shape to follow.
 - **ESM only.** Shadcn UI primitives only on the client; no new UI libraries.
 - **Plan mode is mandatory for schema changes** (`CLAUDE.md`). Task 2 edits `shared/schema.ts`.
-- **`npm run check` (bare `tsc`) must stay at 13 pre-existing errors.** Check with `npm run check 2>&1 | grep -c "error TS"`. From Task 1 onward `npm test` must also pass with pristine output.
+- **`npm run check` (bare `tsc`) must stay at 12 pre-existing errors.** Check with `npm run check 2>&1 | grep -c "error TS"`. The baseline was 13 until the dead `server/services/variable-mapper.ts` was deleted, which removed one of them — 12 is the current floor, not a regression. From Task 1 onward `npm test` must also pass with pristine output.
 - **Commit messages carry no AI attribution.** No `Co-Authored-By`, no mention of Claude, Claude Code or Anthropic (`CLAUDE.md`, and a plugin hook blocks the common forms). Imperative-mood subjects.
 - **Comment policy:** a comment is allowed only for a suppression with its reason, an external fact, a deviation where the obvious version breaks, a measurement with provenance, or `TODO: <ticket> - <what>`.
 
@@ -224,7 +224,7 @@ Expected: all tests pass, output pristine — no warnings, no stray logging. Rec
 npm run check 2>&1 | grep -c "error TS"
 ```
 
-Expected: `13`.
+Expected: `12`.
 
 - [ ] **Step 8: Commit**
 
@@ -316,7 +316,7 @@ export type NewUnitConfiguration = typeof unitConfigurations.$inferInsert;
 - [ ] **Step 5: Verify and push**
 
 ```bash
-npm run check 2>&1 | grep -c "error TS"   # expect 13
+npm run check 2>&1 | grep -c "error TS"   # expect 12
 npm test                                   # expect Task 1's tests still passing
 npm run db:push
 psql -d dvele -c "\d unit_configurations" -c "\d project_units"
@@ -535,7 +535,7 @@ router.use(unitConfigurationsRouter);
 - [ ] **Step 3: Verify**
 
 ```bash
-npm run check 2>&1 | grep -c "error TS"   # expect 13
+npm run check 2>&1 | grep -c "error TS"   # expect 12
 npm test                                   # expect passing
 ```
 
@@ -636,7 +636,7 @@ The two price-per-foot fields are null for a catalog model and populated for a c
 - [ ] **Step 3: Verify**
 
 ```bash
-npm run check 2>&1 | grep -c "error TS"   # expect 13
+npm run check 2>&1 | grep -c "error TS"   # expect 12
 npm test                                   # expect passing
 ```
 
@@ -813,7 +813,7 @@ A project with no phases gets `phases: []` and every existing field keeps its cu
 - [ ] **Step 6: Verify**
 
 ```bash
-npm run check 2>&1 | grep -c "error TS"   # expect 13
+npm run check 2>&1 | grep -c "error TS"   # expect 12
 npm test
 ```
 
@@ -864,7 +864,7 @@ In `Step4SiteAndHome.tsx`, render `<UnitAttachmentEditor projectId={draftProject
 - [ ] **Step 4: Verify**
 
 ```bash
-npm run check 2>&1 | grep -c "error TS"   # expect 13
+npm run check 2>&1 | grep -c "error TS"   # expect 12
 npm test
 ```
 
@@ -900,7 +900,7 @@ Behind `DeleteConfirmDialog`, matching the property delete Plan A added. The con
 - [ ] **Step 3: Verify**
 
 ```bash
-npm run check 2>&1 | grep -c "error TS"   # expect 13
+npm run check 2>&1 | grep -c "error TS"   # expect 12
 npm test
 ```
 

@@ -435,5 +435,5 @@ Recorded because they were not explicitly confirmed:
 - Per-phase completion models. `Completion Model` is a single project-level election
   (Exhibit A.1).
 - Backfilling phases onto historical projects.
-- The 13 pre-existing `tsc` errors in the repository. They are unrelated to this work
+- The 12 pre-existing `tsc` errors in the repository — 13 when this spec was written, one fewer since the dead `server/services/variable-mapper.ts` was deleted. They are unrelated to this work
   and this spec does not change their count.

@@ -19,7 +19,7 @@
 - **Route-level errors are `res.status(4xx).json({ error: "message" })`.** Do not use `{ message }` in a route file.
 - **ESM only.** `import`/`export`; never `require()`.
 - **Every table carries `organizationId`** and every query filters on `req.organizationId`.
-- **The gate is `npm run check` (bare `tsc`). There is no test suite.** The repo currently has **13 pre-existing errors** — that count must not increase. `grep -c "error TS"` is the check.
+- **The gate is `npm run check` (bare `tsc`). There is no test suite.** The repo currently has **12 pre-existing errors** — down from 13 because the dead `server/services/variable-mapper.ts` carried one and has since been deleted — and that count must not increase. `grep -c "error TS"` is the check.
 - **Commit messages carry no AI attribution.** `CLAUDE.md` forbids `Co-Authored-By` trailers and any mention of Claude, Claude Code or Anthropic in git history. This conflicts with the session's default attribution instruction; the repo's own rule wins. Commit messages below follow `CLAUDE.md`.
 - **Use Drizzle for new route files**, following `server/routes/financials.ts`. Do **not** copy the raw `pg.Pool` + hand-aliased SQL style of `server/routes/project-units.ts`; that file predates the Drizzle convention and its column aliasing is a recurring source of drift.
 
@@ -196,7 +196,7 @@ export type NewProperty = typeof properties.$inferInsert;
 npm run check 2>&1 | grep -c "error TS"
 ```
 
-Expected: `13`. Any higher number is a regression introduced by this task.
+Expected: `12`. Any higher number is a regression introduced by this task.
 
 - [ ] **Step 7: Push the schema**
 
@@ -403,7 +403,7 @@ router.use(phasesRouter);
 npm run check 2>&1 | grep -c "error TS"
 ```
 
-Expected: `13`.
+Expected: `12`.
 
 - [ ] **Step 4: Verify by hand**
 
@@ -623,7 +623,7 @@ router.use(propertiesRouter);
 npm run check 2>&1 | grep -c "error TS"
 ```
 
-Expected: `13`.
+Expected: `12`.
 
 - [ ] **Step 4: Verify by hand**
 
@@ -782,7 +782,7 @@ router.patch("/project-units/:id", async (req: Request, res: Response) => {
 npm run check 2>&1 | grep -c "error TS"
 ```
 
-Expected: `13`.
+Expected: `12`.
 
 - [ ] **Step 6: Verify by hand**
 
@@ -1021,7 +1021,7 @@ The optional fields save on blur rather than on every keystroke, so a `PATCH` fi
 npm run check 2>&1 | grep -c "error TS"
 ```
 
-Expected: `13`.
+Expected: `12`.
 
 - [ ] **Step 3: Commit**
 
@@ -1063,7 +1063,7 @@ It goes first because properties and phases are the structure that units attach 
 npm run check 2>&1 | grep -c "error TS"
 ```
 
-Expected: `13`.
+Expected: `12`.
 
 - [ ] **Step 3: Verify Zaca end to end**
 
