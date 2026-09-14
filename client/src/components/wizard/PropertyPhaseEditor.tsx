@@ -29,6 +29,7 @@ export const PropertyPhaseEditor: React.FC<{ projectId: number }> = ({ projectId
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState<number | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Property | null>(null);
+  const [deletePhaseTarget, setDeletePhaseTarget] = useState<Phase | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const phasesKey = ["/api/projects", projectId, "phases"];
@@ -49,6 +50,25 @@ export const PropertyPhaseEditor: React.FC<{ projectId: number }> = ({ projectId
       setErrorMessage(null);
     },
     onError: () => setErrorMessage("Could not add the phase. Try again."),
+  });
+
+  const patchPhase = useMutation({
+    mutationFn: ({ phaseId, name }: { phaseId: number; name: string }) =>
+      apiRequest("PATCH", `/api/phases/${phaseId}`, { name }),
+    onSuccess: () => {
+      invalidate();
+      setErrorMessage(null);
+    },
+    onError: () => setErrorMessage("Could not rename the phase. Try again."),
+  });
+
+  const removePhase = useMutation({
+    mutationFn: (phaseId: number) => apiRequest("DELETE", `/api/phases/${phaseId}`),
+    onSuccess: () => {
+      invalidate();
+      setErrorMessage(null);
+    },
+    onError: () => setErrorMessage("Could not delete the phase. Try again."),
   });
 
   const addProperty = useMutation({
@@ -126,7 +146,54 @@ export const PropertyPhaseEditor: React.FC<{ projectId: number }> = ({ projectId
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-4">
+        {phases.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium">Phases</h3>
+            {phases.map((phase) => {
+              const defaultName = `Phase ${phase.phaseNumber}`;
+              return (
+                <div
+                  key={phase.id}
+                  className="flex flex-wrap items-end gap-2 rounded-lg border p-2"
+                  data-testid={`row-phase-${phase.id}`}
+                >
+                  <Badge variant="secondary">Phase {phase.phaseNumber}</Badge>
+                  <div className="flex-1 min-w-[10rem] space-y-1">
+                    <Label htmlFor={`phase-name-${phase.id}`} className="text-xs">
+                      Name
+                    </Label>
+                    <Input
+                      // Remount when the server value changes so defaultValue re-syncs
+                      // instead of showing the stale typed input.
+                      key={`phase-name-${phase.id}-${phase.name ?? ""}`}
+                      id={`phase-name-${phase.id}`}
+                      defaultValue={phase.name ?? ""}
+                      placeholder={defaultName}
+                      onBlur={(e) =>
+                        patchPhase.mutate({ phaseId: phase.id, name: e.target.value })
+                      }
+                      data-testid={`input-phase-name-${phase.id}`}
+                    />
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setDeletePhaseTarget(phase)}
+                    // Scoped to the phase in flight: a bare isPending would grey out
+                    // the delete button on every phase in the project.
+                    disabled={removePhase.isPending && removePhase.variables === phase.id}
+                    aria-label={`Delete ${phase.name || defaultName}`}
+                    data-testid={`button-delete-phase-${phase.id}`}
+                  >
+                    <Trash2 className="h-4 w-4 text-destructive" aria-hidden="true" />
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {propertyRows.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">
             No properties yet. Add one for each lot in the project.
@@ -234,6 +301,19 @@ export const PropertyPhaseEditor: React.FC<{ projectId: number }> = ({ projectId
         onConfirm={() => {
           if (!deleteTarget) return;
           removeProperty.mutate(deleteTarget.id, { onSettled: () => setDeleteTarget(null) });
+        }}
+      />
+
+      <DeleteConfirmDialog
+        open={!!deletePhaseTarget}
+        onOpenChange={(open) => !open && setDeletePhaseTarget(null)}
+        title="Delete Phase"
+        description={`Delete ${
+          deletePhaseTarget?.name || `Phase ${deletePhaseTarget?.phaseNumber}`
+        }? Its properties will be unassigned, not deleted, and can be reassigned to another phase. This action cannot be undone.`}
+        onConfirm={() => {
+          if (!deletePhaseTarget) return;
+          removePhase.mutate(deletePhaseTarget.id, { onSettled: () => setDeletePhaseTarget(null) });
         }}
       />
     </Card>
