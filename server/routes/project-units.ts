@@ -155,14 +155,27 @@ router.post("/project-units", async (req: Request, res: Response) => {
   }
 });
 
-/** A body id field: absent leaves the column alone, explicit null clears it. */
+/**
+ * A body id field: absent leaves the column alone, explicit null clears it.
+ *
+ * An unparseable value is an error naming the field rather than a `NaN` that
+ * satisfies every guard below and only fails at Postgres as a 500.
+ */
 function resolveId(
   supplied: unknown,
   current: number | null,
-): number | null {
-  if (supplied === undefined) return current;
-  if (supplied === null) return null;
-  return Number(supplied);
+  field: string,
+): { value: number | null } | { error: string } {
+  if (supplied === undefined) return { value: current };
+  if (supplied === null) return { value: null };
+  if (typeof supplied !== "number" && typeof supplied !== "string") {
+    return { error: `${field} must be a positive integer` };
+  }
+  const parsed = Number(supplied);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return { error: `${field} must be a positive integer` };
+  }
+  return { value: parsed };
 }
 
 router.patch("/project-units/:id", async (req: Request, res: Response) => {
@@ -184,8 +197,18 @@ router.patch("/project-units/:id", async (req: Request, res: Response) => {
     }
     const existing = existingUnit.rows[0];
 
-    const resolvedModelId = resolveId(modelId, existing.model_id);
-    const resolvedConfigurationId = resolveId(configurationId, existing.configuration_id);
+    const modelIdResult = resolveId(modelId, existing.model_id, "modelId");
+    if ("error" in modelIdResult) {
+      return res.status(400).json({ error: modelIdResult.error });
+    }
+    const configurationIdResult = resolveId(
+      configurationId, existing.configuration_id, "configurationId",
+    );
+    if ("error" in configurationIdResult) {
+      return res.status(400).json({ error: configurationIdResult.error });
+    }
+    const resolvedModelId = modelIdResult.value;
+    const resolvedConfigurationId = configurationIdResult.value;
 
     const sourceError = pricingSourceError(resolvedModelId, resolvedConfigurationId);
     if (sourceError) return res.status(400).json({ error: sourceError });
