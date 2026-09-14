@@ -9,6 +9,12 @@ import {
   warrantyTerms,
 } from "../../shared/schema";
 import { eq, ne, and, sql, desc } from "drizzle-orm";
+import {
+  isUnitRole,
+  pricingSourceError,
+  propertyAccessible,
+  roleConflict,
+} from "../lib/unit-attachment";
 
 const router = Router();
 
@@ -556,11 +562,13 @@ router.get('/projects/:projectId/units', async (req, res) => {
   try {
     const projectId = parseInt(req.params.projectId);
     const result = await pool.query(
-      `SELECT pu.id, pu.project_id as "projectId", pu.model_id as "modelId", 
+      `SELECT pu.id, pu.project_id as "projectId", pu.model_id as "modelId",
+              pu.property_id as "propertyId", pu.unit_role as "unitRole",
+              pu.configuration_id as "configurationId",
               pu.unit_label as "unitLabel", pu.quantity,
               pu.base_price_snapshot as "basePriceSnapshot",
               pu.customization_total as "customizationTotal",
-              json_build_object(
+              CASE WHEN hm.id IS NULL THEN NULL ELSE json_build_object(
                 'id', hm.id,
                 'name', hm.name,
                 'modelCode', hm.model_code,
@@ -570,12 +578,21 @@ router.get('/projects/:projectId/units', async (req, res) => {
                 'designFee', hm.design_fee,
                 'offsiteBasePrice', hm.offsite_base_price,
                 'onsiteEstPrice', hm.onsite_est_price
-              ) as model
+              ) END as model,
+              CASE WHEN uc.id IS NULL THEN NULL ELSE json_build_object(
+                'id', uc.id,
+                'name', uc.name,
+                'sqFt', uc.sq_ft,
+                'pricePerSqFtLow', uc.price_per_sq_ft_low,
+                'pricePerSqFtHigh', uc.price_per_sq_ft_high,
+                'derivedOffsitePrice', uc.derived_offsite_price
+              ) END as configuration
        FROM project_units pu
        LEFT JOIN home_models hm ON pu.model_id = hm.id
-       WHERE pu.project_id = $1
+       LEFT JOIN unit_configurations uc ON pu.configuration_id = uc.id
+       WHERE pu.project_id = $1 AND pu.organization_id = $2
        ORDER BY pu.unit_label`,
-      [projectId]
+      [projectId, req.organizationId]
     );
     res.json(result.rows);
   } catch (error) {
@@ -587,43 +604,89 @@ router.get('/projects/:projectId/units', async (req, res) => {
 router.post('/projects/:projectId/units', async (req, res) => {
   try {
     const projectId = parseInt(req.params.projectId);
-    const { modelId, quantity } = req.body;
-    
-    const modelResult = await pool.query(
-      `SELECT * FROM home_models WHERE id = $1`,
-      [modelId]
-    );
-    
-    if (modelResult.rows.length === 0) {
-      return res.status(404).json({ error: "Home model not found" });
+    const { modelId, configurationId, quantity, propertyId, unitRole, unitLabel } = req.body;
+
+    const sourceError = pricingSourceError(modelId, configurationId);
+    if (sourceError) {
+      return res.status(400).json({ error: sourceError });
     }
-    
-    const model = modelResult.rows[0];
-    
+
+    // Priced from one source or the other: a catalog model carries its own
+    // offsite base price, a configuration carries the price derived server-side
+    // from its high price per square foot.
+    let model: any = null;
+    let configuration: any = null;
+    let basePriceSnapshot: number | null = null;
+
+    if (modelId != null) {
+      const modelResult = await pool.query(
+        `SELECT * FROM home_models WHERE id = $1`,
+        [modelId]
+      );
+      if (modelResult.rows.length === 0) {
+        return res.status(404).json({ error: "Home model not found" });
+      }
+      model = modelResult.rows[0];
+      basePriceSnapshot = model.offsite_base_price;
+    } else {
+      const configurationResult = await pool.query(
+        `SELECT id, name, sq_ft, price_per_sq_ft_low, price_per_sq_ft_high, derived_offsite_price
+         FROM unit_configurations
+         WHERE id = $1 AND organization_id = $2 AND project_id = $3`,
+        [configurationId, req.organizationId, projectId]
+      );
+      if (configurationResult.rows.length === 0) {
+        return res.status(404).json({ error: "Unit configuration not found" });
+      }
+      configuration = configurationResult.rows[0];
+      basePriceSnapshot = configuration.derived_offsite_price;
+    }
+
+    if (propertyId != null) {
+      if (!(await propertyAccessible(propertyId, req.organizationId, projectId))) {
+        return res.status(404).json({ error: "Property not found" });
+      }
+      if (!isUnitRole(unitRole)) {
+        return res.status(400).json({ error: "unitRole must be 'home' or 'adu'" });
+      }
+      const conflict = await roleConflict(propertyId, unitRole, null);
+      if (conflict) {
+        return res.status(409).json({ error: conflict });
+      }
+    }
+
     const countResult = await pool.query(
       `SELECT COUNT(*) as count FROM project_units WHERE project_id = $1`,
       [projectId]
     );
     const unitCount = parseInt(countResult.rows[0].count) + 1;
-    const unitLabel = `Unit ${String.fromCharCode(64 + unitCount)}`;
-    
+    const resolvedLabel =
+      typeof unitLabel === "string" && unitLabel.trim()
+        ? unitLabel.trim().slice(0, 120)
+        : `Unit ${String.fromCharCode(64 + unitCount)}`;
+
     const insertResult = await pool.query(
-      `INSERT INTO project_units (project_id, model_id, unit_label, quantity, base_price_snapshot, organization_id)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO project_units (project_id, model_id, configuration_id, unit_label, quantity, base_price_snapshot, organization_id, property_id, unit_role)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
-      [projectId, modelId, unitLabel, quantity || 1, model.offsite_base_price, req.organizationId || 1]
+      [projectId, modelId ?? null, configurationId ?? null, resolvedLabel,
+       quantity || 1, basePriceSnapshot, req.organizationId || 1,
+       propertyId ?? null, unitRole ?? null]
     );
-    
+
     const newUnit = insertResult.rows[0];
     res.status(201).json({
       id: newUnit.id,
       projectId: newUnit.project_id,
       modelId: newUnit.model_id,
+      configurationId: newUnit.configuration_id,
+      propertyId: newUnit.property_id,
+      unitRole: newUnit.unit_role,
       unitLabel: newUnit.unit_label,
       quantity: newUnit.quantity,
       basePriceSnapshot: newUnit.base_price_snapshot,
       customizationTotal: newUnit.customization_total,
-      model: {
+      model: model ? {
         id: model.id,
         name: model.name,
         modelCode: model.model_code,
@@ -633,7 +696,15 @@ router.post('/projects/:projectId/units', async (req, res) => {
         designFee: model.design_fee,
         offsiteBasePrice: model.offsite_base_price,
         onsiteEstPrice: model.onsite_est_price
-      }
+      } : null,
+      configuration: configuration ? {
+        id: configuration.id,
+        name: configuration.name,
+        sqFt: configuration.sq_ft,
+        pricePerSqFtLow: configuration.price_per_sq_ft_low,
+        pricePerSqFtHigh: configuration.price_per_sq_ft_high,
+        derivedOffsitePrice: configuration.derived_offsite_price
+      } : null
     });
   } catch (error) {
     console.error("Failed to add unit:", error);

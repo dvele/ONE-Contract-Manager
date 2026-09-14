@@ -1,6 +1,12 @@
 import { Router, Request, Response } from "express";
 import { Pool } from "pg";
 import { requireAuth } from "../middleware/auth";
+import {
+  isUnitRole,
+  pricingSourceError,
+  propertyAccessible,
+  roleConflict,
+} from "../lib/unit-attachment";
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const router = Router();
@@ -15,6 +21,7 @@ const selectFields = `
   pu.customization_total as "customizationTotal",
   pu.notes, pu.created_at as "createdAt",
   pu.property_id as "propertyId", pu.unit_role as "unitRole",
+  pu.configuration_id as "configurationId",
   hm.name as "modelName", hm.model_code as "modelCode",
   p.name as "projectName"
 `;
@@ -75,60 +82,23 @@ const returningFields = `
   base_price_snapshot as "basePriceSnapshot",
   customization_total as "customizationTotal",
   notes, created_at as "createdAt",
-  property_id as "propertyId", unit_role as "unitRole"
+  property_id as "propertyId", unit_role as "unitRole",
+  configuration_id as "configurationId"
 `;
-
-const UNIT_ROLES = ["home", "adu"] as const;
-type UnitRole = (typeof UNIT_ROLES)[number];
-
-/**
- * A property holds at most one home and one ADU. Returns an error message when
- * the requested role is already taken, or null when the attachment is allowed.
- *
- * @param excludeUnitId - unit being updated, so it does not conflict with itself
- */
-async function roleConflict(
-  propertyId: number,
-  unitRole: UnitRole,
-  excludeUnitId: number | null,
-): Promise<string | null> {
-  const result = await pool.query(
-    `SELECT id FROM project_units
-     WHERE property_id = $1 AND unit_role = $2 AND ($3::int IS NULL OR id <> $3)`,
-    [propertyId, unitRole, excludeUnitId],
-  );
-  return result.rows.length > 0
-    ? `This property already has a ${unitRole}`
-    : null;
-}
-
-/**
- * A unit may only attach to a property in its own project and organization.
- * Returns false when the property is missing, belongs to another organization,
- * or belongs to a different project.
- */
-async function propertyAccessible(
-  propertyId: number,
-  organizationId: number,
-  projectId: number,
-): Promise<boolean> {
-  const result = await pool.query(
-    `SELECT id FROM properties WHERE id = $1 AND organization_id = $2 AND project_id = $3`,
-    [propertyId, organizationId, projectId],
-  );
-  return result.rows.length > 0;
-}
 
 router.post("/project-units", async (req: Request, res: Response) => {
   try {
-    const { projectId, modelId, unitLabel, quantity, basePriceSnapshot,
+    const { projectId, modelId, configurationId, unitLabel, quantity, basePriceSnapshot,
             customizationTotal, notes, propertyId, unitRole } = req.body;
+
+    const sourceError = pricingSourceError(modelId, configurationId);
+    if (sourceError) return res.status(400).json({ error: sourceError });
 
     if (propertyId != null) {
       if (!(await propertyAccessible(propertyId, req.organizationId, projectId))) {
         return res.status(404).json({ error: "Property not found" });
       }
-      if (!UNIT_ROLES.includes(unitRole)) {
+      if (!isUnitRole(unitRole)) {
         return res.status(400).json({ error: "unitRole must be 'home' or 'adu'" });
       }
       const conflict = await roleConflict(propertyId, unitRole, null);
@@ -136,10 +106,11 @@ router.post("/project-units", async (req: Request, res: Response) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO project_units (organization_id, project_id, model_id, unit_label, quantity, base_price_snapshot, customization_total, notes, property_id, unit_role)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO project_units (organization_id, project_id, model_id, configuration_id, unit_label, quantity, base_price_snapshot, customization_total, notes, property_id, unit_role)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING ${returningFields}`,
-      [req.organizationId, projectId, modelId, unitLabel, quantity || 1,
+      [req.organizationId, projectId, modelId ?? null, configurationId ?? null,
+       unitLabel, quantity || 1,
        basePriceSnapshot, customizationTotal, notes,
        propertyId ?? null, unitRole ?? null]
     );
@@ -172,7 +143,7 @@ router.patch("/project-units/:id", async (req: Request, res: Response) => {
       }
 
       if (unitRole != null) {
-        if (!UNIT_ROLES.includes(unitRole)) {
+        if (!isUnitRole(unitRole)) {
           return res.status(400).json({ error: "unitRole must be 'home' or 'adu'" });
         }
         // The property this role is being checked against: the incoming propertyId
