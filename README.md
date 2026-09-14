@@ -162,7 +162,7 @@ dvele-contract-manager/
 │   │   └── tableStyles.ts      # Shared table/signature styling
 │   ├── services/                # Business services
 │   │   ├── pricingEngine.ts    # 6-phase pricing calculation engine
-│   │   └── variable-mapper.ts  # Variable mapping service
+│   │   └── pricingMath.ts      # Pure per-phase milestone and rollup math
 │   ├── middleware/              # Express middleware (auth)
 │   ├── templates/               # DOCX contract templates
 │   ├── db.ts                    # Database connection pool
