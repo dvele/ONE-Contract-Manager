@@ -75,6 +75,10 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
   // Additional site work (stored in financials.prelimOnsite)
   const additionalSiteWork = financial?.prelimOnsite || 0;
 
+  // Units are scoped to the project's own organization, not a caller's — this
+  // function has no caller identity. The plain `pu.organization_id = $2` would
+  // price a pre-multi-tenancy project, whose organization is null, at zero; such
+  // a project keeps every one of its units instead.
   const unitsResult = await pool.query(
     `SELECT
       pu.id as unit_id,
@@ -95,8 +99,9 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
      LEFT JOIN home_models hm ON pu.model_id = hm.id
      LEFT JOIN unit_configurations uc ON pu.configuration_id = uc.id
      WHERE pu.project_id = $1
+       AND ($2::int IS NULL OR pu.organization_id = $2)
      ORDER BY pu.id`,
-    [projectId]
+    [projectId, project.organizationId]
   );
 
   const units = unitsResult.rows;
