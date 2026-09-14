@@ -86,7 +86,7 @@ export async function getProjectWithRelations(projectId: number): Promise<Projec
     unitLabel: row.unit_label || '',
     quantity: row.quantity || 1,
     basePriceSnapshot: row.base_price_snapshot || 0,
-    onsiteEstimateSnapshot: row.customization_total || 0,
+    customizationTotal: row.customization_total || 0,
     homeModel: row.source_id ? {
       id: row.source_id,
       modelName: row.source_name || 'Unknown',

@@ -56,7 +56,7 @@ export interface ProjectUnit {
   unitLabel: string;
   quantity: number;
   basePriceSnapshot: number;
-  onsiteEstimateSnapshot: number;
+  customizationTotal: number;
   homeModel?: {
     id: number;
     modelName: string;
@@ -1066,7 +1066,7 @@ export function mapProjectToVariables(
         bathrooms: u.homeModel?.bathrooms,
         squareFootage: u.homeModel?.squareFootage,
         estimatedPrice:
-          (u.basePriceSnapshot || 0) + (u.onsiteEstimateSnapshot || 0),
+          (u.basePriceSnapshot || 0) + (u.customizationTotal || 0),
         quantity: u.quantity || 1,
       })) || null
     ),
