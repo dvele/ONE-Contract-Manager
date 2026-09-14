@@ -6,6 +6,7 @@ import {
   configurationForProject,
   isUnitRole,
   pricingSourceError,
+  projectAccessible,
   propertyAccessible,
   propertyQuantityError,
   roleConflict,
@@ -99,6 +100,14 @@ router.post("/project-units", async (req: Request, res: Response) => {
 
     const quantityError = propertyQuantityError(propertyId, quantity);
     if (quantityError) return res.status(400).json({ error: quantityError });
+
+    // The project id comes from the body and is written into `project_id`, so
+    // it is checked before anything is read or inserted against it — the
+    // configuration and property paths bind the project themselves, the
+    // model-only path has nothing else that would.
+    if (!(await projectAccessible(projectId, req.organizationId))) {
+      return res.status(404).json({ error: "Project not found" });
+    }
 
     // A configuration's derived price is the only authoritative price for a unit
     // built from it, so it overrides whatever snapshot the body carried.
