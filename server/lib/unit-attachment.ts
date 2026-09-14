@@ -120,6 +120,41 @@ export async function configurationForProject(
   return result.rows.length > 0 ? (result.rows[0] as ConfigurationRow) : null;
 }
 
+export interface ModelRow {
+  id: number;
+  name: string;
+  model_code: string;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  sq_ft: number | null;
+  design_fee: number | null;
+  offsite_base_price: number | null;
+  onsite_est_price: number | null;
+}
+
+/**
+ * A unit may only be priced from a catalog model in the caller's own
+ * organization. Returns the row — whose `offsite_base_price` becomes the unit's
+ * snapshot and the largest single figure in a generated contract — or null when
+ * it does not resolve.
+ *
+ * `home_models.organization_id` is `.notNull()`, so unlike `projects` there is
+ * no pre-multi-tenancy row to tolerate: an exact match is the whole rule.
+ */
+export async function modelForOrganization(
+  modelId: number,
+  organizationId: number,
+): Promise<ModelRow | null> {
+  const result = await pool.query(
+    `SELECT id, name, model_code, bedrooms, bathrooms, sq_ft,
+            design_fee, offsite_base_price, onsite_est_price
+     FROM home_models
+     WHERE id = $1 AND organization_id = $2`,
+    [modelId, organizationId],
+  );
+  return result.rows.length > 0 ? (result.rows[0] as ModelRow) : null;
+}
+
 /**
  * A unit is priced from exactly one source: a catalog model or an unpriced
  * configuration. Returns an error message when neither or both are supplied.

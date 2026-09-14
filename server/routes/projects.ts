@@ -13,6 +13,7 @@ import {
   UNIQUE_VIOLATION,
   configurationForProject,
   isUnitRole,
+  modelForOrganization,
   pricingSourceError,
   projectAccessible,
   propertyAccessible,
@@ -634,14 +635,10 @@ router.post('/projects/:projectId/units', async (req, res) => {
     let basePriceSnapshot: number | null = null;
 
     if (modelId != null) {
-      const modelResult = await pool.query(
-        `SELECT * FROM home_models WHERE id = $1 AND organization_id = $2`,
-        [modelId, req.organizationId]
-      );
-      if (modelResult.rows.length === 0) {
+      model = await modelForOrganization(modelId, req.organizationId);
+      if (!model) {
         return res.status(404).json({ error: "Home model not found" });
       }
-      model = modelResult.rows[0];
       basePriceSnapshot = model.offsite_base_price;
     } else {
       configuration = await configurationForProject(configurationId, req.organizationId, projectId);

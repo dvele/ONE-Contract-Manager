@@ -5,6 +5,7 @@ import {
   UNIQUE_VIOLATION,
   configurationForProject,
   isUnitRole,
+  modelForOrganization,
   pricingSourceError,
   projectAccessible,
   propertyAccessible,
@@ -120,6 +121,12 @@ router.post("/project-units", async (req: Request, res: Response) => {
         return res.status(404).json({ error: "Unit configuration not found" });
       }
       resolvedSnapshot = configuration.derived_offsite_price;
+    } else if (!(await modelForOrganization(modelId, req.organizationId))) {
+      // The foreign key only requires the model to exist, not to belong to the
+      // caller, and the pricing engine reads its offsite base price straight
+      // off the join — so an unscoped model id here prices this project from
+      // another organization's catalog.
+      return res.status(404).json({ error: "Home model not found" });
     }
 
     if (propertyId != null) {
@@ -230,15 +237,12 @@ router.patch("/project-units/:id", async (req: Request, res: Response) => {
         return res.status(404).json({ error: "Unit configuration not found" });
       }
       resolvedSnapshot = configuration.derived_offsite_price;
-    } else if (resolvedModelId !== existing.model_id) {
-      const model = await pool.query(
-        `SELECT offsite_base_price FROM home_models WHERE id = $1 AND organization_id = $2`,
-        [resolvedModelId, req.organizationId],
-      );
-      if (model.rows.length === 0) {
+    } else if (resolvedModelId !== null && resolvedModelId !== existing.model_id) {
+      const model = await modelForOrganization(resolvedModelId, req.organizationId);
+      if (!model) {
         return res.status(404).json({ error: "Home model not found" });
       }
-      resolvedSnapshot = model.rows[0].offsite_base_price;
+      resolvedSnapshot = model.offsite_base_price;
     }
 
     if (propertyId != null || unitRole != null) {
