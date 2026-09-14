@@ -7,6 +7,7 @@ import {
   isUnitRole,
   pricingSourceError,
   propertyAccessible,
+  propertyQuantityError,
   roleConflict,
 } from "../lib/unit-attachment";
 
@@ -96,6 +97,9 @@ router.post("/project-units", async (req: Request, res: Response) => {
     const sourceError = pricingSourceError(modelId, configurationId);
     if (sourceError) return res.status(400).json({ error: sourceError });
 
+    const quantityError = propertyQuantityError(propertyId, quantity);
+    if (quantityError) return res.status(400).json({ error: quantityError });
+
     // A configuration's derived price is the only authoritative price for a unit
     // built from it, so it overrides whatever snapshot the body carried.
     let resolvedSnapshot = basePriceSnapshot;
@@ -142,23 +146,72 @@ router.post("/project-units", async (req: Request, res: Response) => {
   }
 });
 
+/** A body id field: absent leaves the column alone, explicit null clears it. */
+function resolveId(
+  supplied: unknown,
+  current: number | null,
+): number | null {
+  if (supplied === undefined) return current;
+  if (supplied === null) return null;
+  return Number(supplied);
+}
+
 router.patch("/project-units/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { modelId, unitLabel, quantity, basePriceSnapshot,
+    const { modelId, configurationId, unitLabel, quantity, basePriceSnapshot,
             customizationTotal, notes, propertyId, unitRole } = req.body;
 
-    if (propertyId != null || unitRole != null) {
-      const existingUnit = await pool.query(
-        `SELECT project_id, property_id FROM project_units WHERE id = $1 AND organization_id = $2`,
-        [id, req.organizationId],
-      );
-      if (existingUnit.rows.length === 0) {
-        return res.status(404).json({ error: "Project unit not found" });
-      }
+    // Every guard below decides against the unit that will exist after the
+    // patch, not against the body alone — a unit half-described by the request
+    // can still end up with two pricing sources or none.
+    const existingUnit = await pool.query(
+      `SELECT project_id, property_id, model_id, configuration_id, quantity
+       FROM project_units WHERE id = $1 AND organization_id = $2`,
+      [id, req.organizationId],
+    );
+    if (existingUnit.rows.length === 0) {
+      return res.status(404).json({ error: "Project unit not found" });
+    }
+    const existing = existingUnit.rows[0];
 
+    const resolvedModelId = resolveId(modelId, existing.model_id);
+    const resolvedConfigurationId = resolveId(configurationId, existing.configuration_id);
+
+    const sourceError = pricingSourceError(resolvedModelId, resolvedConfigurationId);
+    if (sourceError) return res.status(400).json({ error: sourceError });
+
+    const effectivePropertyId = propertyId ?? existing.property_id;
+    const effectiveQuantity = quantity ?? existing.quantity;
+    const quantityError = propertyQuantityError(effectivePropertyId, effectiveQuantity);
+    if (quantityError) return res.status(400).json({ error: quantityError });
+
+    // The snapshot is derived from whichever source now prices the unit, so a
+    // figure in the body cannot become the price of a configuration-backed
+    // unit — the same rule both POST paths apply.
+    let resolvedSnapshot: number | null = basePriceSnapshot ?? null;
+    if (resolvedConfigurationId !== null) {
+      const configuration = await configurationForProject(
+        resolvedConfigurationId, req.organizationId, existing.project_id,
+      );
+      if (!configuration) {
+        return res.status(404).json({ error: "Unit configuration not found" });
+      }
+      resolvedSnapshot = configuration.derived_offsite_price;
+    } else if (resolvedModelId !== existing.model_id) {
+      const model = await pool.query(
+        `SELECT offsite_base_price FROM home_models WHERE id = $1`,
+        [resolvedModelId],
+      );
+      if (model.rows.length === 0) {
+        return res.status(404).json({ error: "Home model not found" });
+      }
+      resolvedSnapshot = model.rows[0].offsite_base_price;
+    }
+
+    if (propertyId != null || unitRole != null) {
       if (propertyId != null &&
-          !(await propertyAccessible(propertyId, req.organizationId, existingUnit.rows[0].project_id))) {
+          !(await propertyAccessible(propertyId, req.organizationId, existing.project_id))) {
         return res.status(404).json({ error: "Property not found" });
       }
 
@@ -166,9 +219,6 @@ router.patch("/project-units/:id", async (req: Request, res: Response) => {
         if (!isUnitRole(unitRole)) {
           return res.status(400).json({ error: "unitRole must be 'home' or 'adu'" });
         }
-        // The property this role is being checked against: the incoming propertyId
-        // when one is given, otherwise the unit's current property.
-        const effectivePropertyId = propertyId ?? existingUnit.rows[0].property_id;
         if (effectivePropertyId != null) {
           const conflict = await roleConflict(
             effectivePropertyId, unitRole, parseInt(String(id), 10)
@@ -182,18 +232,20 @@ router.patch("/project-units/:id", async (req: Request, res: Response) => {
 
     const result = await pool.query(
       `UPDATE project_units SET
-       model_id = COALESCE($3, model_id),
-       unit_label = COALESCE($4, unit_label),
-       quantity = COALESCE($5, quantity),
-       base_price_snapshot = COALESCE($6, base_price_snapshot),
-       customization_total = COALESCE($7, customization_total),
-       notes = COALESCE($8, notes),
-       property_id = COALESCE($9, property_id),
-       unit_role = COALESCE($10, unit_role)
+       model_id = $3,
+       configuration_id = $4,
+       unit_label = COALESCE($5, unit_label),
+       quantity = COALESCE($6, quantity),
+       base_price_snapshot = COALESCE($7, base_price_snapshot),
+       customization_total = COALESCE($8, customization_total),
+       notes = COALESCE($9, notes),
+       property_id = COALESCE($10, property_id),
+       unit_role = COALESCE($11, unit_role)
        WHERE id = $1 AND organization_id = $2
        RETURNING ${returningFields}`,
-      [id, req.organizationId, modelId, unitLabel, quantity,
-       basePriceSnapshot, customizationTotal, notes,
+      [id, req.organizationId, resolvedModelId, resolvedConfigurationId,
+       unitLabel, quantity,
+       resolvedSnapshot, customizationTotal, notes,
        propertyId ?? null, unitRole ?? null]
     );
 
@@ -203,6 +255,9 @@ router.patch("/project-units/:id", async (req: Request, res: Response) => {
 
     res.json(result.rows[0]);
   } catch (error: any) {
+    if (error?.code === UNIQUE_VIOLATION) {
+      return res.status(409).json({ error: "This property already has a unit in that role" });
+    }
     console.error("Error updating project unit:", error);
     res.status(500).json({ error: "Failed to update project unit" });
   }

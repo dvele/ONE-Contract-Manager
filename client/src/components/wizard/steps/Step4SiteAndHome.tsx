@@ -40,6 +40,7 @@ interface ProjectUnit {
   quantity: number;
   basePriceSnapshot: number;
   customizationTotal: number;
+  propertyId: number | null;
   // Null on units priced from a configuration rather than the catalog.
   model: HomeModel | null;
   configuration: UnitConfiguration | null;
@@ -228,9 +229,16 @@ export const Step4SiteAndHome: React.FC = () => {
                                 max={999}
                                 value={unit.quantity || 1}
                                 onChange={(e) => handleQuantityChange(unit.id, e.target.value)}
+                                disabled={unit.propertyId != null}
+                                aria-describedby={unit.propertyId != null ? `qty-help-${unit.id}` : undefined}
                                 className="w-16 h-8 text-center text-sm"
                                 data-testid={`input-quantity-${unit.id}`}
                               />
+                              {unit.propertyId != null && (
+                                <span id={`qty-help-${unit.id}`} className="sr-only">
+                                  A unit attached to a property is always quantity 1.
+                                </span>
+                              )}
                             </div>
                             <Button
                               variant="ghost"

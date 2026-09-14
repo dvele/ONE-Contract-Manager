@@ -37,6 +37,42 @@ export async function roleConflict(
 }
 
 /**
+ * A unit may only be created against a project the caller owns. Mirrors the
+ * check `server/routes/unit-configurations.ts` performs before its insert.
+ *
+ * `projects.organizationId` is nullable and pre-multi-tenancy rows have it
+ * unset; those stay reachable, matching the delete guard in
+ * `server/routes/project-units.ts`.
+ */
+export async function projectAccessible(
+  projectId: number,
+  organizationId: number,
+): Promise<boolean> {
+  const result = await pool.query(
+    `SELECT id FROM projects
+     WHERE id = $1 AND (organization_id IS NULL OR organization_id = $2)`,
+    [projectId, organizationId],
+  );
+  return result.rows.length > 0;
+}
+
+/**
+ * A property-attached unit is always quantity 1 — the property physically
+ * holds one home. Returns an error message when a higher quantity is asked
+ * for, or null when the quantity is allowed.
+ */
+export function propertyQuantityError(
+  propertyId: unknown,
+  quantity: unknown,
+): string | null {
+  if (propertyId === undefined || propertyId === null) return null;
+  if (quantity === undefined || quantity === null) return null;
+  return Number(quantity) === 1
+    ? null
+    : "A unit attached to a property must have quantity 1";
+}
+
+/**
  * A unit may only attach to a property in its own project and organization.
  * Returns false when the property is missing, belongs to another organization,
  * or belongs to a different project.
@@ -53,7 +89,7 @@ export async function propertyAccessible(
   return result.rows.length > 0;
 }
 
-/** Postgres unique_violation, raised by the (property_id, unit_role) constraint. */
+/** Postgres unique_violation, raised by any of this schema's unique constraints. */
 export const UNIQUE_VIOLATION = "23505";
 
 export interface ConfigurationRow {

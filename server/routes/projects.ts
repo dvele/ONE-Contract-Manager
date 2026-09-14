@@ -14,7 +14,9 @@ import {
   configurationForProject,
   isUnitRole,
   pricingSourceError,
+  projectAccessible,
   propertyAccessible,
+  propertyQuantityError,
   roleConflict,
 } from "../lib/unit-attachment";
 
@@ -593,7 +595,7 @@ router.get('/projects/:projectId/units', async (req, res) => {
        LEFT JOIN home_models hm ON pu.model_id = hm.id
        LEFT JOIN unit_configurations uc ON pu.configuration_id = uc.id
        WHERE pu.project_id = $1 AND pu.organization_id = $2
-       ORDER BY pu.unit_label`,
+       ORDER BY pu.id`,
       [projectId, req.organizationId]
     );
     res.json(result.rows);
@@ -611,6 +613,17 @@ router.post('/projects/:projectId/units', async (req, res) => {
     const sourceError = pricingSourceError(modelId, configurationId);
     if (sourceError) {
       return res.status(400).json({ error: sourceError });
+    }
+
+    const quantityError = propertyQuantityError(propertyId, quantity);
+    if (quantityError) {
+      return res.status(400).json({ error: quantityError });
+    }
+
+    // The project id comes straight from the URL and is written into
+    // `project_id`, so it is checked before anything is inserted against it.
+    if (!(await projectAccessible(projectId, req.organizationId))) {
+      return res.status(404).json({ error: "Project not found" });
     }
 
     // Priced from one source or the other: a catalog model carries its own
