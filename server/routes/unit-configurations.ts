@@ -115,19 +115,34 @@ router.patch("/unit-configurations/:id", async (req: Request, res: Response) => 
       return res.status(400).json({ error: parsed.error.issues[0].message });
     }
 
-    const [updated] = await db
-      .update(unitConfigurations)
-      .set({
-        ...parsed.data,
-        derivedOffsitePrice: derivePrice(parsed.data.sqFt, parsed.data.pricePerSqFtHigh),
-      })
-      .where(
-        and(
-          eq(unitConfigurations.id, id),
-          eq(unitConfigurations.organizationId, req.organizationId),
-        ),
-      )
-      .returning();
+    // `base_price_snapshot` is what reaches the exhibits while
+    // `derived_offsite_price` is what `calculateProjectPricing` reads, so the
+    // two are written together or not at all: a half-applied edit produces
+    // line items that do not sum to the project total.
+    const updated = await db.transaction(async (tx) => {
+      const [configuration] = await tx
+        .update(unitConfigurations)
+        .set({
+          ...parsed.data,
+          derivedOffsitePrice: derivePrice(parsed.data.sqFt, parsed.data.pricePerSqFtHigh),
+        })
+        .where(
+          and(
+            eq(unitConfigurations.id, id),
+            eq(unitConfigurations.organizationId, req.organizationId),
+          ),
+        )
+        .returning();
+
+      if (!configuration) return null;
+
+      await tx
+        .update(projectUnits)
+        .set({ basePriceSnapshot: configuration.derivedOffsitePrice })
+        .where(eq(projectUnits.configurationId, configuration.id));
+
+      return configuration;
+    });
 
     if (!updated) return res.status(404).json({ error: "Unit configuration not found" });
 

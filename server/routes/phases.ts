@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "../db/index";
 import { phases, properties, projects } from "../../shared/schema";
 import { requireAuth } from "../middleware/auth";
+import { UNIQUE_VIOLATION } from "../lib/unit-attachment";
 
 /**
  * Project phases — the grouping that drives per-phase pricing, scheduling and
@@ -29,7 +30,6 @@ function parseId(raw: string | string[]): number | null {
   return parseInt(value, 10);
 }
 
-const UNIQUE_VIOLATION = "23505";
 const MAX_PHASE_NUMBER_ASSIGNMENT_RETRIES = 3;
 
 router.get("/projects/:projectId/phases", async (req: Request, res: Response) => {
