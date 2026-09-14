@@ -2138,13 +2138,18 @@ router.get("/components/preview/:componentId", async (req, res) => {
     
     const project = projectResult.rows[0];
     
+    // Scoped to the project's own organization, matching the pricing engine, so
+    // a pre-multi-tenancy project — organization null — keeps every unit rather
+    // than rendering an empty exhibit. `projects` is the only table joined above
+    // that carries `organization_id`, so `p.*` puts it on the row unshadowed.
     const unitsResult = await pool.query(
       `SELECT pu.*, hm.name as model_name, hm.model_code, hm.bedrooms, hm.bathrooms, hm.sq_ft
        FROM project_units pu
        JOIN home_models hm ON hm.id = pu.model_id
        WHERE pu.project_id = $1
+         AND ($2::int IS NULL OR pu.organization_id = $2)
        ORDER BY pu.unit_label`,
-      [projectId]
+      [projectId, project.organization_id]
     );
     
     const units = unitsResult.rows;
@@ -2281,13 +2286,16 @@ router.get("/components/preview-resolved/:componentId", async (req, res) => {
           break;
         }
         case "TABLE_UNIT_DETAILS": {
+          // Same scoping as the other unit-details generator: the project's own
+          // organization, null-tolerant so a legacy project still renders.
           const unitsResult = await pool.query(
             `SELECT pu.*, hm.name as model_name, hm.model_code, hm.bedrooms, hm.bathrooms, hm.sq_ft
              FROM project_units pu
              JOIN home_models hm ON hm.id = pu.model_id
              WHERE pu.project_id = $1
+               AND ($2::int IS NULL OR pu.organization_id = $2)
              ORDER BY pu.unit_label`,
-            [pidNum]
+            [pidNum, projectResult.rows[0].organization_id]
           );
           const formattedUnits = unitsResult.rows.map((u: any) => ({
             unitLabel: u.unit_label,

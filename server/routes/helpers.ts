@@ -59,6 +59,10 @@ export async function getProjectWithRelations(projectId: number): Promise<Projec
     }
   }
 
+  // Units are scoped to the project's own organization, not a caller's — this
+  // function has no caller identity and feeds every contract variable through
+  // mapper.ts. A plain `pu.organization_id = $2` would hand a pre-multi-tenancy
+  // project, whose organization is null, a contract with no units at all.
   const unitsWithModels = await pool.query(
     `SELECT pu.id, pu.project_id, pu.model_id, pu.configuration_id, pu.unit_label, pu.quantity,
             pu.base_price_snapshot, pu.customization_total,
@@ -71,8 +75,9 @@ export async function getProjectWithRelations(projectId: number): Promise<Projec
      LEFT JOIN home_models hm ON pu.model_id = hm.id
      LEFT JOIN unit_configurations uc ON pu.configuration_id = uc.id
      WHERE pu.project_id = $1
+       AND ($2::int IS NULL OR pu.organization_id = $2)
      ORDER BY pu.id`,
-    [projectId]
+    [projectId, project.organizationId]
   );
   const projectUnitsList = unitsWithModels.rows.map((row: any) => ({
     id: row.id,
