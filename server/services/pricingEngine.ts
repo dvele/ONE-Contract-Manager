@@ -1,7 +1,8 @@
 import { db } from "../db/index";
 import { pool } from "../db";
-import { projects, projectDetails, financials, milestones } from "../../shared/schema";
+import { projects, projectDetails, financials, milestones, phases, properties } from "../../shared/schema";
 import { eq } from "drizzle-orm";
+import { buildMilestoneSchedule, type ScheduledMilestone } from "./pricingMath";
 
 export interface PaymentScheduleItem {
   name: string;
@@ -18,6 +19,90 @@ export interface PricingBreakdown {
   totalShipping: number;
 }
 
+export interface PhaseRow {
+  id: number;
+  phaseNumber: number;
+  name: string | null;
+}
+
+export interface PropertyRow {
+  id: number;
+  phaseId: number | null;
+  propertyCode: string;
+}
+
+export interface UnitRow {
+  propertyId: number | null;
+  quantity: number;
+  offsiteBasePrice: number;
+  onsiteEstPrice: number;
+  shippingSetPrice: number;
+  customizationTotal: number;
+}
+
+export interface PhaseRollup {
+  phaseId: number;
+  phaseNumber: number;
+  name: string | null;
+  properties: { propertyCode: string }[];
+  breakdown: {
+    offsite: number;
+    onsite: number;
+    shipping: number;
+    customizations: number;
+  };
+  phaseValue: number;
+  milestones: ScheduledMilestone[];
+}
+
+/**
+ * Rolls units up to their property's phase, applying the same milestone
+ * percentages to each phase's own value (`pricingMath.buildMilestoneSchedule`).
+ *
+ * `phaseValue` excludes the design fee (billed once, project-level) and
+ * excludes on-site cost except under CMOS, mirroring `contractValue` below.
+ */
+export function buildPhaseRollups(
+  phaseRows: PhaseRow[],
+  propertyRows: PropertyRow[],
+  unitRows: UnitRow[],
+  serviceModel: "CRC" | "CMOS"
+): PhaseRollup[] {
+  return phaseRows.map((phase) => {
+    const properties = propertyRows.filter((p) => p.phaseId === phase.id);
+    const propertyIds = new Set(properties.map((p) => p.id));
+    const units = unitRows.filter((u) => u.propertyId !== null && propertyIds.has(u.propertyId));
+
+    const breakdown = units.reduce(
+      (acc, u) => {
+        const qty = u.quantity || 1;
+        acc.offsite += (u.offsiteBasePrice || 0) * qty;
+        acc.onsite += (u.onsiteEstPrice || 0) * qty;
+        acc.shipping += (u.shippingSetPrice || 0) * qty;
+        acc.customizations += (u.customizationTotal || 0) * qty;
+        return acc;
+      },
+      { offsite: 0, onsite: 0, shipping: 0, customizations: 0 }
+    );
+
+    const phaseValue =
+      breakdown.offsite +
+      breakdown.shipping +
+      breakdown.customizations +
+      (serviceModel === "CMOS" ? breakdown.onsite : 0);
+
+    return {
+      phaseId: phase.id,
+      phaseNumber: phase.phaseNumber,
+      name: phase.name,
+      properties: properties.map((p) => ({ propertyCode: p.propertyCode })),
+      breakdown,
+      phaseValue,
+      milestones: buildMilestoneSchedule(phaseValue),
+    };
+  });
+}
+
 export interface PricingSummary {
   breakdown: PricingBreakdown;
   grandTotal: number;
@@ -27,6 +112,7 @@ export interface PricingSummary {
   paymentSchedule: PaymentScheduleItem[];
   unitCount: number;
   unitModelSummary: string;   // e.g., "1x Trinity, 2x Salt Point"
+  phases: PhaseRollup[];
 }
 
 export async function calculateProjectPricing(projectId: number): Promise<PricingSummary> {
@@ -69,6 +155,18 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
 
   const units = unitsResult.rows;
   const unitCount = units.reduce((sum: number, u: any) => sum + (u.quantity || 1), 0);
+
+  // Mapped explicitly to the camelCase UnitRow shape buildPhaseRollups expects —
+  // the raw query above returns snake_case, and letting that mismatch pass
+  // silently through the `|| 0` guards would price every phase at zero.
+  const unitRows: UnitRow[] = units.map((u: any) => ({
+    propertyId: u.property_id ?? null,
+    quantity: u.quantity || 1,
+    offsiteBasePrice: u.offsite_base_price || 0,
+    onsiteEstPrice: u.onsite_est_price || 0,
+    shippingSetPrice: u.shipping_set_price || 0,
+    customizationTotal: u.customization_total || 0,
+  }));
 
   let totalDesignFee = 0;
   let totalOffsite = 0;
@@ -190,6 +288,12 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
   const finalSum = paymentSchedule.reduce((sum, m) => sum + m.amount, 0);
   console.log(`[PricingEngine] Payment schedule sum: ${finalSum} (contractValue: ${contractValue}, adjusted: ${discrepancy !== 0})`);
 
+  // Per-phase rollup (additive): a project with no phases yields phases: []
+  // and every field above keeps its existing project-rollup meaning.
+  const phaseRows: PhaseRow[] = await db.select().from(phases).where(eq(phases.projectId, projectId));
+  const propertyRows: PropertyRow[] = await db.select().from(properties).where(eq(properties.projectId, projectId));
+  const phaseRollups = buildPhaseRollups(phaseRows, propertyRows, unitRows, serviceModel);
+
   return {
     breakdown: {
       totalDesignFee,
@@ -205,5 +309,6 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
     paymentSchedule,
     unitCount,
     unitModelSummary,
+    phases: phaseRollups,
   };
 }
