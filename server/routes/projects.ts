@@ -10,6 +10,8 @@ import {
 } from "../../shared/schema";
 import { eq, ne, and, sql, desc } from "drizzle-orm";
 import {
+  UNIQUE_VIOLATION,
+  configurationForProject,
   isUnitRole,
   pricingSourceError,
   propertyAccessible,
@@ -629,16 +631,10 @@ router.post('/projects/:projectId/units', async (req, res) => {
       model = modelResult.rows[0];
       basePriceSnapshot = model.offsite_base_price;
     } else {
-      const configurationResult = await pool.query(
-        `SELECT id, name, sq_ft, price_per_sq_ft_low, price_per_sq_ft_high, derived_offsite_price
-         FROM unit_configurations
-         WHERE id = $1 AND organization_id = $2 AND project_id = $3`,
-        [configurationId, req.organizationId, projectId]
-      );
-      if (configurationResult.rows.length === 0) {
+      configuration = await configurationForProject(configurationId, req.organizationId, projectId);
+      if (!configuration) {
         return res.status(404).json({ error: "Unit configuration not found" });
       }
-      configuration = configurationResult.rows[0];
       basePriceSnapshot = configuration.derived_offsite_price;
     }
 
@@ -706,7 +702,13 @@ router.post('/projects/:projectId/units', async (req, res) => {
         derivedOffsitePrice: configuration.derived_offsite_price
       } : null
     });
-  } catch (error) {
+  } catch (error: any) {
+    // The (property_id, unit_role) unique constraint settles the race that the
+    // roleConflict check above cannot: two concurrent attaches both pass it and
+    // the loser must still read as a conflict, not a server fault.
+    if (error?.code === UNIQUE_VIOLATION) {
+      return res.status(409).json({ error: "This property already has a unit in that role" });
+    }
     console.error("Failed to add unit:", error);
     res.status(500).json({ error: "Failed to add unit" });
   }

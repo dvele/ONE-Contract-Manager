@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "../db/index";
 import { phases, properties, projectUnits, projects } from "../../shared/schema";
 import { requireAuth } from "../middleware/auth";
+import { UNIQUE_VIOLATION } from "../lib/unit-attachment";
 
 /**
  * Project properties — the lots a project builds on, identified as P-1..P-n.
@@ -35,7 +36,7 @@ function parseId(raw: string | string[]): number | null {
  * A property may only be assigned to a phase in its own project and organization.
  * Returns false when the phase is missing, belongs to another organization, or
  * belongs to a different project. Mirrors `propertyAccessible` in
- * `server/routes/project-units.ts`.
+ * `server/lib/unit-attachment.ts`.
  */
 async function phaseAccessible(
   phaseId: number,
@@ -55,7 +56,6 @@ async function phaseAccessible(
   return !!phase;
 }
 
-const UNIQUE_VIOLATION = "23505";
 const MAX_PROPERTY_CODE_ASSIGNMENT_RETRIES = 3;
 
 router.get("/projects/:projectId/properties", async (req: Request, res: Response) => {

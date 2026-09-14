@@ -53,6 +53,37 @@ export async function propertyAccessible(
   return result.rows.length > 0;
 }
 
+/** Postgres unique_violation, raised by the (property_id, unit_role) constraint. */
+export const UNIQUE_VIOLATION = "23505";
+
+export interface ConfigurationRow {
+  id: number;
+  name: string;
+  sq_ft: number;
+  price_per_sq_ft_low: number;
+  price_per_sq_ft_high: number;
+  derived_offsite_price: number;
+}
+
+/**
+ * A unit may only be priced from a configuration in its own project and
+ * organization. Returns the row — whose `derived_offsite_price` is the only
+ * authoritative price for such a unit — or null when it does not resolve.
+ */
+export async function configurationForProject(
+  configurationId: number,
+  organizationId: number,
+  projectId: number,
+): Promise<ConfigurationRow | null> {
+  const result = await pool.query(
+    `SELECT id, name, sq_ft, price_per_sq_ft_low, price_per_sq_ft_high, derived_offsite_price
+     FROM unit_configurations
+     WHERE id = $1 AND organization_id = $2 AND project_id = $3`,
+    [configurationId, organizationId, projectId],
+  );
+  return result.rows.length > 0 ? (result.rows[0] as ConfigurationRow) : null;
+}
+
 /**
  * A unit is priced from exactly one source: a catalog model or an unpriced
  * configuration. Returns an error message when neither or both are supplied.

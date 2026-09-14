@@ -28,6 +28,7 @@ import {
 import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 import { Home, Plus, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { formatCents, formatCentsExact } from "@/lib/money";
 
 interface Property {
   id: number;
@@ -67,34 +68,12 @@ type UnitRole = (typeof UNIT_ROLES)[number];
 
 const ROLE_LABELS: Record<UnitRole, string> = { home: "Home", adu: "ADU" };
 
-const currencyFormat = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 0,
-});
-
-const perSqFtFormat = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 0,
-  maximumFractionDigits: 2,
-});
-
 const numberFormat = new Intl.NumberFormat("en-US");
 
 const NON_BREAKING_SPACE = " ";
 
 function sqFtLabel(sqFt: number): string {
   return `${numberFormat.format(sqFt)}${NON_BREAKING_SPACE}sqft`;
-}
-
-/** Every stored money value is an integer number of cents. */
-function formatCents(cents: number): string {
-  return currencyFormat.format(cents / 100);
-}
-
-function formatCentsPerSqFt(cents: number): string {
-  return perSqFtFormat.format(cents / 100);
 }
 
 /** The only dollars-to-cents conversion in this component. */
@@ -158,7 +137,7 @@ function modelSummary(model: HomeModel): string {
 }
 
 function configurationRange(configuration: UnitConfiguration): string {
-  return `${formatCentsPerSqFt(configuration.pricePerSqFtLow)}–${formatCentsPerSqFt(
+  return `${formatCentsExact(configuration.pricePerSqFtLow)}–${formatCentsExact(
     configuration.pricePerSqFtHigh,
   )}/sqft`;
 }
@@ -328,7 +307,9 @@ export const UnitAttachmentEditor: React.FC<{ projectId: number }> = ({ projectI
               variant="ghost"
               size="icon"
               onClick={() => setDeleteTarget(unit)}
-              disabled={removeUnit.isPending}
+              // Scoped to the unit in flight: a bare isPending would grey out
+              // the remove button on every slot in the project.
+              disabled={removeUnit.isPending && removeUnit.variables === unit.id}
               aria-label={`Remove the ${roleLabel} from property ${property.propertyCode}`}
               data-testid={`button-remove-unit-${unit.id}`}
             >

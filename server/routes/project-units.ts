@@ -2,6 +2,8 @@ import { Router, Request, Response } from "express";
 import { Pool } from "pg";
 import { requireAuth } from "../middleware/auth";
 import {
+  UNIQUE_VIOLATION,
+  configurationForProject,
   isUnitRole,
   pricingSourceError,
   propertyAccessible,
@@ -94,6 +96,19 @@ router.post("/project-units", async (req: Request, res: Response) => {
     const sourceError = pricingSourceError(modelId, configurationId);
     if (sourceError) return res.status(400).json({ error: sourceError });
 
+    // A configuration's derived price is the only authoritative price for a unit
+    // built from it, so it overrides whatever snapshot the body carried.
+    let resolvedSnapshot = basePriceSnapshot;
+    if (configurationId != null) {
+      const configuration = await configurationForProject(
+        configurationId, req.organizationId, projectId,
+      );
+      if (!configuration) {
+        return res.status(404).json({ error: "Unit configuration not found" });
+      }
+      resolvedSnapshot = configuration.derived_offsite_price;
+    }
+
     if (propertyId != null) {
       if (!(await propertyAccessible(propertyId, req.organizationId, projectId))) {
         return res.status(404).json({ error: "Property not found" });
@@ -111,12 +126,17 @@ router.post("/project-units", async (req: Request, res: Response) => {
        RETURNING ${returningFields}`,
       [req.organizationId, projectId, modelId ?? null, configurationId ?? null,
        unitLabel, quantity || 1,
-       basePriceSnapshot, customizationTotal, notes,
+       resolvedSnapshot, customizationTotal, notes,
        propertyId ?? null, unitRole ?? null]
     );
 
     res.status(201).json(result.rows[0]);
   } catch (error: any) {
+    // See the same translation in server/routes/projects.ts: the unique
+    // constraint decides the race that roleConflict cannot.
+    if (error?.code === UNIQUE_VIOLATION) {
+      return res.status(409).json({ error: "This property already has a unit in that role" });
+    }
     console.error("Error creating project unit:", error);
     res.status(500).json({ error: "Failed to create project unit" });
   }

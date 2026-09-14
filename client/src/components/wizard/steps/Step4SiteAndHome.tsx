@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Home, Plus, Trash2, AlertTriangle, Package } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
+import { formatCents } from '@/lib/money';
 import { PropertyPhaseEditor } from '../PropertyPhaseEditor';
 import { UnitAttachmentEditor } from '../UnitAttachmentEditor';
 
@@ -112,15 +113,6 @@ export const Step4SiteAndHome: React.FC = () => {
     }
   }, [projectUnits]);
   
-  const formatCurrency = (cents: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(cents / 100);
-  };
-
   const handleAddUnit = () => {
     if (selectedModelId && draftProjectId) {
       addUnitMutation.mutate(parseInt(selectedModelId));
@@ -180,7 +172,7 @@ export const Step4SiteAndHome: React.FC = () => {
                     <SelectContent>
                       {homeModels.map((model) => (
                         <SelectItem key={model.id} value={model.id.toString()}>
-                          {model.name} - {model.bedrooms}BR/{model.bathrooms}BA, {model.sqFt.toLocaleString()} sqft ({formatCurrency(model.offsiteBasePrice)})
+                          {model.name} - {model.bedrooms}BR/{model.bathrooms}BA, {model.sqFt.toLocaleString()} sqft ({formatCents(model.offsiteBasePrice)})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -255,17 +247,17 @@ export const Step4SiteAndHome: React.FC = () => {
                           <div className="space-y-1">
                             <div className="flex justify-between gap-8">
                               <span className="text-muted-foreground">Unit Price (Offsite):</span>
-                              <span className="font-mono">{formatCurrency(unit.basePriceSnapshot)}</span>
+                              <span className="font-mono">{formatCents(unit.basePriceSnapshot)}</span>
                             </div>
                             <div className="flex justify-between gap-8">
                               <span className="text-muted-foreground">Unit Price (Est. Onsite):</span>
-                              <span className="font-mono text-muted-foreground">{formatCurrency(onsiteEstimate(unit))}</span>
+                              <span className="font-mono text-muted-foreground">{formatCents(onsiteEstimate(unit))}</span>
                             </div>
                             {(unit.quantity || 1) > 1 && (
                               <div className="flex justify-between gap-8 pt-1 border-t">
                                 <span className="text-muted-foreground font-medium">x{unit.quantity} Subtotal:</span>
                                 <span className="font-mono font-medium">
-                                  {formatCurrency((unit.basePriceSnapshot + onsiteEstimate(unit)) * (unit.quantity || 1))}
+                                  {formatCents((unit.basePriceSnapshot + onsiteEstimate(unit)) * (unit.quantity || 1))}
                                 </span>
                               </div>
                             )}
@@ -275,7 +267,7 @@ export const Step4SiteAndHome: React.FC = () => {
                               {(unit.quantity || 1) > 1 ? `Total (x${unit.quantity})` : 'Total Unit Value'}
                             </span>
                             <span className="font-mono font-semibold text-primary" data-testid={`text-unit-total-${unit.id}`}>
-                              {formatCurrency((unit.basePriceSnapshot + onsiteEstimate(unit)) * (unit.quantity || 1))}
+                              {formatCents((unit.basePriceSnapshot + onsiteEstimate(unit)) * (unit.quantity || 1))}
                             </span>
                           </div>
                         </div>
@@ -296,13 +288,13 @@ export const Step4SiteAndHome: React.FC = () => {
                 {projectUnits.length > 0 && (
                   <div className="text-right space-y-1">
                     <div className="text-sm text-muted-foreground">
-                      Offsite (Manufacturing): {formatCurrency(projectUnits.reduce((sum, u) => sum + u.basePriceSnapshot * (u.quantity || 1), 0))}
+                      Offsite (Manufacturing): {formatCents(projectUnits.reduce((sum, u) => sum + u.basePriceSnapshot * (u.quantity || 1), 0))}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Est. Onsite: {formatCurrency(projectUnits.reduce((sum, u) => sum + onsiteEstimate(u) * (u.quantity || 1), 0))}
+                      Est. Onsite: {formatCents(projectUnits.reduce((sum, u) => sum + onsiteEstimate(u) * (u.quantity || 1), 0))}
                     </div>
                     <div className="text-lg font-semibold text-primary" data-testid="text-grand-total">
-                      Grand Total: {formatCurrency(projectUnits.reduce((sum, u) => sum + (u.basePriceSnapshot + onsiteEstimate(u)) * (u.quantity || 1), 0))}
+                      Grand Total: {formatCents(projectUnits.reduce((sum, u) => sum + (u.basePriceSnapshot + onsiteEstimate(u)) * (u.quantity || 1), 0))}
                     </div>
                   </div>
                 )}
