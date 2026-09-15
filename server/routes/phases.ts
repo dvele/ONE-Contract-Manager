@@ -16,12 +16,22 @@ const router = Router();
 
 router.use(requireAuth);
 
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Dates must be YYYY-MM-DD")
+  .nullable()
+  .optional();
+
 const PhaseInputSchema = z.object({
   name: z.string().trim().max(120).optional(),
   startOffsetDays: z.number().int().min(-365).max(365).optional(),
   manufacturingDays: z.number().int().min(0).max(1095).optional(),
   onsiteDays: z.number().int().min(0).max(1095).optional(),
   deliveryLagDays: z.number().int().min(0).max(365).optional(),
+  factoryStartOverride: isoDate,
+  factoryCompleteOverride: isoDate,
+  deliveryWindowOverride: isoDate,
+  targetCoOverride: isoDate,
 });
 
 function parseId(raw: string | string[]): number | null {
