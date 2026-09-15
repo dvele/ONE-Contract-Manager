@@ -26,6 +26,7 @@ import {
   deriveDesignMilestones,
   toDateOnly,
   ISO_DATE,
+  isRealCalendarDate,
   type PhaseDates,
 } from "../services/scheduleMath";
 
@@ -690,9 +691,17 @@ const D1_REVIEW_PERIODS = {
  * `??` alone is nullish-safe but not date-safe and would print TBD over a
  * perfectly good derived date. `pricingEngine.calculateProjectPricing` guards
  * `agreementExecutionDate` the same way for the same reason.
+ *
+ * `ISO_DATE` is shape-only by design, so the calendar check is separate and
+ * required: `2027-02-30` passes the pattern and `new Date` silently rolls it
+ * over to March 2, which would print a date nobody entered into Exhibit D
+ * instead of falling through to the derived one. `scheduleMath.validOverride`
+ * guards the per-phase override columns identically.
  */
 function dateOverride(value: string | null | undefined): string | null {
-  return value && ISO_DATE.test(value) ? value : null;
+  return value && ISO_DATE.test(value) && isRealCalendarDate(value)
+    ? value
+    : null;
 }
 
 /**
