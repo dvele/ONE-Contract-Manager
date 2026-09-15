@@ -35,46 +35,46 @@ const UNITS: UnitRow[] = [
 
 describe("buildPhaseRollups", () => {
   it("sums a phase from the units of all its properties", () => {
-    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC");
+    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC", 0, []);
     expect(phase1.breakdown.offsite).toBe(1_000_000_00);
     expect(phase1.properties.map((p) => p.propertyCode)).toEqual(["P-1", "P-2"]);
   });
 
   it("excludes on-site from phase value under CRC and includes it under CMOS", () => {
-    const crc = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC")[0];
-    const cmos = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CMOS")[0];
+    const crc = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC", 0, [])[0];
+    const cmos = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CMOS", 0, [])[0];
     expect(crc.phaseValue).toBe(1_000_000_00);
     expect(cmos.phaseValue).toBe(1_200_000_00);
   });
 
   it("bills the same six percentages under either model", () => {
-    const crc = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC")[0];
-    const cmos = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CMOS")[0];
+    const crc = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC", 0, [])[0];
+    const cmos = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CMOS", 0, [])[0];
     expect(crc.milestones.map((m) => m.percentage)).toEqual([20, 20, 20, 20, 15, 5]);
     expect(cmos.milestones.map((m) => m.percentage)).toEqual([20, 20, 20, 20, 15, 5]);
   });
 
   it("carries retainage under CRC, against the CRC phase value", () => {
-    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC");
+    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC", 0, []);
     const retainage = phase1.milestones.find((m) => m.name === "Retainage");
     // 5% of the CRC phase value (1,000,000 — on-site excluded), not of on-site.
     expect(retainage?.amount).toBe(50_000_00);
   });
 
   it("bills a larger retainage under CMOS because on-site is in the base", () => {
-    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CMOS");
+    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CMOS", 0, []);
     const retainage = phase1.milestones.find((m) => m.name === "Retainage");
     // 5% of 1,200,000 — the same percentage against a base that includes on-site.
     expect(retainage?.amount).toBe(60_000_00);
   });
 
   it("yields an empty array when no phases exist, preserving legacy behaviour", () => {
-    expect(buildPhaseRollups([], [], UNITS, "CRC")).toEqual([]);
+    expect(buildPhaseRollups([], [], UNITS, "CRC", 0, [])).toEqual([]);
   });
 
   it("ignores units whose property is not attached to any phase", () => {
     const orphan = [...UNITS, unit({ id: 200, propertyId: null, offsiteBasePrice: 999_000_00 })];
-    const total = buildPhaseRollups(PHASES, PROPERTIES, orphan, "CRC").reduce((s, p) => s + p.breakdown.offsite, 0);
+    const total = buildPhaseRollups(PHASES, PROPERTIES, orphan, "CRC", 0, []).reduce((s, p) => s + p.breakdown.offsite, 0);
     expect(total).toBe(1_500_000_00);
   });
 
@@ -88,7 +88,7 @@ describe("buildPhaseRollups", () => {
       unit({ id: 201, propertyId: 99, offsiteBasePrice: 999_000_00, onsiteEstPrice: 999_000_00 }),
     ];
 
-    const rollups = buildPhaseRollups(PHASES, propertiesWithOrphan, unitsWithOrphan, "CRC");
+    const rollups = buildPhaseRollups(PHASES, propertiesWithOrphan, unitsWithOrphan, "CRC", 0, []);
 
     expect(rollups.some((p) => p.properties.some((prop) => prop.propertyCode === "P-UNPHASED"))).toBe(false);
     const total = rollups.reduce((s, p) => s + p.breakdown.offsite, 0);
@@ -99,7 +99,7 @@ describe("buildPhaseRollups", () => {
     // Phase 1's units carry 200,000.00 on-site (2 x 100,000.00), phase 2's carry
     // 100,000.00 — a 2:1 split, so 300,000.00 of additional site work lands as
     // 200,000.00 / 100,000.00, on top of each phase's own on-site total.
-    const [phase1, phase2] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CMOS", 300_000_00);
+    const [phase1, phase2] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CMOS", 300_000_00, []);
     expect(phase1.breakdown.onsite).toBe(400_000_00); // 200,000 units + 200,000 share
     expect(phase2.breakdown.onsite).toBe(200_000_00); // 100,000 units + 100,000 share
     expect(phase1.phaseValue).toBe(1_400_000_00);
@@ -107,7 +107,7 @@ describe("buildPhaseRollups", () => {
   });
 
   it("does not add additional site work to phaseValue under CRC, even though it still lands in the on-site breakdown", () => {
-    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC", 300_000_00);
+    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC", 300_000_00, []);
     expect(phase1.breakdown.onsite).toBe(400_000_00);
     expect(phase1.phaseValue).toBe(1_000_000_00); // unchanged: on-site excluded under CRC
   });
@@ -130,7 +130,7 @@ describe("buildPhaseRollups", () => {
     ];
     const additionalSiteWork = 100; // 100 / 3 does not divide evenly
 
-    const rollups = buildPhaseRollups(threePhases, threeProperties, threeUnits, "CMOS", additionalSiteWork);
+    const rollups = buildPhaseRollups(threePhases, threeProperties, threeUnits, "CMOS", additionalSiteWork, []);
     const siteWorkShares = rollups.map((p) => p.breakdown.onsite - 1);
 
     expect(siteWorkShares.reduce((sum, s) => sum + s, 0)).toBe(additionalSiteWork);
@@ -145,7 +145,7 @@ describe("buildPhaseRollups", () => {
       unit({ id: 400, propertyId: 10, offsiteBasePrice: 600_000_00, onsiteEstPrice: 100_000_00, customizationTotal: 75_000_00 }),
       unit({ id: 401, propertyId: 11, offsiteBasePrice: 400_000_00, onsiteEstPrice: 100_000_00, customizationTotal: 25_000_00 }),
     ];
-    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, withCustomizations, "CRC");
+    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, withCustomizations, "CRC", 0, []);
 
     expect(phase1.breakdown.customizations).toBe(100_000_00);
     expect(phase1.phaseValue).toBe(1_100_000_00);
@@ -156,7 +156,7 @@ describe("buildPhaseRollups", () => {
     const legacyQuantityUnit = [
       unit({ id: 500, propertyId: 10, quantity: 3, offsiteBasePrice: 100_000_00, customizationTotal: 10_000_00 }),
     ];
-    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, legacyQuantityUnit, "CRC");
+    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, legacyQuantityUnit, "CRC", 0, []);
 
     expect(phase1.breakdown.customizations).toBe(30_000_00);
     expect(phase1.phaseValue).toBe(330_000_00);
@@ -175,15 +175,15 @@ describe("buildPhaseRollups", () => {
       unit({ ...u, customizationTotal: [75_000_00, 25_000_00, 50_000_00][i] })
     );
 
-    const crc = buildPhaseRollups(PHASES, PROPERTIES, customized, "CRC", additionalSiteWork);
+    const crc = buildPhaseRollups(PHASES, PROPERTIES, customized, "CRC", additionalSiteWork, []);
     expect(crc.reduce((s, p) => s + p.phaseValue, 0)).toBe(offsite + customizations + shipping);
 
-    const cmos = buildPhaseRollups(PHASES, PROPERTIES, customized, "CMOS", additionalSiteWork);
+    const cmos = buildPhaseRollups(PHASES, PROPERTIES, customized, "CMOS", additionalSiteWork, []);
     expect(cmos.reduce((s, p) => s + p.phaseValue, 0)).toBe(offsite + customizations + shipping + onsite);
   });
 
   it("carries the property address and per-unit detail Exhibits A.2 and B.1 render", () => {
-    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC");
+    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC", 0, []);
     const [firstProperty] = phase1.properties;
 
     expect(firstProperty).toMatchObject({
@@ -205,7 +205,7 @@ describe("buildPhaseRollups", () => {
   });
 
   it("gives a property with no units an empty units array rather than omitting it", () => {
-    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, [UNITS[0]], "CRC");
+    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, [UNITS[0]], "CRC", 0, []);
     expect(phase1.properties.map((p) => p.propertyCode)).toEqual(["P-1", "P-2"]);
     expect(phase1.properties[1].units).toEqual([]);
   });
@@ -241,8 +241,8 @@ describe("buildPhaseRollups", () => {
     });
   });
 
-  it("defaults to all-null dates on every phase when phaseDates is omitted entirely", () => {
-    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC");
+  it("gives every phase all-null dates when phaseDates is an empty array", () => {
+    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC", 0, []);
     expect(phase1.dates).toEqual({
       phaseNumber: 1,
       factoryStart: null,
