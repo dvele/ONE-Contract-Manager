@@ -34,6 +34,7 @@ export const PropertyPhaseEditor: React.FC<{ projectId: number }> = ({ projectId
 
   const phasesKey = ["/api/projects", projectId, "phases"];
   const propertiesKey = ["/api/projects", projectId, "properties"];
+  const pricingKey = ["/api/projects", projectId, "pricing-summary"];
 
   const { data: phases = [] } = useQuery<Phase[]>({ queryKey: phasesKey });
   const { data: propertyRows = [] } = useQuery<Property[]>({ queryKey: propertiesKey });
@@ -41,6 +42,10 @@ export const PropertyPhaseEditor: React.FC<{ projectId: number }> = ({ projectId
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: phasesKey });
     queryClient.invalidateQueries({ queryKey: propertiesKey });
+    // The pricing summary carries each phase's derived schedule dates, which
+    // Step 6 renders. Without this a phase added here shows four TBDs there
+    // until something else happens to invalidate the summary.
+    queryClient.invalidateQueries({ queryKey: pricingKey });
   };
 
   const addPhase = useMutation({

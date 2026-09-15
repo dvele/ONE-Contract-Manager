@@ -1612,12 +1612,14 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         if (data.designPhaseDays < 30 || data.designPhaseDays > 180) {
           errors.designPhaseDays = 'Design phase must be 30-180 days';
         }
-        if (data.manufacturingDurationDays < 60 || data.manufacturingDurationDays > 365) {
-          errors.manufacturingDurationDays = 'Manufacturing must be 60-365 days';
-        }
-        if (data.onsiteDurationDays < 30 || data.onsiteDurationDays > 180) {
-          errors.onsiteDurationDays = 'On-site must be 30-180 days';
-        }
+        // manufacturingDurationDays and onsiteDurationDays were range-checked
+        // here while Step 6 offered inputs for them. Those durations now live on
+        // the phase, so a project already storing an out-of-range value would
+        // fail this check with no control anywhere in the wizard to correct it —
+        // Step 8 renders no message for either key, leaving a disabled Next
+        // button and a toast naming nothing. Both values are still saved and
+        // still read (pricingEngine's per-phase fallback among them); only the
+        // unfixable check is gone.
         if (data.warrantyFitFinishMonths < 12 || data.warrantyFitFinishMonths > 36) {
           errors.warrantyFitFinishMonths = 'Fit & finish warranty must be 12-36 months';
         }

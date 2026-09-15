@@ -116,6 +116,22 @@ function formatDate(value: string | null): string {
 
 const WHOLE_NUMBER = /^-?\d+$/;
 
+/** Shape only, matching `ISO_DATE` in server/services/scheduleMath.ts. A browser
+ * with no native date control falls back to a text input, which can hand back
+ * anything. */
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * `ISO_DATE` accepts any four-digit year, so the typos that reach the server
+ * unchallenged are year-magnitude ones — `0227-03-05` for `2027-03-05`, which is
+ * a real calendar date and would anchor a contract schedule to the third
+ * century. These bounds are wider than any plausible project and narrow enough
+ * to catch that class. Lexicographic comparison is chronological for
+ * zero-padded ISO dates.
+ */
+const MIN_OVERRIDE_DATE = "2000-01-01";
+const MAX_OVERRIDE_DATE = "2099-12-31";
+
 function dayCount(days: number | null, fallback: string): string {
   return days === null ? fallback : `${days} days`;
 }
@@ -157,12 +173,16 @@ export const PhaseScheduleEditor: React.FC<{ projectId: number }> = ({ projectId
   const phasesKey = ["/api/projects", projectId, "phases"];
   const pricingKey = ["/api/projects", projectId, "pricing-summary"];
 
-  const { data: phases = [] } = useQuery<Phase[]>({ queryKey: phasesKey });
+  const { data: phases = [], isFetching: isFetchingPhases } = useQuery<Phase[]>({
+    queryKey: phasesKey,
+  });
   // The derived dates come from the server's own schedule math by way of the
   // pricing summary, so what this card shows is what the contract will print.
   // Recomputing the chain here would be a second implementation of
   // server/services/scheduleMath.ts, free to drift from the one that signs.
-  const { data: pricing } = useQuery<PricingSummary>({ queryKey: pricingKey });
+  const { data: pricing, isFetching: isFetchingPricing } = useQuery<PricingSummary>({
+    queryKey: pricingKey,
+  });
 
   const patchPhase = useMutation({
     mutationFn: ({
@@ -181,6 +201,13 @@ export const PhaseScheduleEditor: React.FC<{ projectId: number }> = ({ projectId
     },
     onError: () => setErrorMessage("Could not save the schedule change. Check the value and try again."),
   });
+
+  // The two queries settle at different speeds. `phases` is one indexed SELECT;
+  // `pricing-summary` reruns the whole pricing calculation, so after a save the
+  // new override is already in `phases` while `dates` still holds the pre-save
+  // value. React Query serves the previous `data` throughout a refetch, so only
+  // `isFetching` separates that window from a genuine disagreement.
+  const isSettled = !isFetchingPhases && !isFetchingPricing && !patchPhase.isPending;
 
   const setFieldError = (key: string, message: string | null) =>
     setFieldErrors((previous) => {
@@ -228,9 +255,27 @@ export const PhaseScheduleEditor: React.FC<{ projectId: number }> = ({ projectId
   };
 
   const saveOverride = (phase: Phase, spec: DateSpec, raw: string) => {
+    const key = `${phase.id}:${spec.override}`;
+
     // An emptied date input reads as "", which must reach the API as null so the
     // column clears and the phase returns to its derived date.
     const value = raw === "" ? null : raw;
+
+    if (value !== null) {
+      if (!ISO_DATE.test(value)) {
+        setFieldError(key, "Enter the date as YYYY-MM-DD, or clear the field.");
+        return;
+      }
+      if (value < MIN_OVERRIDE_DATE || value > MAX_OVERRIDE_DATE) {
+        setFieldError(
+          key,
+          `Enter a date between ${MIN_OVERRIDE_DATE} and ${MAX_OVERRIDE_DATE}, or clear the field.`,
+        );
+        return;
+      }
+    }
+
+    setFieldError(key, null);
     if (phase[spec.override] === value) return;
     patchPhase.mutate({ phaseId: phase.id, field: spec.override, value });
   };
@@ -304,7 +349,11 @@ export const PhaseScheduleEditor: React.FC<{ projectId: number }> = ({ projectId
                           data-testid={`input-${spec.field}-${phase.id}`}
                         />
                         {error ? (
-                          <p id={errorId} className="text-xs text-destructive">
+                          // role="alert": the error is raised on blur, so focus
+                          // has already left and an aria-describedby change
+                          // announces nothing. This announces it without taking
+                          // focus back off the field the user moved to.
+                          <p id={errorId} role="alert" className="text-xs text-destructive">
                             {error} Not saved.
                           </p>
                         ) : (
@@ -321,6 +370,8 @@ export const PhaseScheduleEditor: React.FC<{ projectId: number }> = ({ projectId
                   {DATE_SPECS.map((spec) => {
                     const overrideId = `${spec.override}-${phase.id}`;
                     const sourceId = `${overrideId}-source`;
+                    const overrideErrorId = `${overrideId}-error`;
+                    const overrideError = fieldErrors[`${phase.id}:${spec.override}`];
                     // A blank column is not an override. Rows written before the
                     // API validated these fields can hold "" or a
                     // calendar-impossible string, both of which the server
@@ -330,13 +381,10 @@ export const PhaseScheduleEditor: React.FC<{ projectId: number }> = ({ projectId
                     const effective = dates[spec.key];
                     // The server resolves an override to the date it prints, so
                     // an override that does not come back as the effective date
-                    // is one it refused. Suppressed while a save is in flight or
-                    // before the summary loads, when the two legitimately differ.
+                    // is one it refused. Only meaningful once both queries have
+                    // settled; see `isSettled`.
                     const isIgnored =
-                      isOverridden &&
-                      pricing !== undefined &&
-                      !patchPhase.isPending &&
-                      stored !== effective;
+                      isOverridden && pricing !== undefined && isSettled && stored !== effective;
 
                     return (
                       <div
@@ -392,15 +440,31 @@ export const PhaseScheduleEditor: React.FC<{ projectId: number }> = ({ projectId
                             id={overrideId}
                             name={overrideId}
                             type="date"
+                            min={MIN_OVERRIDE_DATE}
+                            max={MAX_OVERRIDE_DATE}
                             autoComplete="off"
                             defaultValue={stored ?? ""}
-                            aria-describedby={sourceId}
+                            aria-invalid={!!overrideError}
+                            aria-describedby={overrideError ? overrideErrorId : sourceId}
                             onBlur={(event) => saveOverride(phase, spec, event.target.value)}
                             data-testid={`input-${spec.override}-${phase.id}`}
                           />
-                          <p className="text-xs text-muted-foreground">
-                            {isSaving(phase.id, spec.override) ? "Saving…" : "Leave empty to calculate."}
-                          </p>
+                          {overrideError ? (
+                            <p
+                              id={overrideErrorId}
+                              role="alert"
+                              className="text-xs text-destructive"
+                              data-testid={`text-error-${spec.override}-${phase.id}`}
+                            >
+                              {overrideError} Not saved.
+                            </p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              {isSaving(phase.id, spec.override)
+                                ? "Saving…"
+                                : "Leave empty to calculate."}
+                            </p>
+                          )}
                         </div>
                       </div>
                     );

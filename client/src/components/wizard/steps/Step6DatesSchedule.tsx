@@ -27,9 +27,23 @@ const D1_OVERRIDES = [
   { field: 'permitSubmittalDate', label: 'Permit Submittal', testId: 'input-permit-submittal-date' },
 ] as const;
 
+// The help text differs per field because the fallbacks do. mapper.ts:1483
+// resolves PRODUCTION_COMPLETE_DATE to the phase rollup when the column is
+// empty; mapper.ts:1478 has no such fallback for PRODUCTION_MIDPOINT_DATE, and
+// no rolled midpoint exists to fall back to, so an empty column prints TBD.
 const D2_OVERRIDES = [
-  { field: 'productionMidpointDate', label: 'Production Midpoint', testId: 'input-production-midpoint-date' },
-  { field: 'productionCompleteDate', label: 'Production Complete', testId: 'input-production-complete-date' },
+  {
+    field: 'productionMidpointDate',
+    label: 'Production Midpoint',
+    testId: 'input-production-midpoint-date',
+    help: 'Nothing calculates this one. Empty prints TBD in Exhibit D.2.',
+  },
+  {
+    field: 'productionCompleteDate',
+    label: 'Production Complete',
+    testId: 'input-production-complete-date',
+    help: 'Empty means rolled up from the phases — the latest factory completion.',
+  },
 ] as const;
 
 const SITE_READINESS = [
@@ -185,37 +199,65 @@ export const Step6DatesSchedule: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="max-w-xs space-y-1">
-            <Label htmlFor="designPhaseDays">Design Duration (days)</Label>
-            <Input
-              id="designPhaseDays"
-              name="designPhaseDays"
-              type="number"
-              inputMode="numeric"
-              step={1}
-              min={30}
-              max={180}
-              autoComplete="off"
-              value={projectData.designPhaseDays || ''}
-              onChange={(e) => updateProjectData({ designPhaseDays: parseInt(e.target.value) || 0 })}
-              placeholder="60…"
-              aria-invalid={!!validationErrors.designPhaseDays}
-              aria-describedby={
-                validationErrors.designPhaseDays ? 'designPhaseDays-error' : 'designPhaseDays-help'
-              }
-              className={`tabular-nums ${validationErrors.designPhaseDays ? 'border-destructive' : ''}`}
-              data-testid="input-design-days"
-            />
-            {validationErrors.designPhaseDays ? (
-              <p id="designPhaseDays-error" className="text-xs text-destructive">
-                {validationErrors.designPhaseDays}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label htmlFor="designPhaseDays">Design Duration (days)</Label>
+              <Input
+                id="designPhaseDays"
+                name="designPhaseDays"
+                type="number"
+                inputMode="numeric"
+                step={1}
+                min={30}
+                max={180}
+                autoComplete="off"
+                value={projectData.designPhaseDays || ''}
+                onChange={(e) => updateProjectData({ designPhaseDays: parseInt(e.target.value) || 0 })}
+                placeholder="60…"
+                aria-invalid={!!validationErrors.designPhaseDays}
+                aria-describedby={
+                  validationErrors.designPhaseDays ? 'designPhaseDays-error' : 'designPhaseDays-help'
+                }
+                className={`tabular-nums ${validationErrors.designPhaseDays ? 'border-destructive' : ''}`}
+                data-testid="input-design-days"
+              />
+              {validationErrors.designPhaseDays ? (
+                <p id="designPhaseDays-error" className="text-xs text-destructive">
+                  {validationErrors.designPhaseDays}
+                </p>
+              ) : (
+                <p id="designPhaseDays-help" className="text-xs text-muted-foreground">
+                  Typical: 30&ndash;90 days. Phase 1 enters the factory this many days after the
+                  project start.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="manufacturingDurationDays">Default Production Duration (days)</Label>
+              <Input
+                id="manufacturingDurationDays"
+                name="manufacturingDurationDays"
+                type="number"
+                inputMode="numeric"
+                step={1}
+                min={1}
+                max={1095}
+                autoComplete="off"
+                value={projectData.manufacturingDurationDays || ''}
+                onChange={(e) =>
+                  updateProjectData({ manufacturingDurationDays: parseInt(e.target.value) || 0 })
+                }
+                placeholder="120…"
+                aria-describedby="manufacturingDurationDays-help"
+                className="tabular-nums"
+                data-testid="input-default-production-days"
+              />
+              <p id="manufacturingDurationDays-help" className="text-xs text-muted-foreground">
+                Used by any phase with no manufacturing days of its own. Set a phase&rsquo;s own
+                duration below to override it there.
               </p>
-            ) : (
-              <p id="designPhaseDays-help" className="text-xs text-muted-foreground">
-                Typical: 30&ndash;90 days. Phase 1 enters the factory this many days after the
-                project start.
-              </p>
-            )}
+            </div>
           </div>
 
           <div className="space-y-2 pt-4 border-t">
@@ -291,8 +333,9 @@ export const Step6DatesSchedule: React.FC = () => {
             <Badge variant="outline" className="text-xs">Exhibit D.2</Badge>
           </CardTitle>
           <CardDescription>
-            Exhibit D.2 states one production span for the whole project, rolled up from the phases
-            above. Enter a date here only to assert it over that rollup.
+            Exhibit D.2 states one production span for the whole project. Production Complete rolls
+            up from the phases above unless you assert it here; Production Midpoint has no
+            calculation behind it, so leaving it empty prints TBD.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -311,7 +354,7 @@ export const Step6DatesSchedule: React.FC = () => {
                   data-testid={milestone.testId}
                 />
                 <p id={`${milestone.field}-help`} className="text-xs text-muted-foreground">
-                  Empty means rolled up from the phases.
+                  {milestone.help}
                 </p>
               </div>
             ))}
