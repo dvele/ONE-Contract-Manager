@@ -24,12 +24,16 @@ const isoDate = z
   .nullable()
   .optional();
 
+// The durations are nullable, not merely optional: clearing one has to reach the
+// column as null. A null manufacturingDays is what hands the phase back to the
+// project's production duration (pricingEngine.calculateProjectPricing), and a
+// null offset or lag is not 0 — 0 is an asserted same-day start.
 const PhaseInputSchema = z.object({
   name: z.string().trim().max(120).optional(),
-  startOffsetDays: z.number().int().min(-365).max(365).optional(),
-  manufacturingDays: z.number().int().min(0).max(1095).optional(),
-  onsiteDays: z.number().int().min(0).max(1095).optional(),
-  deliveryLagDays: z.number().int().min(0).max(365).optional(),
+  startOffsetDays: z.number().int().min(-365).max(365).nullable().optional(),
+  manufacturingDays: z.number().int().min(0).max(1095).nullable().optional(),
+  onsiteDays: z.number().int().min(0).max(1095).nullable().optional(),
+  deliveryLagDays: z.number().int().min(0).max(365).nullable().optional(),
   factoryStartOverride: isoDate,
   factoryCompleteOverride: isoDate,
   deliveryWindowOverride: isoDate,

@@ -1,27 +1,75 @@
 import { useEffect, useMemo } from 'react';
 import { useWizard } from '../WizardContext';
+import { PhaseScheduleEditor } from '../PhaseScheduleEditor';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar, Clock, Info, AlertTriangle, Target } from 'lucide-react';
 
+/**
+ * The Exhibit D.1 review periods, in business days, as `D1_REVIEW_PERIODS` in
+ * server/lib/mapper.ts states them. Exhibit D.1's own "Review Period" column is
+ * the source; no column stores them, so they are shown here read-only rather
+ * than as inputs that would have nowhere to save.
+ */
+const D1_REVIEW_PERIODS = [
+  { label: 'Kickoff Review', days: 5 },
+  { label: 'Schematic Review', days: 10 },
+  { label: 'Permit Set Review', days: 10 },
+  { label: 'Green Light Review', days: 5 },
+];
+
+const D1_OVERRIDES = [
+  { field: 'designKickoffDate', label: 'Design Kickoff', testId: 'input-design-kickoff-date' },
+  { field: 'schematicDesignDate', label: 'Schematic Design Complete', testId: 'input-schematic-design-date' },
+  { field: 'designDevelopmentDate', label: 'Design Development Complete', testId: 'input-design-development-date' },
+  { field: 'permitSubmittalDate', label: 'Permit Submittal', testId: 'input-permit-submittal-date' },
+] as const;
+
+const D2_OVERRIDES = [
+  { field: 'productionMidpointDate', label: 'Production Midpoint', testId: 'input-production-midpoint-date' },
+  { field: 'productionCompleteDate', label: 'Production Complete', testId: 'input-production-complete-date' },
+] as const;
+
+const SITE_READINESS = [
+  { field: 'foundationReadyDays', label: 'Foundation Ready (days)', placeholder: '14…', max: 90, testId: 'input-foundation-ready-days' },
+  { field: 'utilityStubbedDays', label: 'Utilities Stubbed (days)', placeholder: '14…', max: 90, testId: 'input-utility-stubbed-days' },
+  { field: 'siteAccessReadyDays', label: 'Site Access Ready (days)', placeholder: '7…', max: 60, testId: 'input-site-access-ready-days' },
+  { field: 'permitsScheduledDays', label: 'Permits Scheduled (days)', placeholder: '30…', max: 120, testId: 'input-permits-scheduled-days' },
+  { field: 'craneAccessReadyDays', label: 'Crane Access Ready (days)', placeholder: '7…', max: 60, testId: 'input-crane-access-ready-days' },
+] as const;
+
+/**
+ * UTC, matching `formatDateOrTBD` in server/lib/mapper.ts: a `YYYY-MM-DD`
+ * string parses as UTC midnight, so formatting it in the viewer's own zone
+ * prints the previous day anywhere west of UTC.
+ */
+const dateFormat = new Intl.DateTimeFormat('en-US', {
+  weekday: 'long',
+  year: 'numeric',
+  month: 'long',
+  day: 'numeric',
+  timeZone: 'UTC',
+});
+
 export const Step6DatesSchedule: React.FC = () => {
-  const { 
-    wizardState, 
-    updateProjectData
-  } = useWizard();
-  
+  const { wizardState, updateProjectData, draftProjectId } = useWizard();
+
   const { projectData, validationErrors } = wizardState;
-  
-  // Use project's existing start date (from Step 1)
-  // agreementDate comes from Step 1, defaults to today if not set
-  const projectStartDate = useMemo(() => {
-    if (projectData.agreementDate) return new Date(projectData.agreementDate);
-    return new Date(); // Default to today
-  }, [projectData.agreementDate]);
-  
+
+  // `effectiveDate`, not `agreementDate`, is what the wizard saves to
+  // projectDetails.agreementExecutionDate, and that column is what the server
+  // anchors every derived date to. Showing agreementDate here would name a
+  // start the schedule does not actually use.
+  const projectStart = projectData.effectiveDate || projectData.agreementDate;
+
+  const projectStartLabel = useMemo(() => {
+    if (!projectStart) return 'Not set';
+    const parsed = new Date(`${projectStart}T00:00:00Z`);
+    return Number.isNaN(parsed.getTime()) ? projectStart : dateFormat.format(parsed);
+  }, [projectStart]);
+
   // Auto-set effectiveDate from agreementDate on mount or when agreementDate changes
   useEffect(() => {
     if (!projectData.effectiveDate && projectData.agreementDate) {
@@ -32,14 +80,18 @@ export const Step6DatesSchedule: React.FC = () => {
       updateProjectData({ effectiveDate: today });
     }
   }, [projectData.agreementDate, projectData.effectiveDate, updateProjectData]);
-  
+
   useEffect(() => {
     if (!projectData.onsiteDurationDays) {
       const defaultDays = projectData.serviceModel === 'CRC' ? 90 : 60;
       updateProjectData({ onsiteDurationDays: defaultDays });
     }
   }, [projectData.serviceModel]);
-  
+
+  // manufacturingDurationDays keeps its default even though this step no longer
+  // shows it: the wizard saves it to projects.productionDuration, which every
+  // phase with no manufacturingDays of its own falls back to. Letting it settle
+  // at 0 would derive a null factoryComplete for each of those phases.
   useEffect(() => {
     const updates: Partial<typeof projectData> = {};
     if (!projectData.designPhaseDays) {
@@ -52,246 +104,226 @@ export const Step6DatesSchedule: React.FC = () => {
       updateProjectData(updates);
     }
   }, []);
-  
-  // Calculate delivery and completion dates based on start date + durations
+
+  // The project-level rollup behind COMPLETION_DATE and PROJECT_END_DATE in
+  // mapper.ts. Its inputs are no longer edited on this step, but the mapper
+  // still reads projects.estimatedCompletionDate, so it keeps being derived.
   const { deliveryDate, completionDate } = useMemo(() => {
-    const startDate = new Date(projectStartDate);
-    
-    // Delivery = start + design + manufacturing
-    const deliveryDays = (projectData.designPhaseDays || 0) + 
-                         (projectData.manufacturingDurationDays || 0);
+    const startDate = new Date(`${projectStart || new Date().toISOString().split('T')[0]}T00:00:00Z`);
+
+    const deliveryDays =
+      (projectData.designPhaseDays || 0) + (projectData.manufacturingDurationDays || 0);
     const delivery = new Date(startDate);
-    delivery.setDate(delivery.getDate() + deliveryDays);
-    
-    // Completion = start + design + manufacturing + onsite
+    delivery.setUTCDate(delivery.getUTCDate() + deliveryDays);
+
     const totalDays = deliveryDays + (projectData.onsiteDurationDays || 0);
     const completion = new Date(startDate);
-    completion.setDate(completion.getDate() + totalDays);
-    
+    completion.setUTCDate(completion.getUTCDate() + totalDays);
+
     return { deliveryDate: delivery, completionDate: completion };
-  }, [projectStartDate, projectData.designPhaseDays, projectData.manufacturingDurationDays, projectData.onsiteDurationDays]);
-  
-  // Auto-save estimated dates to project data when they change
+  }, [
+    projectStart,
+    projectData.designPhaseDays,
+    projectData.manufacturingDurationDays,
+    projectData.onsiteDurationDays,
+  ]);
+
   useEffect(() => {
     const deliveryStr = deliveryDate.toISOString().split('T')[0];
     const completionStr = completionDate.toISOString().split('T')[0];
-    
-    if (projectData.targetDeliveryDate !== deliveryStr || 
-        projectData.estimatedCompletionDate !== completionStr) {
-      updateProjectData({ 
+
+    if (
+      projectData.targetDeliveryDate !== deliveryStr ||
+      projectData.estimatedCompletionDate !== completionStr
+    ) {
+      updateProjectData({
         targetDeliveryDate: deliveryStr,
-        estimatedCompletionDate: completionStr
+        estimatedCompletionDate: completionStr,
       });
     }
   }, [deliveryDate, completionDate]);
-  
-  const totalDays = (projectData.designPhaseDays || 0) + 
-                    (projectData.manufacturingDurationDays || 0) + 
-                    (projectData.onsiteDurationDays || 0);
-  
-  const formatDate = (date: Date | null) => {
-    if (!date) return 'Not calculated';
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long',
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
-  };
-  
-  const designPercent = totalDays > 0 ? ((projectData.designPhaseDays || 0) / totalDays) * 100 : 0;
-  const mfgPercent = totalDays > 0 ? ((projectData.manufacturingDurationDays || 0) / totalDays) * 100 : 0;
-  const onsitePercent = totalDays > 0 ? ((projectData.onsiteDurationDays || 0) / totalDays) * 100 : 0;
-  
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
-            Key Dates
+            <Calendar className="h-5 w-5 text-primary" aria-hidden="true" />
+            Project Start
           </CardTitle>
           <CardDescription>
-            Set the project timeline and key milestones
+            Every date below derives from this day. Change it in Step 1.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent>
           <div className="p-4 bg-muted/30 rounded-lg border flex items-start gap-3">
-            <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
-            <div>
+            <Info className="h-5 w-5 text-muted-foreground mt-0.5" aria-hidden="true" />
+            <div className="min-w-0">
               <p className="text-sm font-medium">Project Start Date</p>
-              <p className="text-lg font-semibold">{formatDate(projectStartDate)}</p>
+              <p className="text-lg font-semibold tabular-nums break-words" data-testid="text-project-start">
+                {projectStartLabel}
+              </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Based on the agreement date from Step 1 (or project creation date)
+                Taken from the agreement date in Step 1. Design, manufacturing, delivery and
+                occupancy all chain forward from it.
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-primary" />
-            Phase Durations
+            <Clock className="h-5 w-5 text-primary" aria-hidden="true" />
+            Design
+            <Badge variant="outline" className="text-xs">Exhibit D.1</Badge>
           </CardTitle>
           <CardDescription>
-            Configure the length of each project phase
+            How long design runs before the first phase enters the factory, and the review periods
+            that place each D.1 milestone.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="designPhaseDays">
-                Design Phase (days)
-              </Label>
-              <Input
-                id="designPhaseDays"
-                type="number"
-                value={projectData.designPhaseDays || ''}
-                onChange={(e) => updateProjectData({ designPhaseDays: parseInt(e.target.value) || 0 })}
-                placeholder="e.g., 60"
-                min={30}
-                max={180}
-                className={validationErrors.designPhaseDays ? 'border-red-500' : ''}
-                data-testid="input-design-days"
-              />
-              {validationErrors.designPhaseDays && (
-                <p className="text-sm text-red-500">{validationErrors.designPhaseDays}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Typical: 30-90 days
+          <div className="max-w-xs space-y-1">
+            <Label htmlFor="designPhaseDays">Design Duration (days)</Label>
+            <Input
+              id="designPhaseDays"
+              name="designPhaseDays"
+              type="number"
+              inputMode="numeric"
+              step={1}
+              min={30}
+              max={180}
+              autoComplete="off"
+              value={projectData.designPhaseDays || ''}
+              onChange={(e) => updateProjectData({ designPhaseDays: parseInt(e.target.value) || 0 })}
+              placeholder="60…"
+              aria-invalid={!!validationErrors.designPhaseDays}
+              aria-describedby={
+                validationErrors.designPhaseDays ? 'designPhaseDays-error' : 'designPhaseDays-help'
+              }
+              className={`tabular-nums ${validationErrors.designPhaseDays ? 'border-destructive' : ''}`}
+              data-testid="input-design-days"
+            />
+            {validationErrors.designPhaseDays ? (
+              <p id="designPhaseDays-error" className="text-xs text-destructive">
+                {validationErrors.designPhaseDays}
               </p>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="manufacturingDurationDays">
-                Manufacturing (days)
-              </Label>
-              <Input
-                id="manufacturingDurationDays"
-                type="number"
-                value={projectData.manufacturingDurationDays || ''}
-                onChange={(e) => updateProjectData({ manufacturingDurationDays: parseInt(e.target.value) || 0 })}
-                placeholder="e.g., 120"
-                min={60}
-                max={365}
-                className={validationErrors.manufacturingDurationDays ? 'border-red-500' : ''}
-                data-testid="input-manufacturing-days"
-              />
-              {validationErrors.manufacturingDurationDays && (
-                <p className="text-sm text-red-500">{validationErrors.manufacturingDurationDays}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Typical: 90-180 days
+            ) : (
+              <p id="designPhaseDays-help" className="text-xs text-muted-foreground">
+                Typical: 30&ndash;90 days. Phase 1 enters the factory this many days after the
+                project start.
               </p>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="onsiteDurationDays" className="flex items-center gap-2">
-                On-Site (days)
-                {projectData.serviceModel === 'CRC' && (
-                  <Badge variant="outline" className="text-xs">CRC</Badge>
-                )}
-              </Label>
-              <Input
-                id="onsiteDurationDays"
-                type="number"
-                value={projectData.onsiteDurationDays || ''}
-                onChange={(e) => updateProjectData({ onsiteDurationDays: parseInt(e.target.value) || 0 })}
-                placeholder={projectData.serviceModel === 'CRC' ? '90' : '60'}
-                min={30}
-                max={180}
-                className={validationErrors.onsiteDurationDays ? 'border-red-500' : ''}
-                data-testid="input-onsite-days"
-              />
-              {validationErrors.onsiteDurationDays && (
-                <p className="text-sm text-red-500">{validationErrors.onsiteDurationDays}</p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                {projectData.serviceModel === 'CRC' 
-                  ? 'Default: 90 days (client-managed)' 
-                  : 'Default: 60 days (Dvele-managed)'
-                }
-              </p>
-            </div>
+            )}
           </div>
-          
-          <div className="space-y-3 pt-4 border-t">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Total Duration</span>
-              <span className="font-medium">{totalDays} days ({Math.round(totalDays / 30)} months)</span>
-            </div>
-            
-            <div className="h-4 bg-muted rounded-full overflow-hidden flex">
-              <div 
-                className="bg-blue-500 h-full transition-all"
-                style={{ width: `${designPercent}%` }}
-                title={`Design: ${projectData.designPhaseDays || 0} days`}
-              />
-              <div 
-                className="bg-amber-500 h-full transition-all"
-                style={{ width: `${mfgPercent}%` }}
-                title={`Manufacturing: ${projectData.manufacturingDurationDays || 0} days`}
-              />
-              <div 
-                className="bg-green-500 h-full transition-all"
-                style={{ width: `${onsitePercent}%` }}
-                title={`On-Site: ${projectData.onsiteDurationDays || 0} days`}
-              />
-            </div>
-            
-            <div className="flex flex-wrap gap-4 text-xs">
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded bg-blue-500" />
-                <span>Design ({projectData.designPhaseDays || 0}d)</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded bg-amber-500" />
-                <span>Manufacturing ({projectData.manufacturingDurationDays || 0}d)</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 rounded bg-green-500" />
-                <span>On-Site ({projectData.onsiteDurationDays || 0}d)</span>
-              </div>
-            </div>
+
+          <div className="space-y-2 pt-4 border-t">
+            <h3 className="text-sm font-medium">Review Periods</h3>
+            <p className="text-xs text-muted-foreground">
+              Fixed by Exhibit D.1 and stated in business days. They place each milestone below
+              when no date is entered for it.
+            </p>
+            <dl className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-1">
+              {D1_REVIEW_PERIODS.map((period) => (
+                <div key={period.label} className="rounded-lg border bg-muted/30 p-3 min-w-0">
+                  <dt className="text-xs text-muted-foreground break-words">{period.label}</dt>
+                  <dd className="text-base font-semibold tabular-nums">
+                    {period.days} business days
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
-            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-              <div className="flex items-start gap-3">
-                <Calendar className="h-5 w-5 text-amber-600 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Estimated Delivery Date</p>
-                  <p className="text-lg font-semibold text-amber-600">{formatDate(deliveryDate)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Start + Design + Manufacturing
+
+          <div className="space-y-2 pt-4 border-t">
+            <h3 className="text-sm font-medium">Milestone Date Overrides</h3>
+            <p className="text-xs text-muted-foreground">
+              Leave these empty and each date is calculated from the project start through the
+              review periods above. Enter one to assert it instead; clear it to calculate it again.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              {D1_OVERRIDES.map((milestone) => (
+                <div key={milestone.field} className="space-y-1">
+                  <Label htmlFor={milestone.field}>{milestone.label}</Label>
+                  <Input
+                    id={milestone.field}
+                    name={milestone.field}
+                    type="date"
+                    autoComplete="off"
+                    value={projectData[milestone.field] || ''}
+                    onChange={(e) => updateProjectData({ [milestone.field]: e.target.value })}
+                    aria-describedby={`${milestone.field}-help`}
+                    data-testid={milestone.testId}
+                  />
+                  <p id={`${milestone.field}-help`} className="text-xs text-muted-foreground">
+                    Empty means calculated.
                   </p>
                 </div>
-              </div>
-            </div>
-            
-            <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
-              <div className="flex items-start gap-3">
-                <Calendar className="h-5 w-5 text-primary mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Estimated Completion Date</p>
-                  <p className="text-lg font-semibold text-primary">{formatDate(completionDate)}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Start + Design + Manufacturing + On-Site
-                  </p>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </CardContent>
       </Card>
-      
+
+      {draftProjectId ? (
+        <PhaseScheduleEditor projectId={draftProjectId} />
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-primary" aria-hidden="true" />
+              Phase Schedule
+            </CardTitle>
+            <CardDescription>
+              Save the project in Step 1 and add phases in Step 4, then set each phase&rsquo;s
+              schedule here.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-primary" />
-            Interface Deadlines
+            <Target className="h-5 w-5 text-primary" aria-hidden="true" />
+            Production Rollup Overrides
+            <Badge variant="outline" className="text-xs">Exhibit D.2</Badge>
+          </CardTitle>
+          <CardDescription>
+            Exhibit D.2 states one production span for the whole project, rolled up from the phases
+            above. Enter a date here only to assert it over that rollup.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {D2_OVERRIDES.map((milestone) => (
+              <div key={milestone.field} className="space-y-1">
+                <Label htmlFor={milestone.field}>{milestone.label}</Label>
+                <Input
+                  id={milestone.field}
+                  name={milestone.field}
+                  type="date"
+                  autoComplete="off"
+                  value={projectData[milestone.field] || ''}
+                  onChange={(e) => updateProjectData({ [milestone.field]: e.target.value })}
+                  aria-describedby={`${milestone.field}-help`}
+                  data-testid={milestone.testId}
+                />
+                <p id={`${milestone.field}-help`} className="text-xs text-muted-foreground">
+                  Empty means rolled up from the phases.
+                </p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-primary" aria-hidden="true" />
+            Site Readiness
             <Badge variant="outline" className="text-xs">Exhibit C.4</Badge>
           </CardTitle>
           <CardDescription>
@@ -300,186 +332,32 @@ export const Step6DatesSchedule: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="foundationReadyDays">Foundation Ready (days)</Label>
-              <Input
-                id="foundationReadyDays"
-                type="number"
-                value={projectData.foundationReadyDays || ''}
-                onChange={(e) => updateProjectData({ foundationReadyDays: parseInt(e.target.value) || 0 })}
-                placeholder="14"
-                min={1}
-                max={90}
-                data-testid="input-foundation-ready-days"
-              />
-              <p className="text-xs text-muted-foreground">Default: 14 days</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="utilityStubbedDays">Utilities Stubbed (days)</Label>
-              <Input
-                id="utilityStubbedDays"
-                type="number"
-                value={projectData.utilityStubbedDays || ''}
-                onChange={(e) => updateProjectData({ utilityStubbedDays: parseInt(e.target.value) || 0 })}
-                placeholder="14"
-                min={1}
-                max={90}
-                data-testid="input-utility-stubbed-days"
-              />
-              <p className="text-xs text-muted-foreground">Default: 14 days</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="siteAccessReadyDays">Site Access Ready (days)</Label>
-              <Input
-                id="siteAccessReadyDays"
-                type="number"
-                value={projectData.siteAccessReadyDays || ''}
-                onChange={(e) => updateProjectData({ siteAccessReadyDays: parseInt(e.target.value) || 0 })}
-                placeholder="7"
-                min={1}
-                max={60}
-                data-testid="input-site-access-ready-days"
-              />
-              <p className="text-xs text-muted-foreground">Default: 7 days</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="permitsScheduledDays">Permits Scheduled (days)</Label>
-              <Input
-                id="permitsScheduledDays"
-                type="number"
-                value={projectData.permitsScheduledDays || ''}
-                onChange={(e) => updateProjectData({ permitsScheduledDays: parseInt(e.target.value) || 0 })}
-                placeholder="30"
-                min={1}
-                max={120}
-                data-testid="input-permits-scheduled-days"
-              />
-              <p className="text-xs text-muted-foreground">Default: 30 days</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="craneAccessReadyDays">Crane Access Ready (days)</Label>
-              <Input
-                id="craneAccessReadyDays"
-                type="number"
-                value={projectData.craneAccessReadyDays || ''}
-                onChange={(e) => updateProjectData({ craneAccessReadyDays: parseInt(e.target.value) || 0 })}
-                placeholder="7"
-                min={1}
-                max={60}
-                data-testid="input-crane-access-ready-days"
-              />
-              <p className="text-xs text-muted-foreground">Default: 7 days</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5 text-primary" />
-            Milestone Target Dates
-            <Badge variant="outline" className="text-xs">Exhibit D.1 / D.2</Badge>
-          </CardTitle>
-          <CardDescription>
-            Target dates for design, permitting, and production milestones (leave blank for TBD)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div>
-            <p className="text-sm font-medium mb-3">D.1 - Design / Pre-Production</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="designKickoffDate">Design Kickoff</Label>
+            {SITE_READINESS.map((condition) => (
+              <div key={condition.field} className="space-y-1">
+                <Label htmlFor={condition.field}>{condition.label}</Label>
                 <Input
-                  id="designKickoffDate"
-                  type="date"
-                  value={projectData.designKickoffDate || ''}
-                  onChange={(e) => updateProjectData({ designKickoffDate: e.target.value })}
-                  data-testid="input-design-kickoff-date"
+                  id={condition.field}
+                  name={condition.field}
+                  type="number"
+                  inputMode="numeric"
+                  step={1}
+                  min={1}
+                  max={condition.max}
+                  autoComplete="off"
+                  value={projectData[condition.field] || ''}
+                  onChange={(e) =>
+                    updateProjectData({ [condition.field]: parseInt(e.target.value) || 0 })
+                  }
+                  placeholder={condition.placeholder}
+                  aria-describedby={`${condition.field}-help`}
+                  className="tabular-nums"
+                  data-testid={condition.testId}
                 />
+                <p id={`${condition.field}-help`} className="text-xs text-muted-foreground">
+                  Default: {condition.placeholder.replace('…', '')} days
+                </p>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="schematicDesignDate">Schematic Design Complete</Label>
-                <Input
-                  id="schematicDesignDate"
-                  type="date"
-                  value={projectData.schematicDesignDate || ''}
-                  onChange={(e) => updateProjectData({ schematicDesignDate: e.target.value })}
-                  data-testid="input-schematic-design-date"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="designDevelopmentDate">Design Development Complete</Label>
-                <Input
-                  id="designDevelopmentDate"
-                  type="date"
-                  value={projectData.designDevelopmentDate || ''}
-                  onChange={(e) => updateProjectData({ designDevelopmentDate: e.target.value })}
-                  data-testid="input-design-development-date"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="permitSubmittalDate">Permit Submittal</Label>
-                <Input
-                  id="permitSubmittalDate"
-                  type="date"
-                  value={projectData.permitSubmittalDate || ''}
-                  onChange={(e) => updateProjectData({ permitSubmittalDate: e.target.value })}
-                  data-testid="input-permit-submittal-date"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t pt-4">
-            <p className="text-sm font-medium mb-3">D.2 - Production Milestones</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="productionMidpointDate">Production Midpoint</Label>
-                <Input
-                  id="productionMidpointDate"
-                  type="date"
-                  value={projectData.productionMidpointDate || ''}
-                  onChange={(e) => updateProjectData({ productionMidpointDate: e.target.value })}
-                  data-testid="input-production-midpoint-date"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="productionCompleteDate">Production Complete</Label>
-                <Input
-                  id="productionCompleteDate"
-                  type="date"
-                  value={projectData.productionCompleteDate || ''}
-                  onChange={(e) => updateProjectData({ productionCompleteDate: e.target.value })}
-                  data-testid="input-production-complete-date"
-                />
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-muted/30">
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium">Contract Variables</p>
-              <p className="text-xs text-muted-foreground">
-                This step populates schedule, deadline, and milestone variables
-              </p>
-            </div>
-            <Badge variant="secondary" className="text-xs">
-              EFFECTIVE_DATE, DESIGN_DAYS, MFG_DAYS, ONSITE_DAYS, C.4 deadlines, D.1/D.2 dates
-            </Badge>
+            ))}
           </div>
         </CardContent>
       </Card>
