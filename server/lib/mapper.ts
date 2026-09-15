@@ -25,8 +25,7 @@ import { buildSignatureBlock as buildStyledSignatureBlock } from "./tableStyles"
 import {
   deriveDesignMilestones,
   toDateOnly,
-  ISO_DATE,
-  isRealCalendarDate,
+  asCalendarDate,
   type PhaseDates,
 } from "../services/scheduleMath";
 
@@ -683,28 +682,6 @@ const D1_REVIEW_PERIODS = {
 };
 
 /**
- * Treats a blank or malformed override as absent so it falls through to the
- * derived date.
- *
- * These override columns are unconstrained `text` written straight from
- * request bodies, and a wizard save path stores `""` rather than NULL — so
- * `??` alone is nullish-safe but not date-safe and would print TBD over a
- * perfectly good derived date. `pricingEngine.calculateProjectPricing` guards
- * `agreementExecutionDate` the same way for the same reason.
- *
- * `ISO_DATE` is shape-only by design, so the calendar check is separate and
- * required: `2027-02-30` passes the pattern and `new Date` silently rolls it
- * over to March 2, which would print a date nobody entered into Exhibit D
- * instead of falling through to the derived one. `scheduleMath.validOverride`
- * guards the per-phase override columns identically.
- */
-function dateOverride(value: string | null | undefined): string | null {
-  return value && ISO_DATE.test(value) && isRealCalendarDate(value)
-    ? value
-    : null;
-}
-
-/**
  * Earliest and latest of a `YYYY-MM-DD` list, ignoring nulls. Lexicographic
  * comparison is chronological for zero-padded ISO dates. An empty list (a
  * project with no phases) yields null, which renders as TBD.
@@ -795,11 +772,9 @@ export function mapProjectToVariables(
   // before chaining the phase dates. D.1's milestones and D.2's phase rollup
   // must anchor to the same day or the two exhibits state conflicting
   // schedules for one project.
-  const executionDate = projectDetails?.agreementExecutionDate;
   const projectStart =
-    executionDate && ISO_DATE.test(executionDate)
-      ? executionDate
-      : toDateOnly(project.createdAt ?? null);
+    asCalendarDate(projectDetails?.agreementExecutionDate) ??
+    toDateOnly(project.createdAt ?? null);
 
   // Exhibit D.1 target dates, derived; the projectDetails columns below
   // override them per-milestone.
@@ -977,10 +952,10 @@ export function mapProjectToVariables(
     // Exhibit D.2 row P-1. The wizard's project-level date overrides the
     // earliest factory start across the phases.
     PRODUCTION_START_DATE: formatDateOrTBD(
-      dateOverride(projectDetails?.productionStartDate) ?? rolledProductionStart
+      asCalendarDate(projectDetails?.productionStartDate) ?? rolledProductionStart
     ),
     PRODUCTION_START_DATE_WRITTEN: formatDateWritten(
-      dateOverride(projectDetails?.productionStartDate) ?? rolledProductionStart
+      asCalendarDate(projectDetails?.productionStartDate) ?? rolledProductionStart
     ),
     ESTIMATED_DELIVERY_DATE: projectDetails?.estimatedDeliveryDate || "",
     ESTIMATED_DELIVERY_DATE_WRITTEN: formatDateWritten(
@@ -1486,18 +1461,18 @@ export function mapProjectToVariables(
     // D.1 rows D-1..D-4: derived from the project start through the stated
     // review periods, with the wizard's own date winning per milestone.
     DESIGN_KICKOFF_DATE: formatDateOrTBD(
-      dateOverride(projectDetails?.designKickoffDate) ?? designMilestones.kickoff
+      asCalendarDate(projectDetails?.designKickoffDate) ?? designMilestones.kickoff
     ),
     SCHEMATIC_DESIGN_DATE: formatDateOrTBD(
-      dateOverride(projectDetails?.schematicDesignDate) ??
+      asCalendarDate(projectDetails?.schematicDesignDate) ??
         designMilestones.schematic
     ),
     DESIGN_DEVELOPMENT_DATE: formatDateOrTBD(
-      dateOverride(projectDetails?.designDevelopmentDate) ??
+      asCalendarDate(projectDetails?.designDevelopmentDate) ??
         designMilestones.greenLightPackage
     ),
     PERMIT_SUBMITTAL_DATE: formatDateOrTBD(
-      dateOverride(projectDetails?.permitSubmittalDate) ??
+      asCalendarDate(projectDetails?.permitSubmittalDate) ??
         designMilestones.permitSet
     ),
     PRODUCTION_MIDPOINT_DATE: formatDateOrTBD(
@@ -1506,7 +1481,7 @@ export function mapProjectToVariables(
     // D.2 rows P-2..P-4. PRODUCTION_START_DATE (row P-1) is in the DATES
     // section above.
     PRODUCTION_COMPLETE_DATE: formatDateOrTBD(
-      dateOverride(projectDetails?.productionCompleteDate) ??
+      asCalendarDate(projectDetails?.productionCompleteDate) ??
         rolledProductionComplete
     ),
     DELIVERY_SET_DATE: formatDateOrTBD(rolledDeliverySet),

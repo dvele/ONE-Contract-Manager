@@ -3,7 +3,7 @@ import { pool } from "../db";
 import { projects, projectDetails, financials, milestones, phases, properties } from "../../shared/schema";
 import { asc, eq } from "drizzle-orm";
 import { buildPhaseRollups, type PropertyRow, type UnitRow, type PhaseRollup } from "./pricingMath";
-import { addDays, derivePhaseDates, toDateOnly, ISO_DATE, type PhaseDurations } from "./scheduleMath";
+import { addDays, derivePhaseDates, toDateOnly, asCalendarDate, type PhaseDurations } from "./scheduleMath";
 
 export type { PhaseRollup, RollupProperty, RollupUnit } from "./pricingMath";
 
@@ -276,14 +276,13 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
 
   // agreementExecutionDate is unconstrained `text` written from request bodies
   // (including a wizard save path that does not guard against ""), so `??`
-  // alone is not enough: an empty string or a non-YYYY-MM-DD value is
-  // nullish-safe but not date-safe, and would otherwise blank every
-  // downstream phase date instead of falling back to createdAt.
-  const executionDate = scheduleDetails?.agreementExecutionDate;
+  // alone is not enough: an empty string, a non-YYYY-MM-DD value, or a
+  // calendar-impossible one like 2026-02-30 is nullish-safe but not date-safe,
+  // and would otherwise anchor every downstream phase date to a rolled-over
+  // date instead of falling back to createdAt.
   const projectStart =
-    executionDate && ISO_DATE.test(executionDate)
-      ? executionDate
-      : toDateOnly(project.createdAt);
+    asCalendarDate(scheduleDetails?.agreementExecutionDate) ??
+    toDateOnly(project.createdAt);
   const designComplete = addDays(projectStart, project.designDuration);
 
   // manufacturingDays has no column default (unlike startOffsetDays/deliveryLagDays):

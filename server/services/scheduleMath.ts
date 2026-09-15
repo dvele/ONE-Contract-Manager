@@ -99,17 +99,35 @@ export function addBusinessDays(date: string | null, days: number | null): strin
 }
 
 /**
- * An override is user/legacy-supplied text, not a value this module derived —
- * a row written before validation existed at the API boundary can already hold
- * a calendar-impossible string. That is bad data, not a missing input: the
- * chain can still legitimately compute a date, so an invalid override is
- * treated as absent (falls through to the derived value) rather than
- * propagating null. Printing the bad string verbatim, or anchoring downstream
- * dates to it, would be worse than silently preferring the computed answer.
+ * The single guard for every user- or legacy-supplied date this system reads:
+ * returns the value when it is a usable `YYYY-MM-DD` calendar date, and null
+ * otherwise.
+ *
+ * Both checks are load-bearing and neither implies the other. `ISO_DATE` is
+ * shape-only and accepts `2027-02-30`, which `new Date` then silently rolls
+ * over to March 2. `isRealCalendarDate` accepts unpadded `2026-3-5`, which
+ * fails the ISO shape and which `new Date` parses in the *host's* zone rather
+ * than UTC — shifting the day on any machine west of UTC. Only the pair
+ * rejects both.
+ *
+ * Such a value is user/legacy-supplied text, not something this module
+ * derived: a row written before validation existed at the API boundary can
+ * already hold a calendar-impossible string. That is bad data, not a missing
+ * input — the chain can still legitimately compute a date, so an invalid
+ * value is treated as absent (callers fall through to a derived value) rather
+ * than propagating null. Printing the bad string verbatim, or anchoring
+ * downstream dates to it, would be worse than preferring the computed answer.
+ *
+ * Every caller that reads a date column routes through this one function —
+ * `derivePhaseDates` and `parseDate` here, `mapper.ts`'s override resolution,
+ * and both `projectStart` resolutions. Copies of this pair drifted apart once
+ * already.
  */
-function validOverride(value: string | null): string | null {
-  if (value === null) return null;
-  return isRealCalendarDate(value) ? value : null;
+export function asCalendarDate(
+  value: string | null | undefined
+): string | null {
+  if (!value) return null;
+  return ISO_DATE.test(value) && isRealCalendarDate(value) ? value : null;
 }
 
 /**
@@ -132,16 +150,16 @@ export function derivePhaseDates(
     // that. manufacturingDays and onsiteDays have no such column default: a null there is
     // a genuinely unknown duration, so it gets no substituted value below.
     const factoryStart =
-      validOverride(phase.factoryStartOverride) ??
+      asCalendarDate(phase.factoryStartOverride) ??
       addDays(previousComplete, phase.startOffsetDays ?? 0);
     const factoryComplete =
-      validOverride(phase.factoryCompleteOverride) ??
+      asCalendarDate(phase.factoryCompleteOverride) ??
       addDays(factoryStart, phase.manufacturingDays);
     const deliveryWindow =
-      validOverride(phase.deliveryWindowOverride) ??
+      asCalendarDate(phase.deliveryWindowOverride) ??
       addDays(factoryComplete, phase.deliveryLagDays ?? 0);
     const targetCO =
-      validOverride(phase.targetCoOverride) ?? addDays(deliveryWindow, phase.onsiteDays);
+      asCalendarDate(phase.targetCoOverride) ?? addDays(deliveryWindow, phase.onsiteDays);
 
     result.push({
       phaseNumber: phase.phaseNumber,
@@ -169,8 +187,7 @@ export function deriveDesignMilestones(
 }
 
 function parseDate(value: string): Date | null {
-  if (!ISO_DATE.test(value)) return null;
-  if (!isRealCalendarDate(value)) return null;
+  if (asCalendarDate(value) === null) return null;
   const parsed = new Date(`${value}T00:00:00Z`);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }

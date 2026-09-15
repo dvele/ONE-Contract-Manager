@@ -2,12 +2,55 @@ import { describe, expect, it } from "vitest";
 import {
   addBusinessDays,
   addDays,
+  asCalendarDate,
   derivePhaseDates,
   deriveDesignMilestones,
   toDateOnly,
   ISO_DATE,
   type PhaseDurations,
 } from "../scheduleMath";
+
+describe("asCalendarDate", () => {
+  it("returns a usable YYYY-MM-DD date unchanged", () => {
+    expect(asCalendarDate("2026-03-02")).toBe("2026-03-02");
+    expect(asCalendarDate("2026-01-01")).toBe("2026-01-01");
+    expect(asCalendarDate("2026-12-31")).toBe("2026-12-31");
+  });
+
+  it("rejects a calendar-impossible date that passes the ISO shape", () => {
+    // new Date() silently rolls these over rather than failing, which is the
+    // whole reason the calendar check exists alongside the pattern.
+    expect(asCalendarDate("2027-02-30")).toBeNull();
+    expect(asCalendarDate("2026-02-29")).toBeNull();
+    expect(asCalendarDate("2026-04-31")).toBeNull();
+    expect(asCalendarDate("2026-13-01")).toBeNull();
+    expect(asCalendarDate("2026-00-10")).toBeNull();
+  });
+
+  it("rejects a real date that fails the ISO shape", () => {
+    // Unpadded values name a real day but parse in the host's zone rather than
+    // UTC, shifting the date west of UTC — so the shape check is load-bearing
+    // too, not redundant with the calendar check.
+    expect(ISO_DATE.test("2026-3-5")).toBe(false);
+    expect(asCalendarDate("2026-3-5")).toBeNull();
+    expect(asCalendarDate("2026-3-05")).toBeNull();
+    expect(asCalendarDate("03/15/2026")).toBeNull();
+  });
+
+  it("treats absent and blank input as absent", () => {
+    expect(asCalendarDate(null)).toBeNull();
+    expect(asCalendarDate(undefined)).toBeNull();
+    expect(asCalendarDate("")).toBeNull();
+  });
+
+  it("accepts a real leap day and rejects a fake one", () => {
+    expect(asCalendarDate("2028-02-29")).toBe("2028-02-29");
+    expect(asCalendarDate("2024-02-29")).toBe("2024-02-29");
+    expect(asCalendarDate("2026-02-29")).toBeNull();
+    // 2100 is divisible by 4 but not a leap year under the century rule.
+    expect(asCalendarDate("2100-02-29")).toBeNull();
+  });
+});
 
 describe("addDays", () => {
   it("adds calendar days across a month boundary", () => {
