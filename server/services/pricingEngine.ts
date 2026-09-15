@@ -2,7 +2,8 @@ import { db } from "../db/index";
 import { pool } from "../db";
 import { projects, projectDetails, financials, milestones, phases, properties } from "../../shared/schema";
 import { asc, eq } from "drizzle-orm";
-import { buildPhaseRollups, type PhaseRow, type PropertyRow, type UnitRow, type PhaseRollup } from "./pricingMath";
+import { buildPhaseRollups, type PropertyRow, type UnitRow, type PhaseRollup } from "./pricingMath";
+import { addDays, derivePhaseDates, type PhaseDurations } from "./scheduleMath";
 
 export type { PhaseRollup, RollupProperty, RollupUnit } from "./pricingMath";
 
@@ -54,6 +55,10 @@ interface RawUnitRow {
   onsite_est_price: number | null;
   shipping_set_price: number | null;
   customization_total: number | null;
+}
+
+function toDateOnly(date: Date | null): string | null {
+  return date === null ? null : date.toISOString().slice(0, 10);
 }
 
 export async function calculateProjectPricing(projectId: number): Promise<PricingSummary> {
@@ -250,7 +255,7 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
 
   // A project with no phases yields phases: [] and every field above keeps
   // its existing project-rollup meaning.
-  const phaseRows: PhaseRow[] = await db
+  const phaseRows = await db
     .select()
     .from(phases)
     .where(eq(phases.projectId, projectId))
@@ -262,7 +267,40 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
         .where(eq(properties.projectId, projectId))
         .orderBy(asc(properties.id))
     : [];
-  const phaseRollups = buildPhaseRollups(phaseRows, propertyRows, unitRows, serviceModel, additionalSiteWork);
+
+  const [scheduleDetails] = await db
+    .select({ agreementExecutionDate: projectDetails.agreementExecutionDate })
+    .from(projectDetails)
+    .where(eq(projectDetails.projectId, projectId));
+
+  const projectStart = scheduleDetails?.agreementExecutionDate ?? toDateOnly(project.createdAt);
+  const designComplete = addDays(projectStart, project.designDuration);
+
+  // manufacturingDays has no column default (unlike startOffsetDays/deliveryLagDays):
+  // every phase created before this plan has it unset, so it falls back to the
+  // wizard's project-level production duration rather than deriving a null
+  // factoryComplete for every existing project.
+  const phaseDurations: PhaseDurations[] = phaseRows.map((phase) => ({
+    phaseNumber: phase.phaseNumber,
+    startOffsetDays: phase.startOffsetDays,
+    manufacturingDays: phase.manufacturingDays ?? project.productionDuration,
+    onsiteDays: phase.onsiteDays,
+    deliveryLagDays: phase.deliveryLagDays,
+    factoryStartOverride: phase.factoryStartOverride,
+    factoryCompleteOverride: phase.factoryCompleteOverride,
+    deliveryWindowOverride: phase.deliveryWindowOverride,
+    targetCoOverride: phase.targetCoOverride,
+  }));
+  const phaseDates = derivePhaseDates(designComplete, phaseDurations);
+
+  const phaseRollups = buildPhaseRollups(
+    phaseRows,
+    propertyRows,
+    unitRows,
+    serviceModel,
+    additionalSiteWork,
+    phaseDates
+  );
 
   return {
     breakdown: {

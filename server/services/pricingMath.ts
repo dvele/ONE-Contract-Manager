@@ -1,3 +1,5 @@
+import type { PhaseDates } from "./scheduleMath";
+
 /**
  * Pure milestone math for per-phase payment schedules.
  *
@@ -113,6 +115,17 @@ export interface PhaseRollup {
   };
   phaseValue: number;
   milestones: ScheduledMilestone[];
+  dates: PhaseDates;
+}
+
+function emptyPhaseDates(phaseNumber: number): PhaseDates {
+  return {
+    phaseNumber,
+    factoryStart: null,
+    factoryComplete: null,
+    deliveryWindow: null,
+    targetCO: null,
+  };
 }
 
 /**
@@ -130,6 +143,12 @@ export interface PhaseRollup {
  * the project level. That is the only remaining source of divergence, and it
  * is what Plan D's reconciliation check has to refuse generation over.
  *
+ * `phaseDates` is matched to each phase by `phaseNumber`, not array position —
+ * the caller derives it separately (deriving needs the project start, a
+ * database read, which this function must not perform) and its ordering is
+ * not guaranteed to track `phaseRows`. A phase with no matching entry gets
+ * all-null dates rather than throwing.
+ *
  * Customizations also stay broken out in `breakdown` so the figure remains
  * visible on its own.
  */
@@ -138,7 +157,8 @@ export function buildPhaseRollups(
   propertyRows: PropertyRow[],
   unitRows: UnitRow[],
   serviceModel: "CRC" | "CMOS",
-  additionalSiteWork = 0
+  additionalSiteWork = 0,
+  phaseDates: PhaseDates[] = []
 ): PhaseRollup[] {
   const grouped = phaseRows.map((phase) => {
     const phaseProperties = propertyRows.filter((p) => p.phaseId === phase.id);
@@ -200,6 +220,10 @@ export function buildPhaseRollups(
       breakdown.shipping +
       (serviceModel === "CMOS" ? onsite : 0);
 
+    const dates =
+      phaseDates.find((d) => d.phaseNumber === phase.phaseNumber) ??
+      emptyPhaseDates(phase.phaseNumber);
+
     return {
       phaseId: phase.id,
       phaseNumber: phase.phaseNumber,
@@ -208,6 +232,7 @@ export function buildPhaseRollups(
       breakdown: { ...breakdown, onsite },
       phaseValue,
       milestones: buildMilestoneSchedule(phaseValue),
+      dates,
     };
   });
 }

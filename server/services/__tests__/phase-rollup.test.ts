@@ -209,4 +209,46 @@ describe("buildPhaseRollups", () => {
     expect(phase1.properties.map((p) => p.propertyCode)).toEqual(["P-1", "P-2"]);
     expect(phase1.properties[1].units).toEqual([]);
   });
+
+  it("matches phaseDates to each phase by phaseNumber, not by array position", () => {
+    // Deliberately out of order and offset from PHASES's own [1, 2] ordering,
+    // so a position-based join would either misattribute or throw.
+    const phaseDates = [
+      { phaseNumber: 2, factoryStart: "2027-06-01", factoryComplete: "2027-07-01", deliveryWindow: "2027-07-08", targetCO: "2027-08-01" },
+      { phaseNumber: 1, factoryStart: "2027-01-01", factoryComplete: "2027-02-01", deliveryWindow: "2027-02-08", targetCO: "2027-03-01" },
+    ];
+
+    const [phase1, phase2] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC", 0, phaseDates);
+
+    expect(phase1.dates.factoryStart).toBe("2027-01-01");
+    expect(phase2.dates.factoryStart).toBe("2027-06-01");
+  });
+
+  it("gives a phase with no matching phaseDates entry all-null dates rather than throwing", () => {
+    const phaseDates = [
+      { phaseNumber: 1, factoryStart: "2027-01-01", factoryComplete: "2027-02-01", deliveryWindow: "2027-02-08", targetCO: "2027-03-01" },
+    ];
+
+    const [phase1, phase2] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC", 0, phaseDates);
+
+    expect(phase1.dates.factoryStart).toBe("2027-01-01");
+    expect(phase2.dates).toEqual({
+      phaseNumber: 2,
+      factoryStart: null,
+      factoryComplete: null,
+      deliveryWindow: null,
+      targetCO: null,
+    });
+  });
+
+  it("defaults to all-null dates on every phase when phaseDates is omitted entirely", () => {
+    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC");
+    expect(phase1.dates).toEqual({
+      phaseNumber: 1,
+      factoryStart: null,
+      factoryComplete: null,
+      deliveryWindow: null,
+      targetCO: null,
+    });
+  });
 });
