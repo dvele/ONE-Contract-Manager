@@ -320,7 +320,7 @@ The generators largely exist; the exhibit bodies never call them.
 | Exhibit | Change |
 |---|---|
 | A.2 | → `{{EXHIBIT_A2_TABLE}}`. Generator rewritten: one row per property with its phase, its home and ADU, and the owning phase's four derived dates. |
-| A.4 | → `{{EXHIBIT_A4_TABLE}}`, broken out per phase. `LOGISTICS_PRICE` wired to `breakdown.totalShipping`; `{{DESIGN_FEE}}` replaced by `{{DESIGN_FEE_WRITTEN}}`. Under CMOS the on-site scope renders as three rows: site prep, transport and setup, stitching and completion. |
+| A.4 | → `{{EXHIBIT_A4_TABLE}}`, broken out per phase. `LOGISTICS_PRICE` wired to `breakdown.totalShipping`; `{{DESIGN_FEE}}` replaced by `{{DESIGN_FEE_WRITTEN}}`. Under CMOS the on-site scope stays **one** line — see *On-site scope is not priced by category* below. |
 | A.5 | → `{{EXHIBIT_A5_TABLE}}`: the project-level Design Fee row, then each phase's milestones with derived amounts. **The trailing `{{PAYMENT_SCHEDULE_TABLE}}` is removed.** |
 | B.1 | First table → `{{EXHIBIT_B1_TABLE}}`, one row per property. Second table retained but grouped by model, so it still reads `14× Lumina` rather than 14 rows. |
 | C.2 | → `{{RESPONSIBILITY_MATRIX_TABLE}}`, inheriting the inline-SVG checkmarks. Three columns (Task / Company / Client-GC); the Notes / Acceptance Standard column is dropped to match the wizard. |
@@ -402,16 +402,43 @@ about this order changed.
 
 ---
 
+## On-site scope is not priced by category
+
+**Decided 2026-09-15.** A.4 renders a single On-site Services line under CMOS, and none
+under CRC. The site-work breakdown — site prep, transport and setup, stitching and
+completion — is **scope, not price**, and Exhibit C.2 already carries it.
+
+This corrects an earlier reading of the same conversation. The three categories were
+named while answering a question about *offsite* inputs, and they map onto the
+responsibility matrix that already exists in `responsibilityDefaults.ts`, which models
+it more finely than three rows:
+
+| Named during design | C.2 category, already built |
+|---|---|
+| site prep | Site Preparation & Readiness |
+| transport and setup | Delivery Coordination, Module Installation |
+| stitching and completion | Module Installation, Site Maintenance & Cleanup |
+
+Nothing in the issued contract or the schema suggests a three-way *pricing* split, and
+there are already two on-site money levers — `home_models.onsiteEstPrice` per model and
+the project-level `financials.prelimOnsite` buffer. Adding three more would have left
+their relationship undefined.
+
+**Consequence for Plan D:** its Step 7 work covers the editable payment schedule and
+the two *offsite* inputs (factory, and delivery/assembly). It does **not** add on-site
+category inputs. Pricing on-site work by category would be its own feature — three
+fields, three inputs, and a decision about how they relate to the per-model estimate —
+not a footnote in A.4.
+
 ## Assumptions
 
 Recorded because they were not explicitly confirmed:
 
-1. Under CMOS, A.4's on-site scope renders as three rows — site prep, transport and
-   setup, stitching and completion — matching the categories named during design. Under
-   CRC no on-site rows appear.
-2. `financials.prelimOnsite` pro-rates across phases by on-site share rather than
-   staying a single project-level line.
-3. A property must be assigned to a phase before a contract can be generated, but may
+1. `financials.prelimOnsite` pro-rates across phases by on-site share rather than
+   staying a single project-level line. **Implemented in Plan B.** Where a CMOS
+   project's phases carry no on-site cost at all, every share computes to zero and the
+   whole buffer lands on the last phase — accepted 2026-09-15.
+2. A property must be assigned to a phase before a contract can be generated, but may
    exist unassigned while the wizard is being filled in.
 
 ## Open items register
