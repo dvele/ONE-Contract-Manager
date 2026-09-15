@@ -151,6 +151,11 @@ Unrelated to this work, but they cost a day and will cost the next person the sa
 - **The `npm run check` baseline is 12**, not 13. It fell when the dead
   `server/services/variable-mapper.ts` was deleted — that file carried one of the
   thirteen. Twelve is correct; do not treat it as a regression.
+- **Test files are not type-checked by anything.** `tsconfig.json` excludes
+  `**/*.test.ts`, and vitest does no type-checking of its own, so a type error in a test
+  never fails `npm run check`. Verified by injecting one and watching the count stay at
+  12. Do not assume a wrong argument type or a stale signature in a test will be caught
+  by a gate — it will not.
 - **The test suite must stay hermetic.** Run it as `env -u DATABASE_URL npm test`.
   A test that imports a database-bound module passes only in a polluted shell; this
   happened once and was caught only by running the gate outside the subagent's
