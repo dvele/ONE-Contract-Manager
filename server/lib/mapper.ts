@@ -22,6 +22,12 @@ import {
   type ProjectUnit as TGProjectUnit,
 } from "./tableGenerators";
 import { buildSignatureBlock as buildStyledSignatureBlock } from "./tableStyles";
+import {
+  deriveDesignMilestones,
+  toDateOnly,
+  ISO_DATE,
+  type PhaseDates,
+} from "../services/scheduleMath";
 
 // =============================================================================
 // TYPE DEFINITIONS
@@ -309,6 +315,8 @@ export const VARIABLE_CATEGORIES = {
     "PERMIT_SUBMITTAL_DATE",
     "PRODUCTION_MIDPOINT_DATE",
     "PRODUCTION_COMPLETE_DATE",
+    "DELIVERY_SET_DATE",
+    "CO_EQUIVALENT_DATE",
   ],
   legal: [
     "GOVERNING_LAW_STATE",
@@ -405,6 +413,13 @@ export function formatDateWritten(dateStr: string | null | undefined): string {
 
 /**
  * Format a date or return "TBD" if not provided
+ *
+ * Rendered in UTC because the input is a `YYYY-MM-DD` calendar date, not an
+ * instant: `new Date("2026-03-02")` is midnight *UTC*, which
+ * `toLocaleDateString` then renders in the host zone — printing "March 1,
+ * 2026" on any host west of UTC. ECS runs with TZ=UTC so this is invisible
+ * there and visible on a developer's machine, and these values are the target
+ * dates printed in Exhibit D of an executed agreement.
  */
 export function formatDateOrTBD(dateStr: string | null | undefined): string {
   if (!dateStr) return "TBD";
@@ -413,6 +428,7 @@ export function formatDateOrTBD(dateStr: string | null | undefined): string {
     year: "numeric",
     month: "long",
     day: "numeric",
+    timeZone: "UTC",
   });
 }
 
@@ -643,6 +659,55 @@ export interface PricingSummaryForMapper {
   }[];
   unitCount: number;
   unitModelSummary: string;
+  // Structurally satisfied by pricingEngine's `PhaseRollup[]`. Declared as the
+  // narrow shape this file reads so mapper.ts gains no import from a
+  // database-bound module. Optional because several callers still map a
+  // project with no pricing run.
+  phases?: { dates: PhaseDates }[];
+}
+
+// =============================================================================
+// EXHIBIT D SCHEDULE HELPERS
+// =============================================================================
+
+/**
+ * The Exhibit D.1 review periods, in business days. Exhibit D.1's own "Review
+ * Period" column states them (5 / 10 / 10 / 5); no column stores them.
+ */
+const D1_REVIEW_PERIODS = {
+  kickoffReviewDays: 5,
+  schematicReviewDays: 10,
+  permitSetReviewDays: 10,
+  greenLightReviewDays: 5,
+};
+
+/**
+ * Treats a blank or malformed override as absent so it falls through to the
+ * derived date.
+ *
+ * These override columns are unconstrained `text` written straight from
+ * request bodies, and a wizard save path stores `""` rather than NULL — so
+ * `??` alone is nullish-safe but not date-safe and would print TBD over a
+ * perfectly good derived date. `pricingEngine.calculateProjectPricing` guards
+ * `agreementExecutionDate` the same way for the same reason.
+ */
+function dateOverride(value: string | null | undefined): string | null {
+  return value && ISO_DATE.test(value) ? value : null;
+}
+
+/**
+ * Earliest and latest of a `YYYY-MM-DD` list, ignoring nulls. Lexicographic
+ * comparison is chronological for zero-padded ISO dates. An empty list (a
+ * project with no phases) yields null, which renders as TBD.
+ */
+function earliestDate(dates: (string | null)[]): string | null {
+  const present = dates.filter((d): d is string => d !== null);
+  return present.length === 0 ? null : present.reduce((a, b) => (b < a ? b : a));
+}
+
+function latestDate(dates: (string | null)[]): string | null {
+  const present = dates.filter((d): d is string => d !== null);
+  return present.length === 0 ? null : present.reduce((a, b) => (b > a ? b : a));
 }
 
 // =============================================================================
@@ -716,6 +781,37 @@ export function mapProjectToVariables(
     "onsite",
     "ONSITE"
   );
+
+  // Mirrors the projectStart that pricingEngine.calculateProjectPricing derives
+  // before chaining the phase dates. D.1's milestones and D.2's phase rollup
+  // must anchor to the same day or the two exhibits state conflicting
+  // schedules for one project.
+  const executionDate = projectDetails?.agreementExecutionDate;
+  const projectStart =
+    executionDate && ISO_DATE.test(executionDate)
+      ? executionDate
+      : toDateOnly(project.createdAt ?? null);
+
+  // Exhibit D.1 target dates, derived; the projectDetails columns below
+  // override them per-milestone.
+  const designMilestones = deriveDesignMilestones(
+    projectStart,
+    D1_REVIEW_PERIODS
+  );
+
+  // Exhibit D.2 has one row per milestone where the project has one per phase,
+  // so the phases roll up to a single span. Absent a pricing run (or with no
+  // phases) every entry is null and the rows render TBD.
+  const phaseDates: PhaseDates[] =
+    pricingSummary?.phases?.map((phase) => phase.dates) ?? [];
+  const rolledProductionStart = earliestDate(
+    phaseDates.map((d) => d.factoryStart)
+  );
+  const rolledProductionComplete = latestDate(
+    phaseDates.map((d) => d.factoryComplete)
+  );
+  const rolledDeliverySet = latestDate(phaseDates.map((d) => d.deliveryWindow));
+  const rolledTargetCO = latestDate(phaseDates.map((d) => d.targetCO));
 
   // Build the variables object
   const variables: ContractVariables = {
@@ -869,9 +965,13 @@ export function mapProjectToVariables(
     ),
     GREEN_LIGHT_DATE: projectDetails?.greenLightDate || "",
     GREEN_LIGHT_DATE_WRITTEN: formatDateWritten(projectDetails?.greenLightDate),
-    PRODUCTION_START_DATE: projectDetails?.productionStartDate || "",
+    // Exhibit D.2 row P-1. The wizard's project-level date overrides the
+    // earliest factory start across the phases.
+    PRODUCTION_START_DATE: formatDateOrTBD(
+      dateOverride(projectDetails?.productionStartDate) ?? rolledProductionStart
+    ),
     PRODUCTION_START_DATE_WRITTEN: formatDateWritten(
-      projectDetails?.productionStartDate
+      dateOverride(projectDetails?.productionStartDate) ?? rolledProductionStart
     ),
     ESTIMATED_DELIVERY_DATE: projectDetails?.estimatedDeliveryDate || "",
     ESTIMATED_DELIVERY_DATE_WRITTEN: formatDateWritten(
@@ -1374,18 +1474,34 @@ export function mapProjectToVariables(
     // ===================
     // EXHIBIT D.1/D.2 - TARGET DATES
     // ===================
-    DESIGN_KICKOFF_DATE: formatDateOrTBD(projectDetails?.designKickoffDate),
-    SCHEMATIC_DESIGN_DATE: formatDateOrTBD(projectDetails?.schematicDesignDate),
-    DESIGN_DEVELOPMENT_DATE: formatDateOrTBD(
-      projectDetails?.designDevelopmentDate
+    // D.1 rows D-1..D-4: derived from the project start through the stated
+    // review periods, with the wizard's own date winning per milestone.
+    DESIGN_KICKOFF_DATE: formatDateOrTBD(
+      dateOverride(projectDetails?.designKickoffDate) ?? designMilestones.kickoff
     ),
-    PERMIT_SUBMITTAL_DATE: formatDateOrTBD(projectDetails?.permitSubmittalDate),
+    SCHEMATIC_DESIGN_DATE: formatDateOrTBD(
+      dateOverride(projectDetails?.schematicDesignDate) ??
+        designMilestones.schematic
+    ),
+    DESIGN_DEVELOPMENT_DATE: formatDateOrTBD(
+      dateOverride(projectDetails?.designDevelopmentDate) ??
+        designMilestones.greenLightPackage
+    ),
+    PERMIT_SUBMITTAL_DATE: formatDateOrTBD(
+      dateOverride(projectDetails?.permitSubmittalDate) ??
+        designMilestones.permitSet
+    ),
     PRODUCTION_MIDPOINT_DATE: formatDateOrTBD(
       projectDetails?.productionMidpointDate
     ),
+    // D.2 rows P-2..P-4. PRODUCTION_START_DATE (row P-1) is in the DATES
+    // section above.
     PRODUCTION_COMPLETE_DATE: formatDateOrTBD(
-      projectDetails?.productionCompleteDate
+      dateOverride(projectDetails?.productionCompleteDate) ??
+        rolledProductionComplete
     ),
+    DELIVERY_SET_DATE: formatDateOrTBD(rolledDeliverySet),
+    CO_EQUIVALENT_DATE: formatDateOrTBD(rolledTargetCO),
 
     // ===================
     // CONDITIONAL FLAGS (for template logic)
