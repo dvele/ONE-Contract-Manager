@@ -50,6 +50,25 @@ export interface DesignMilestones {
  * guarantee validate separately. */
 export const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * Confirms a `YYYY-MM-DD` string names a date that actually exists on the
+ * calendar. `ISO_DATE` checks shape only, and V8's `Date` parsing is
+ * inconsistent about the rest: `new Date("2026-02-30T00:00:00Z")` silently
+ * rolls over to March 2 instead of failing, while an out-of-range month does
+ * fail. Round-tripping through `Date.UTC` (which also rolls over) and
+ * confirming the components come back unchanged catches the day-level case
+ * the parser itself won't.
+ */
+export function isRealCalendarDate(value: string): boolean {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
 /** Adds calendar days. Null in, null out — a missing duration is not zero. */
 export function addDays(date: string | null, days: number | null): string | null {
   if (date === null || days === null) return null;
@@ -133,6 +152,7 @@ export function deriveDesignMilestones(
 
 function parseDate(value: string): Date | null {
   if (!ISO_DATE.test(value)) return null;
+  if (!isRealCalendarDate(value)) return null;
   const parsed = new Date(`${value}T00:00:00Z`);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }

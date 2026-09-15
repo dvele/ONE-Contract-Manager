@@ -25,6 +25,20 @@ describe("addDays", () => {
   it("returns null for a null duration rather than treating it as zero", () => {
     expect(addDays("2026-01-01", null)).toBeNull();
   });
+
+  it("rejects a calendar-impossible day rather than letting Date roll it over", () => {
+    // Date("2026-02-30T00:00:00Z") silently rolls over to 2026-03-02 in V8.
+    // A rolled-over date is worse than a missing one, so this must null out.
+    expect(addDays("2026-02-30", 1)).toBeNull();
+  });
+
+  it("still adds correctly across a real month-end, unlike the impossible case above", () => {
+    expect(addDays("2026-02-28", 1)).toBe("2026-03-01");
+  });
+
+  it("still accepts a leap day two years out, so the calendar check isn't collateral damage", () => {
+    expect(addDays("2028-02-29", 1)).toBe("2028-03-01");
+  });
 });
 
 describe("addBusinessDays", () => {
@@ -48,6 +62,10 @@ describe("addBusinessDays", () => {
 
   it("returns null for a null duration rather than treating it as zero", () => {
     expect(addBusinessDays("2026-01-01", null)).toBeNull();
+  });
+
+  it("rejects a calendar-impossible day the same way addDays does", () => {
+    expect(addBusinessDays("2026-02-30", 1)).toBeNull();
   });
 });
 
@@ -134,6 +152,21 @@ describe("derivePhaseDates", () => {
   it("returns null dates throughout when the project has no start", () => {
     const [p1] = derivePhaseDates(null, [phase(1)]);
     expect(p1.factoryStart).toBeNull();
+    expect(p1.targetCO).toBeNull();
+  });
+
+  it("nulls out downstream dates for a calendar-impossible override rather than printing it verbatim", () => {
+    // A row written before the zod refinement existed could already hold an
+    // override like this. derivePhaseDates takes an override as-is with no
+    // parsing of its own — factoryStart below is a pass-through of the raw
+    // string — but everything chained off it goes through addDays, which now
+    // rejects the impossible date instead of anchoring to a rolled-over one.
+    const [p1] = derivePhaseDates(DESIGN_COMPLETE, [
+      phase(1, { factoryStartOverride: "2026-02-30" }),
+    ]);
+    expect(p1.factoryStart).toBe("2026-02-30");
+    expect(p1.factoryComplete).toBeNull();
+    expect(p1.deliveryWindow).toBeNull();
     expect(p1.targetCO).toBeNull();
   });
 

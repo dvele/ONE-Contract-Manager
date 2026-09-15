@@ -5,6 +5,7 @@ import { db } from "../db/index";
 import { phases, properties, projects } from "../../shared/schema";
 import { requireAuth } from "../middleware/auth";
 import { UNIQUE_VIOLATION } from "../lib/unit-attachment";
+import { ISO_DATE, isRealCalendarDate } from "../services/scheduleMath";
 
 /**
  * Project phases — the grouping that drives per-phase pricing, scheduling and
@@ -16,25 +17,9 @@ const router = Router();
 
 router.use(requireAuth);
 
-// The regex alone accepts calendar-impossible values like "2027-02-30".
-// derivePhaseDates prints an override verbatim without parsing it, and every
-// date chained after a bad one silently goes null — so an impossible date
-// would land in an executed agreement instead of failing at the boundary.
-// Round-tripping through Date.UTC's rolling-over numeric constructor and
-// checking the components come back unchanged catches that.
-function isRealCalendarDate(value: string): boolean {
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  );
-}
-
 const isoDate = z
   .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Dates must be YYYY-MM-DD")
+  .regex(ISO_DATE, "Dates must be YYYY-MM-DD")
   .refine(isRealCalendarDate, "Dates must be a real calendar date")
   .nullable()
   .optional();
