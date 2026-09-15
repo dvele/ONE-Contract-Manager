@@ -71,6 +71,36 @@ re-querying the phase→property→unit join. Use it.
 
 ## 3. Findings that cost effort to establish
 
+### `formatDateWritten` renders a date one day early west of UTC
+
+`server/lib/mapper.ts` parses a `YYYY-MM-DD` string into a `Date` — which JavaScript reads
+as UTC midnight — and then formats it in the host's local zone, so any host behind UTC
+renders the previous day. `2026-03-02` prints as "March 1, 2026".
+
+`formatDateOrTBD` had the same defect and was fixed in Plan C by passing
+`timeZone: "UTC"`. **`formatDateWritten` still has it, across roughly fifteen variables**,
+and was left alone as out of scope for that task.
+
+Invisible on ECS, where `TZ=UTC`. Wrong on any developer machine in the Americas, and
+wrong anywhere the deployment timezone changes. It puts a date one day early into an
+executed agreement, which is the kind of error nobody notices until a deadline is disputed.
+The fix is the same one-line `timeZone: "UTC"`; the reason it is not done here is that it
+touches fifteen variables at once and deserves its own verification.
+
+### The exhibit bodies do not reference the schedule variables at all
+
+Resolving a variable in `mapper.ts` does not make it appear in a contract. The MASTER_EF
+exhibit bodies are `exhibits.content` database rows, and D.1's and D.2's Target Date cells
+are literal empty `<td></td>` while C.4 carries the literal text `[TBD] days before
+delivery`. A search of the seeded content finds **zero** occurrences of
+`DESIGN_KICKOFF_DATE`, `PRODUCTION_START_DATE`, `FOUNDATION_READY_DAYS` or any of the
+other eleven.
+
+Plan C was written as though the mapper alone would fill them and had to be corrected
+mid-execution. Wiring the bodies is Plan E's job — and Plan E must also handle exhibit
+rows already seeded into the deployed database, because editing `server/seed-data.json`
+does not change them.
+
 ### `renderUnitPricingTable` has never executed successfully
 
 `server/services/component-library.ts:129-131` selects `hm.model_name` and

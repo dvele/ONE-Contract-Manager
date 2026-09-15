@@ -553,9 +553,13 @@ git commit -m "Rebuild step 6 around the derived timeline"
 
 ## Deliverable
 
-Entering a start date and durations produces every date in Exhibits A.2, D.1 and D.2, with an override at any point. C.4 stops saying `[TBD]`.
+Entering a start date and durations derives every date the contract needs — per-phase factory, delivery and completion dates, and the four D.1 design milestones — with an override available at any point, and resolves them all as template variables.
 
-**This is the first plan that changes the generated document.** Plans A and B were provably inert; this one fills columns that have been blank since the exhibits were written. Regenerating a contract for a project with phases is therefore a required verification, not a nicety — and the diff against a pre-branch generation should show dates appearing and nothing else moving.
+**Corrected 2026-09-15, mid-execution: this plan does *not* change the generated document.** The original text here claimed it did. It cannot. The exhibit bodies are database rows whose Target Date cells are literal empty `<td></td>` and whose C.4 rows carry the literal text `[TBD] days before delivery` — **not** `{{VARIABLE}}` placeholders. A search of the seeded exhibit content finds zero occurrences of `DESIGN_KICKOFF_DATE`, `PRODUCTION_START_DATE`, `FOUNDATION_READY_DAYS` or any of the other eleven. No mapper change can alter a document that never references the variable.
+
+Wiring the exhibit bodies is **Plan E**, which the spec has always assigned it ("D.1 / D.2 — Target Date cells wired to derived dates"). Plan C makes the values exist and be correct; Plan E makes them appear. Plan E must also decide what to do about exhibit rows already seeded into the deployed database, since editing `server/seed-data.json` alone does not change them.
+
+So Plans A, B and C are all inert with respect to the generated contract, and a regeneration diff should show **no change at all**. That is the verification, and it is still worth running.
 
 ## Deferred to later plans
 
