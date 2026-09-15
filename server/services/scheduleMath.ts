@@ -88,6 +88,10 @@ export function derivePhaseDates(
   let previousComplete: string | null = designComplete;
 
   for (const phase of phases) {
+    // startOffsetDays and deliveryLagDays default to 0 in shared/schema.ts (project_phases
+    // table) — a null there means "none specified," and 0 is the schema's own reading of
+    // that. manufacturingDays and onsiteDays have no such column default: a null there is
+    // a genuinely unknown duration, so it gets no substituted value below.
     const factoryStart =
       phase.factoryStartOverride ?? addDays(previousComplete, phase.startOffsetDays ?? 0);
     const factoryComplete =

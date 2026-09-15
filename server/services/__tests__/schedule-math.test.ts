@@ -43,6 +43,10 @@ describe("addBusinessDays", () => {
   it("propagates null", () => {
     expect(addBusinessDays(null, 5)).toBeNull();
   });
+
+  it("returns null for a null duration rather than treating it as zero", () => {
+    expect(addBusinessDays("2026-01-01", null)).toBeNull();
+  });
 });
 
 describe("derivePhaseDates", () => {
@@ -129,6 +133,25 @@ describe("derivePhaseDates", () => {
     const [p1] = derivePhaseDates(null, [phase(1)]);
     expect(p1.factoryStart).toBeNull();
     expect(p1.targetCO).toBeNull();
+  });
+
+  describe("null day-count fields default to zero, unlike missing durations", () => {
+    it("treats a null startOffsetDays the same as zero", () => {
+      const withNull = derivePhaseDates(DESIGN_COMPLETE, [phase(1), phase(2, { startOffsetDays: null })]);
+      const withZero = derivePhaseDates(DESIGN_COMPLETE, [phase(1), phase(2, { startOffsetDays: 0 })]);
+      expect(withNull[1].factoryStart).toBe(withZero[1].factoryStart);
+    });
+
+    it("treats a null deliveryLagDays the same as zero", () => {
+      const [withNull] = derivePhaseDates(DESIGN_COMPLETE, [phase(1, { deliveryLagDays: null })]);
+      const [withZero] = derivePhaseDates(DESIGN_COMPLETE, [phase(1, { deliveryLagDays: 0 })]);
+      expect(withNull.deliveryWindow).toBe(withZero.deliveryWindow);
+    });
+
+    it("still returns a null factoryComplete for a null manufacturingDays, by contrast", () => {
+      const [p1] = derivePhaseDates(DESIGN_COMPLETE, [phase(1, { manufacturingDays: null })]);
+      expect(p1.factoryComplete).toBeNull();
+    });
   });
 });
 
