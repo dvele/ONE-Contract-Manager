@@ -155,19 +155,52 @@ describe("derivePhaseDates", () => {
     expect(p1.targetCO).toBeNull();
   });
 
-  it("nulls out downstream dates for a calendar-impossible override rather than printing it verbatim", () => {
+  it("treats a calendar-impossible override as absent and derives the date instead of printing it verbatim", () => {
     // A row written before the zod refinement existed could already hold an
-    // override like this. derivePhaseDates takes an override as-is with no
-    // parsing of its own — factoryStart below is a pass-through of the raw
-    // string — but everything chained off it goes through addDays, which now
-    // rejects the impossible date instead of anchoring to a rolled-over one.
+    // override like this. An unparseable override is bad data, not a missing
+    // input — the chain can still legitimately compute factoryStart from
+    // designComplete, so that computed date wins rather than the schedule
+    // going null or the impossible string reaching a generated contract.
     const [p1] = derivePhaseDates(DESIGN_COMPLETE, [
       phase(1, { factoryStartOverride: "2026-02-30" }),
     ]);
-    expect(p1.factoryStart).toBe("2026-02-30");
-    expect(p1.factoryComplete).toBeNull();
-    expect(p1.deliveryWindow).toBeNull();
-    expect(p1.targetCO).toBeNull();
+    expect(p1.factoryStart).toBe(addDays(DESIGN_COMPLETE, 0));
+    expect(p1.factoryStart).not.toBe("2026-02-30");
+    expect(p1.factoryComplete).toBe(addDays(p1.factoryStart, 100));
+    expect(p1.deliveryWindow).not.toBeNull();
+    expect(p1.targetCO).not.toBeNull();
+  });
+
+  it("falls through the same way for each of the other three overrides", () => {
+    const [p1] = derivePhaseDates(DESIGN_COMPLETE, [
+      phase(1, {
+        factoryCompleteOverride: "2026-02-30",
+        deliveryWindowOverride: "2026-04-31",
+        targetCoOverride: "2026-06-31",
+      }),
+    ]);
+    expect(p1.factoryComplete).toBe(addDays(p1.factoryStart, 100));
+    expect(p1.deliveryWindow).toBe(addDays(p1.factoryComplete, 10));
+    expect(p1.targetCO).toBe(addDays(p1.deliveryWindow, 60));
+  });
+
+  it("still lets a valid override win over the derived value and rebase everything downstream", () => {
+    // Guards against the fallback logic accidentally swallowing legitimate
+    // overrides along with the invalid ones.
+    const [p1, p2] = derivePhaseDates(DESIGN_COMPLETE, [
+      phase(1, { factoryStartOverride: "2026-06-01" }),
+      phase(2),
+    ]);
+    expect(p1.factoryStart).toBe("2026-06-01");
+    expect(p1.factoryComplete).toBe(addDays("2026-06-01", 100));
+    expect(p2.factoryStart).toBe(p1.factoryComplete);
+  });
+
+  it("accepts a leap day as an override, so the calendar check isn't collateral damage here either", () => {
+    const [p1] = derivePhaseDates(DESIGN_COMPLETE, [
+      phase(1, { factoryStartOverride: "2028-02-29" }),
+    ]);
+    expect(p1.factoryStart).toBe("2028-02-29");
   });
 
   describe("null day-count fields default to zero, unlike missing durations", () => {

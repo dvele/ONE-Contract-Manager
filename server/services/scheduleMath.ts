@@ -99,6 +99,20 @@ export function addBusinessDays(date: string | null, days: number | null): strin
 }
 
 /**
+ * An override is user/legacy-supplied text, not a value this module derived —
+ * a row written before validation existed at the API boundary can already hold
+ * a calendar-impossible string. That is bad data, not a missing input: the
+ * chain can still legitimately compute a date, so an invalid override is
+ * treated as absent (falls through to the derived value) rather than
+ * propagating null. Printing the bad string verbatim, or anchoring downstream
+ * dates to it, would be worse than silently preferring the computed answer.
+ */
+function validOverride(value: string | null): string | null {
+  if (value === null) return null;
+  return isRealCalendarDate(value) ? value : null;
+}
+
+/**
  * Derives each phase's four dates, chaining phase n from phase n-1's factory
  * completion.
  *
@@ -118,12 +132,16 @@ export function derivePhaseDates(
     // that. manufacturingDays and onsiteDays have no such column default: a null there is
     // a genuinely unknown duration, so it gets no substituted value below.
     const factoryStart =
-      phase.factoryStartOverride ?? addDays(previousComplete, phase.startOffsetDays ?? 0);
+      validOverride(phase.factoryStartOverride) ??
+      addDays(previousComplete, phase.startOffsetDays ?? 0);
     const factoryComplete =
-      phase.factoryCompleteOverride ?? addDays(factoryStart, phase.manufacturingDays);
+      validOverride(phase.factoryCompleteOverride) ??
+      addDays(factoryStart, phase.manufacturingDays);
     const deliveryWindow =
-      phase.deliveryWindowOverride ?? addDays(factoryComplete, phase.deliveryLagDays ?? 0);
-    const targetCO = phase.targetCoOverride ?? addDays(deliveryWindow, phase.onsiteDays);
+      validOverride(phase.deliveryWindowOverride) ??
+      addDays(factoryComplete, phase.deliveryLagDays ?? 0);
+    const targetCO =
+      validOverride(phase.targetCoOverride) ?? addDays(deliveryWindow, phase.onsiteDays);
 
     result.push({
       phaseNumber: phase.phaseNumber,

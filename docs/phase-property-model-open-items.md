@@ -160,7 +160,7 @@ Unrelated to this work, but they cost a day and will cost the next person the sa
   A test that imports a database-bound module passes only in a polluted shell; this
   happened once and was caught only by running the gate outside the subagent's
   environment. `server/services/pricingMath.ts` imports nothing, deliberately.
-- 59 tests across 3 files, vitest 4 (v5 requires `@types/node` ≥22; this repo pins 20).
+- 62 tests across 3 files, vitest 4 (v5 requires `@types/node` ≥22; this repo pins 20).
 - **Nothing on this branch has been exercised through a browser or over HTTP.** Every
   `/api` route sits behind Cognito JWT validation. Verification was `tsc`, the vitest
   suite, and throwaway scripts driving the route handlers directly.
