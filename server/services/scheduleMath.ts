@@ -44,6 +44,12 @@ export interface DesignMilestones {
   greenLightPackage: string | null;
 }
 
+/** Matches the `YYYY-MM-DD` shape this module and the phase-override columns
+ * use throughout. Shape only — it does not confirm the date exists on the
+ * calendar (e.g. it accepts `2027-02-30`); callers that need that stronger
+ * guarantee validate separately. */
+export const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
 /** Adds calendar days. Null in, null out — a missing duration is not zero. */
 export function addDays(date: string | null, days: number | null): string | null {
   if (date === null || days === null) return null;
@@ -126,11 +132,28 @@ export function deriveDesignMilestones(
 }
 
 function parseDate(value: string): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  if (!ISO_DATE.test(value)) return null;
   const parsed = new Date(`${value}T00:00:00Z`);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function formatDate(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Renders a `Date` as `YYYY-MM-DD` using the process's local calendar
+ * components, not UTC. `timestamp` (without time zone) columns come back from
+ * node-postgres parsed in the local zone, so rendering through
+ * `toISOString()` — which is always UTC — can shift the date by one on a
+ * non-UTC host: a project created at 11pm Pacific is already the next day in
+ * UTC. ECS runs with `TZ=UTC` so this is invisible there; it is not invisible
+ * on a developer's machine, and this date anchors a contract schedule.
+ */
+export function toDateOnly(date: Date | null): string | null {
+  if (date === null) return null;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }

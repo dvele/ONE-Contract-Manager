@@ -3,7 +3,7 @@ import { pool } from "../db";
 import { projects, projectDetails, financials, milestones, phases, properties } from "../../shared/schema";
 import { asc, eq } from "drizzle-orm";
 import { buildPhaseRollups, type PropertyRow, type UnitRow, type PhaseRollup } from "./pricingMath";
-import { addDays, derivePhaseDates, type PhaseDurations } from "./scheduleMath";
+import { addDays, derivePhaseDates, toDateOnly, ISO_DATE, type PhaseDurations } from "./scheduleMath";
 
 export type { PhaseRollup, RollupProperty, RollupUnit } from "./pricingMath";
 
@@ -55,10 +55,6 @@ interface RawUnitRow {
   onsite_est_price: number | null;
   shipping_set_price: number | null;
   customization_total: number | null;
-}
-
-function toDateOnly(date: Date | null): string | null {
-  return date === null ? null : date.toISOString().slice(0, 10);
 }
 
 export async function calculateProjectPricing(projectId: number): Promise<PricingSummary> {
@@ -268,12 +264,26 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
         .orderBy(asc(properties.id))
     : [];
 
-  const [scheduleDetails] = await db
-    .select({ agreementExecutionDate: projectDetails.agreementExecutionDate })
-    .from(projectDetails)
-    .where(eq(projectDetails.projectId, projectId));
+  // Only needed to derive schedule dates below, and derivePhaseDates returns
+  // [] regardless of designComplete when there are no phases — skip the read
+  // for the common phase-less project instead of paying for it every call.
+  const [scheduleDetails] = phaseRows.length > 0
+    ? await db
+        .select({ agreementExecutionDate: projectDetails.agreementExecutionDate })
+        .from(projectDetails)
+        .where(eq(projectDetails.projectId, projectId))
+    : [];
 
-  const projectStart = scheduleDetails?.agreementExecutionDate ?? toDateOnly(project.createdAt);
+  // agreementExecutionDate is unconstrained `text` written from request bodies
+  // (including a wizard save path that does not guard against ""), so `??`
+  // alone is not enough: an empty string or a non-YYYY-MM-DD value is
+  // nullish-safe but not date-safe, and would otherwise blank every
+  // downstream phase date instead of falling back to createdAt.
+  const executionDate = scheduleDetails?.agreementExecutionDate;
+  const projectStart =
+    executionDate && ISO_DATE.test(executionDate)
+      ? executionDate
+      : toDateOnly(project.createdAt);
   const designComplete = addDays(projectStart, project.designDuration);
 
   // manufacturingDays has no column default (unlike startOffsetDays/deliveryLagDays):

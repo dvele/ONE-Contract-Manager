@@ -157,7 +157,7 @@ export function buildPhaseRollups(
   propertyRows: PropertyRow[],
   unitRows: UnitRow[],
   serviceModel: "CRC" | "CMOS",
-  additionalSiteWork = 0,
+  additionalSiteWork: number,
   phaseDates: PhaseDates[]
 ): PhaseRollup[] {
   const grouped = phaseRows.map((phase) => {

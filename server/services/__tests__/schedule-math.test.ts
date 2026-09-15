@@ -4,6 +4,8 @@ import {
   addDays,
   derivePhaseDates,
   deriveDesignMilestones,
+  toDateOnly,
+  ISO_DATE,
   type PhaseDurations,
 } from "../scheduleMath";
 
@@ -152,6 +154,32 @@ describe("derivePhaseDates", () => {
       const [p1] = derivePhaseDates(DESIGN_COMPLETE, [phase(1, { manufacturingDays: null })]);
       expect(p1.factoryComplete).toBeNull();
     });
+  });
+});
+
+describe("toDateOnly", () => {
+  it("renders the local calendar date from local components, not through UTC", () => {
+    // Built from local (year, month, day, hour, minute) components, so this is
+    // late evening on the process's own clock regardless of which host runs
+    // the suite. toISOString() would report the UTC date instead, which is a
+    // day ahead of this one on any host west of UTC at this hour.
+    const lateEvening = new Date(2027, 0, 31, 23, 30);
+    expect(toDateOnly(lateEvening)).toBe("2027-01-31");
+  });
+
+  it("zero-pads single-digit months and days", () => {
+    const date = new Date(2027, 2, 5);
+    expect(toDateOnly(date)).toBe("2027-03-05");
+  });
+
+  it("returns null for a null date", () => {
+    expect(toDateOnly(null)).toBeNull();
+  });
+
+  it("output always matches the shared ISO_DATE shape", () => {
+    const rendered = toDateOnly(new Date(2027, 11, 1, 20, 0));
+    expect(rendered).not.toBeNull();
+    expect(ISO_DATE.test(rendered as string)).toBe(true);
   });
 });
 
