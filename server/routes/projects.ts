@@ -9,6 +9,7 @@ import {
   warrantyTerms,
 } from "../../shared/schema";
 import { eq, ne, and, sql, desc } from "drizzle-orm";
+import { z } from "zod";
 import {
   UNIQUE_VIOLATION,
   configurationForProject,
@@ -22,6 +23,50 @@ import {
 } from "../lib/unit-attachment";
 
 const router = Router();
+
+/**
+ * `designDuration` and `productionDuration` anchor the whole derived schedule:
+ * the first places every phase's factory start, the second is the span a phase
+ * with no `manufacturingDays` of its own falls back to. Both are plain `int4`
+ * columns written straight from a request body, and `calculateProjectPricing`
+ * — which serves `GET /pricing-summary` and every contract-generation route —
+ * adds them to a date, so a value the calendar cannot express takes all of
+ * those down at once for that project.
+ *
+ * The ceiling matches the per-phase bound in server/routes/phases.ts: a
+ * project-level fallback should be able to express anything a phase can state
+ * directly. The floor is 1, not the 0 that phases.ts allows — a 0 on one phase
+ * asserts that phase builds in no time, while a 0 here collapses every phase
+ * without its own duration onto the project start.
+ *
+ * Only these two are bounded: the other duration columns feed written text and
+ * a day count, never date arithmetic. Unlisted keys are ignored, so this
+ * validates a partial update without constraining the rest of the body.
+ */
+const MIN_DURATION_DAYS = 1;
+const MAX_DURATION_DAYS = 1095;
+
+const durationDays = z
+  .number()
+  .int(`Durations must be a whole number of days`)
+  .min(MIN_DURATION_DAYS, `Durations must be at least ${MIN_DURATION_DAYS} day`)
+  .max(MAX_DURATION_DAYS, `Durations must be at most ${MAX_DURATION_DAYS} days`)
+  .nullable()
+  .optional();
+
+const ScheduleDurationsSchema = z.object({
+  designDuration: durationDays,
+  productionDuration: durationDays,
+});
+
+/** Returns the 400 body for an out-of-range duration, or null when the request
+ * may proceed. */
+function scheduleDurationError(body: Record<string, unknown>): string | null {
+  const parsed = ScheduleDurationsSchema.safeParse(body);
+  if (parsed.success) return null;
+  const issue = parsed.error.issues[0];
+  return `${issue.path.join(".")}: ${issue.message}`;
+}
 
 // ---------------------------------------------------------------------------
 // PROJECT NUMBER UNIQUENESS CHECK
@@ -233,8 +278,13 @@ router.get("/projects/:id", async (req, res) => {
 
 router.post("/projects", async (req, res) => {
   try {
+    const durationError = scheduleDurationError(req.body);
+    if (durationError) {
+      return res.status(400).json({ error: durationError });
+    }
+
     let { llcId, ...projectData } = req.body;
-    
+
     // Auto-generate LLC if not provided
     if (!llcId) {
       // Get site address from project details or project name
@@ -281,6 +331,33 @@ router.post("/projects", async (req, res) => {
 router.patch("/projects/:id", async (req, res) => {
   try {
     const projectId = parseInt(req.params.id);
+
+    // The wizard's autosave PATCHes the whole project on a two-second timer and
+    // resends whatever it loaded, so a row written before these bounds existed
+    // would fail every save — including the fields the user is actually
+    // editing. A value identical to the stored one is not a new assertion, so
+    // it passes; only a changed one is held to the range. Same ordering as
+    // PhaseScheduleEditor's duration fields, for the same reason.
+    const [current] = await db
+      .select({
+        designDuration: projects.designDuration,
+        productionDuration: projects.productionDuration,
+      })
+      .from(projects)
+      .where(eq(projects.id, projectId));
+
+    const submitted: Record<string, unknown> = { ...req.body };
+    if (current) {
+      for (const key of ["designDuration", "productionDuration"] as const) {
+        if (key in submitted && submitted[key] === current[key]) delete submitted[key];
+      }
+    }
+
+    const durationError = scheduleDurationError(submitted);
+    if (durationError) {
+      return res.status(400).json({ error: durationError });
+    }
+
     const updateData = { ...req.body };
 
     if (updateData.projectNumber) {
