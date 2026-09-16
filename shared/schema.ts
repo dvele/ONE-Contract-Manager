@@ -472,6 +472,8 @@ export const financials = pgTable("financials", {
   // Preliminary Pricing (at Design Agreement)
   prelimOffsite: integer("prelim_offsite"),
   prelimOnsite: integer("prelim_onsite"),
+  additionalOffsite: integer("additional_offsite"), // cents
+  additionalDelivery: integer("additional_delivery"), // cents
   prelimContractPrice: integer("prelim_contract_price"), // Total preliminary
   
   // Final Pricing (at Green Light)
@@ -507,7 +509,8 @@ export const milestones = pgTable("milestones", {
   projectId: integer("project_id")
     .references(() => projects.id)
     .notNull(),
-  
+  phaseId: integer("phase_id").references(() => phases.id),
+
   // Milestone Identity
   milestoneType: text("milestone_type").notNull(), // 'client', 'manufacturing', 'onsite'
   milestoneNumber: integer("milestone_number").notNull(),
@@ -944,6 +947,10 @@ export const milestonesRelations = relations(milestones, ({ one }) => ({
   project: one(projects, {
     fields: [milestones.projectId],
     references: [projects.id],
+  }),
+  phase: one(phases, {
+    fields: [milestones.phaseId],
+    references: [phases.id],
   }),
 }));
 
