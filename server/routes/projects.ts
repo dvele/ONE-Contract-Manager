@@ -25,22 +25,29 @@ import {
 const router = Router();
 
 /**
- * `designDuration` and `productionDuration` anchor the whole derived schedule:
- * the first places every phase's factory start, the second is the span a phase
- * with no `manufacturingDays` of its own falls back to. Both are plain `int4`
- * columns written straight from a request body, and `calculateProjectPricing`
- * — which serves `GET /pricing-summary` and every contract-generation route —
- * adds them to a date, so a value the calendar cannot express takes all of
- * those down at once for that project.
+ * `designDuration`, `productionDuration` and `deliveryDuration` anchor the
+ * whole derived schedule: the first places every phase's factory start, and
+ * the other two are the spans a phase with no `manufacturingDays` / no
+ * `onsiteDays` of its own falls back to. All three are plain `int4` columns
+ * written straight from a request body, and `calculateProjectPricing` — which
+ * serves `GET /pricing-summary` and every contract-generation route — adds
+ * them to a date, so a value the calendar cannot express takes all of those
+ * down at once for that project.
  *
  * The ceiling matches the per-phase bound in server/routes/phases.ts: a
  * project-level fallback should be able to express anything a phase can state
  * directly. The floor is 1, not the 0 that phases.ts allows — a 0 on one phase
  * asserts that phase builds in no time, while a 0 here collapses every phase
- * without its own duration onto the project start.
+ * without its own duration onto the project start, or (for delivery) prints
+ * the delivery date itself as the Certificate of Occupancy date.
  *
- * Only these two are bounded: the other duration columns feed written text and
- * a day count, never date arithmetic. Unlisted keys are ignored, so this
+ * `null` is deliberately accepted and is the way to clear a duration: it lands
+ * as NULL, which derives no date, which the exhibits render as TBD. 0 is not a
+ * synonym for that and never was — which is why a stored 0 in any of these
+ * three columns can only have come from a writer that meant "not set".
+ *
+ * The remaining two duration columns feed written text and a day count, never
+ * date arithmetic, and are not bounded. Unlisted keys are ignored, so this
  * validates a partial update without constraining the rest of the body.
  */
 const MIN_DURATION_DAYS = 1;
@@ -54,9 +61,16 @@ const durationDays = z
   .nullable()
   .optional();
 
+const SCHEDULE_DURATION_KEYS = [
+  "designDuration",
+  "productionDuration",
+  "deliveryDuration",
+] as const;
+
 const ScheduleDurationsSchema = z.object({
   designDuration: durationDays,
   productionDuration: durationDays,
+  deliveryDuration: durationDays,
 });
 
 /** Returns the 400 body for an out-of-range duration, or null when the request
@@ -342,13 +356,14 @@ router.patch("/projects/:id", async (req, res) => {
       .select({
         designDuration: projects.designDuration,
         productionDuration: projects.productionDuration,
+        deliveryDuration: projects.deliveryDuration,
       })
       .from(projects)
       .where(eq(projects.id, projectId));
 
     const submitted: Record<string, unknown> = { ...req.body };
     if (current) {
-      for (const key of ["designDuration", "productionDuration"] as const) {
+      for (const key of SCHEDULE_DURATION_KEYS) {
         if (key in submitted && submitted[key] === current[key]) delete submitted[key];
       }
     }
