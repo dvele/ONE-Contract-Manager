@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DollarSign, RefreshCw, AlertTriangle, Calculator, Loader2, Receipt } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
+import { PhasePaymentEditor } from '../PhasePaymentEditor';
 
 interface PaymentScheduleItem {
   name: string;
@@ -26,6 +27,15 @@ interface PricingBreakdown {
   totalShipping: number;
 }
 
+/** As `reconcilePhases` returns it: whether the phase values agree with the
+ * contract total, and by how much they do not. */
+interface Reconciliation {
+  reconciles: boolean;
+  shortfall: number;
+  unexplained: number;
+  explainedByUnphased: boolean;
+}
+
 interface PricingSummary {
   breakdown: PricingBreakdown;
   grandTotal: number;
@@ -33,7 +43,44 @@ interface PricingSummary {
   serviceModel: string;
   paymentSchedule: PaymentScheduleItem[];
   unitCount: number;
+  reconciliation?: Reconciliation;
 }
+
+/** The two project-level adjustments this step writes, alongside the design fee
+ * and site-work buffer already here. Each sits on top of a model-derived figure
+ * shown beside it, so the sum is legible without arithmetic. */
+interface OffsiteAdjustmentSpec {
+  field: 'additionalOffsite' | 'additionalDelivery';
+  label: string;
+  title: string;
+  description: string;
+  derivedLabel: string;
+  derivedOf: (breakdown: PricingBreakdown) => number;
+  testId: string;
+}
+
+const OFFSITE_ADJUSTMENTS: OffsiteAdjustmentSpec[] = [
+  {
+    field: 'additionalOffsite',
+    label: 'Additional Factory Amount (in dollars)',
+    title: 'Offsite Services (Factory)',
+    description:
+      'Added on top of the factory price derived from the unit models — engineering, options or scope the catalog price does not carry.',
+    derivedLabel: 'Model-derived factory price',
+    derivedOf: (breakdown) => breakdown.totalOffsite,
+    testId: 'additional-offsite',
+  },
+  {
+    field: 'additionalDelivery',
+    label: 'Additional Delivery Amount (in dollars)',
+    title: 'Offsite Services (Delivery/Assembly)',
+    description:
+      'Added on top of the shipping and set price derived from the unit models — crane, escort, access or assembly beyond the standard set.',
+    derivedLabel: 'Model-derived shipping and set price',
+    derivedOf: (breakdown) => breakdown.totalShipping,
+    testId: 'additional-delivery',
+  },
+];
 
 export const Step7Pricing: React.FC = () => {
   const { 
@@ -58,16 +105,87 @@ export const Step7Pricing: React.FC = () => {
       maximumFractionDigits: 0
     }).format(cents / 100);
   };
+
+  // The reconciliation figure is shown to the cent: rounded to whole dollars, a
+  // discrepancy under a dollar prints as "$0", which reads as no discrepancy at
+  // all — and a single cent is exactly what this check exists to catch.
+  const formatCurrencyExact = (cents: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(cents / 100);
+  };
   
   const { data: pricingSummary, isLoading, isError, refetch } = useQuery<PricingSummary>({
     queryKey: ['/api/projects', draftProjectId, 'pricing-summary'],
     enabled: !!draftProjectId,
   });
   
-  const { data: financialsData } = useQuery<{ prelimOnsite?: number; designFee?: number }>({
+  const { data: financialsData } = useQuery<{
+    prelimOnsite?: number;
+    designFee?: number;
+    additionalOffsite?: number | null;
+    additionalDelivery?: number | null;
+  }>({
     queryKey: ['/api/projects', draftProjectId, 'financials'],
     enabled: !!draftProjectId,
   });
+
+  // Held as typed text, not a number: an empty field means "not set", which
+  // must reach the API as null. Coercing it to 0 would assert a zero
+  // adjustment, and a stored 0 is indistinguishable from a figure someone
+  // actually entered.
+  const [adjustments, setAdjustments] = useState<Record<string, string>>({});
+  const [adjustmentError, setAdjustmentError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (financialsData === undefined) return;
+    setAdjustments({
+      additionalOffsite:
+        financialsData.additionalOffsite == null ? '' : String(financialsData.additionalOffsite / 100),
+      additionalDelivery:
+        financialsData.additionalDelivery == null ? '' : String(financialsData.additionalDelivery / 100),
+    });
+  }, [financialsData?.additionalOffsite, financialsData?.additionalDelivery]);
+
+  const saveAdjustmentsMutation = useMutation({
+    mutationFn: async (values: Record<string, number | null>) => {
+      if (!draftProjectId) throw new Error('Project not saved yet');
+      return apiRequest('PATCH', `/api/projects/${draftProjectId}/financials`, values);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', draftProjectId, 'pricing-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/projects', draftProjectId, 'financials'] });
+      setAdjustmentError(null);
+    },
+    onError: () => setAdjustmentError('Could not save the adjustments. Check the amounts and try again.'),
+  });
+
+  // Validated here, at the commit point, rather than in validateStep:
+  // updateProjectData clears the whole validationErrors map on every field
+  // change, so a step-scoped error slot never survives to be shown.
+  const handleSaveAdjustments = () => {
+    const values: Record<string, number | null> = {};
+
+    for (const spec of OFFSITE_ADJUSTMENTS) {
+      const raw = (adjustments[spec.field] ?? '').trim();
+      if (raw === '') {
+        values[spec.field] = null;
+        continue;
+      }
+      const dollars = Number(raw);
+      if (!Number.isFinite(dollars) || dollars < 0) {
+        setAdjustmentError(`Enter ${spec.title} as an amount of 0 or more, or clear the field.`);
+        return;
+      }
+      values[spec.field] = Math.round(dollars * 100);
+    }
+
+    setAdjustmentError(null);
+    saveAdjustmentsMutation.mutate(values);
+  };
   
   useEffect(() => {
     if (financialsData?.prelimOnsite != null) {
@@ -166,8 +284,33 @@ export const Step7Pricing: React.FC = () => {
     );
   }
   
+  const reconciliation = pricingSummary?.reconciliation;
+
   return (
     <div className="space-y-6">
+      {reconciliation && !reconciliation.reconciles && (
+        // Said here rather than left to Step 9: generation refuses an
+        // unreconciled project with a 409, and a blocked generation whose
+        // reason appears nowhere upstream is a dead end.
+        <Card className="border-destructive/50 bg-destructive/5" data-testid="card-reconciliation-warning">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-destructive shrink-0" aria-hidden="true" />
+              <div className="min-w-0" role="alert">
+                <p className="font-medium">Phase Values Do Not Match the Contract Total</p>
+                <p className="text-sm text-muted-foreground">
+                  {reconciliation.unexplained > 0
+                    ? `${formatCurrencyExact(reconciliation.unexplained)} of the contract total belongs to no phase.`
+                    : `The phases carry ${formatCurrencyExact(Math.abs(reconciliation.unexplained))} more than the contract total.`}{' '}
+                  A contract cannot be generated until this is resolved. Check in Step 4 that every
+                  unit is attached to a property in a phase.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -371,6 +514,88 @@ export const Step7Pricing: React.FC = () => {
         </CardContent>
       </Card>
       
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5" />
+            Offsite Services
+          </CardTitle>
+          <CardDescription>
+            Adjustments on top of the factory and delivery prices derived from the unit models.
+            Leave a field empty where there is no adjustment.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {OFFSITE_ADJUSTMENTS.map((spec) => {
+              const inputId = `input-${spec.testId}`;
+              const helpId = `${inputId}-help`;
+              return (
+                <div key={spec.field} className="space-y-2">
+                  <Label htmlFor={inputId}>{spec.label}</Label>
+                  <div className="relative">
+                    <DollarSign
+                      className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                    <Input
+                      id={inputId}
+                      name={spec.field}
+                      type="number"
+                      inputMode="decimal"
+                      step={0.01}
+                      min={0}
+                      autoComplete="off"
+                      placeholder="0.00…"
+                      className="pl-9 tabular-nums"
+                      aria-describedby={helpId}
+                      value={adjustments[spec.field] ?? ''}
+                      onChange={(e) =>
+                        setAdjustments((previous) => ({ ...previous, [spec.field]: e.target.value }))
+                      }
+                      data-testid={inputId}
+                    />
+                  </div>
+                  <p id={helpId} className="text-xs text-muted-foreground">
+                    {spec.description}{' '}
+                    {pricingSummary && (
+                      <span className="tabular-nums">
+                        {spec.derivedLabel}: {formatCurrency(spec.derivedOf(pricingSummary.breakdown))}.
+                      </span>
+                    )}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              onClick={handleSaveAdjustments}
+              disabled={saveAdjustmentsMutation.isPending || !draftProjectId}
+              data-testid="button-save-offsite-adjustments"
+            >
+              {saveAdjustmentsMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" aria-hidden="true" />
+                  Save &amp; Recalculate
+                </>
+              )}
+            </Button>
+            <p className="text-sm text-destructive" aria-live="polite" data-testid="text-offsite-adjustment-error">
+              {adjustmentError}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <PhasePaymentEditor projectId={draftProjectId} />
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

@@ -157,6 +157,23 @@ enforced one hop up, on the owning project.
 
 ---
 
+### Web Interface Guidelines deviations in the payment editor (recorded 2026-09-16)
+
+`PhasePaymentEditor.tsx` departs from two rules in
+`.agents/skills/web-design-guidelines`, deliberately:
+
+- **Destructive actions need a confirmation or an undo window.** Removing a
+  milestone row has neither. The row is draft state until Save, and
+  *Discard Changes* restores the whole set from the server — the undo exists, it
+  is just not per-row. A modal per row deletion in a table people restructure
+  freely would cost more than it protects.
+- **Amounts are derived in the client**, duplicating `priceSchedule` in
+  `server/services/pricingMath.ts`. `PhaseScheduleEditor` deliberately reads its
+  dates back from the server instead; that is not possible here, because the
+  amounts shown belong to percentages the user has typed and not yet saved. The
+  residual rule is mirrored exactly so the figure on screen equals the figure
+  that reaches the contract. **If either rule changes, both must change.**
+
 ## 4. Known latent issues, no live data path
 
 None of these are reachable through the application today. All are recorded rather
@@ -178,6 +195,15 @@ than fixed because fixing them unverified buys nothing.
   well under it and totals are summed in JavaScript rather than stored, so nothing is
   broken — but a single unit above that has nowhere to go and no constraint says so.
   `unit_configurations` guards its own product explicitly; nothing else does.
+- **`POST /contracts/:id/regenerate` leaks an open transaction.** It issues
+  `BEGIN` and then returns early on two paths — "Template not found" (404) and
+  "Template has no clauses" (400) — without `ROLLBACK`. The `finally` releases
+  the client back to the pool still **idle in transaction**, so the next caller
+  to borrow it runs inside a transaction that is never committed. Found while
+  verifying Plan D Task 5: a throwaway script's cleanup `DELETE`s silently
+  vanished when the pool closed. Pre-existing, unrelated to the reconciliation
+  gate (which returns before `BEGIN`). The fix is a `ROLLBACK` on both paths, or
+  moving `BEGIN` below them.
 - **Three separate `pg.Pool` instances** (`server/db.ts`, `server/db/index.ts`,
   `server/routes/project-units.ts`), so a transaction cannot span a `project-units.ts`
   write and a shared-pool write.
