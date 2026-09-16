@@ -20,23 +20,35 @@ const D1_REVIEW_PERIODS = [
   { label: 'Green Light Review', days: 5 },
 ];
 
+/**
+ * Ordered by the derivation chain, which is also Exhibit D.1's own row order:
+ * D-1 Kickoff, D-2 Schematic, D-3 Permit Set, D-4 Green Light Package. Each
+ * date derives from the one above it through that row's review period, so a
+ * field showing a later date above an earlier one would contradict both the
+ * exhibit and the values in the boxes.
+ *
+ * `designDevelopmentDate` backs D-4 and `permitSubmittalDate` backs D-3 — the
+ * column names read the other way round; see
+ * docs/phase-property-model-open-items.md.
+ */
 const D1_OVERRIDES = [
-  { field: 'designKickoffDate', label: 'Design Kickoff', testId: 'input-design-kickoff-date' },
-  { field: 'schematicDesignDate', label: 'Schematic Design Complete', testId: 'input-schematic-design-date' },
-  { field: 'designDevelopmentDate', label: 'Design Development Complete', testId: 'input-design-development-date' },
-  { field: 'permitSubmittalDate', label: 'Permit Submittal', testId: 'input-permit-submittal-date' },
+  { field: 'designKickoffDate', label: 'Kickoff (D-1)', testId: 'input-design-kickoff-date' },
+  { field: 'schematicDesignDate', label: 'Schematic (D-2)', testId: 'input-schematic-design-date' },
+  { field: 'permitSubmittalDate', label: 'Permit Set (D-3)', testId: 'input-permit-submittal-date' },
+  { field: 'designDevelopmentDate', label: 'Green Light Package (D-4)', testId: 'input-design-development-date' },
 ] as const;
 
-// The help text differs per field because the fallbacks do. mapper.ts:1483
-// resolves PRODUCTION_COMPLETE_DATE to the phase rollup when the column is
-// empty; mapper.ts:1478 has no such fallback for PRODUCTION_MIDPOINT_DATE, and
-// no rolled midpoint exists to fall back to, so an empty column prints TBD.
+// The help text differs per field because the fallbacks do. mapper.ts resolves
+// PRODUCTION_COMPLETE_DATE to the phase rollup when the column is empty;
+// PRODUCTION_MIDPOINT_DATE has no such fallback. It also has no row: D.2's
+// table is P-1 Factory Start, P-2 Factory Completion, P-3 Delivery/Set, P-4
+// CO/Equivalent, so a midpoint has nowhere to print, filled or empty.
 const D2_OVERRIDES = [
   {
     field: 'productionMidpointDate',
     label: 'Production Midpoint',
     testId: 'input-production-midpoint-date',
-    help: 'Nothing calculates this one. Empty prints TBD in Exhibit D.2.',
+    help: 'Nothing calculates this one, and Exhibit D.2 has no row for it — it prints nowhere today.',
   },
   {
     field: 'productionCompleteDate',
@@ -406,8 +418,8 @@ export const Step6DatesSchedule: React.FC = () => {
           </CardTitle>
           <CardDescription>
             Exhibit D.2 states one production span for the whole project. Production Complete rolls
-            up from the phases above unless you assert it here; Production Midpoint has no
-            calculation behind it, so leaving it empty prints TBD.
+            up from the phases above unless you assert it here; Production Midpoint has neither a
+            calculation behind it nor a row in D.2 to print into.
           </CardDescription>
         </CardHeader>
         <CardContent>

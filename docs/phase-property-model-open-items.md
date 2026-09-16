@@ -1,8 +1,8 @@
 # Phase & Property Model — Open Items and Findings
 
-**Last updated:** 2026-09-14
+**Last updated:** 2026-09-16
 **Branch:** `feat/phase-property-model` (unmerged)
-**Covers:** Plans A and B of five. See
+**Covers:** Plans A, B and C of five. See
 [`docs/superpowers/specs/2026-09-10-phase-property-model-design.md`](superpowers/specs/2026-09-10-phase-property-model-design.md)
 for the design, and the plan documents beside it for what was built.
 
@@ -66,6 +66,28 @@ Preserve agreement, where A.4's line items did not sum to A.4's own total.
 Also for Plan E: `PhaseRollup.properties` carries property `id`, `propertyCode`,
 `address` and per-unit detail specifically so A.2 and B.1 can be built without
 re-querying the phase→property→unit join. Use it.
+
+### Two D.1 naming decisions Plan E must make before wiring D-4's cell (raised 2026-09-16)
+
+**The bindings are correct — do not "fix" them.** Verified against the seeded exhibit
+body: D.1's rows are D-1 Kickoff, D-2 Schematic, D-3 Permit Set, D-4 Green Light
+Package, and `mapper.ts` binds `PERMIT_SUBMITTAL_DATE` to the permit-set milestone
+(D-3) and `DESIGN_DEVELOPMENT_DATE` to the green-light package (D-4). They print in
+ascending order. An earlier ledger entry claiming the two were transposed is wrong.
+
+What is unresolved is what D-4's cell should say:
+
+1. **`DESIGN_DEVELOPMENT_DATE` is misnamed.** It derives ten business days *after*
+   `PERMIT_SUBMITTAL_DATE`, which the two names imply backwards — design development
+   normally precedes permit submittal. The column is
+   `project_details.design_development_date` and the variable is public in
+   `VARIABLE_CATEGORIES`, so renaming it is a migration plus a variable-library change,
+   not a one-line edit. Step 6 now labels the field "Green Light Package (D-4)" to
+   match what it actually holds; the variable still reads the other way.
+2. **`GREEN_LIGHT_DATE` already exists**, over `project_details.greenLightDate` — a
+   hand-entered column with no derivation. So two variables plausibly belong in D-4's
+   Target Date cell, and nothing today says which wins. Decide before wiring the cell;
+   wiring both would print two different dates for one milestone.
 
 ---
 
