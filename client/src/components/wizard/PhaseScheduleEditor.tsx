@@ -78,7 +78,7 @@ const DURATION_SPECS: DurationSpec[] = [
     min: 0,
     max: 1095,
     placeholder: "60…",
-    help: "Delivery through certificate of occupancy.",
+    help: "Delivery through certificate of occupancy. Clear this to fall back to the project's on-site duration.",
   },
 ];
 
@@ -122,12 +122,10 @@ const WHOLE_NUMBER = /^-?\d+$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * `ISO_DATE` accepts any four-digit year, so the typos that reach the server
- * unchallenged are year-magnitude ones — `0227-03-05` for `2027-03-05`, which is
- * a real calendar date and would anchor a contract schedule to the third
- * century. These bounds are wider than any plausible project and narrow enough
- * to catch that class. Lexicographic comparison is chronological for
- * zero-padded ISO dates.
+ * Mirrors `MIN_OVERRIDE_DATE`/`MAX_OVERRIDE_DATE` in server/routes/phases.ts so
+ * the field states the limit before the request is sent rather than after a 400
+ * comes back. Lexicographic comparison is chronological for zero-padded ISO
+ * dates.
  */
 const MIN_OVERRIDE_DATE = "2000-01-01";
 const MAX_OVERRIDE_DATE = "2099-12-31";
@@ -154,7 +152,10 @@ function derivation(phase: Phase, key: DateSpec["key"]): string {
     case "deliveryWindow":
       return `Factory completion + ${dayCount(phase.deliveryLagDays, "0 days")} of delivery lag.`;
     case "targetCO":
-      return `Delivery + ${dayCount(phase.onsiteDays, "an unset on-site duration")} on site.`;
+      return `Delivery + ${dayCount(
+        phase.onsiteDays,
+        "the project's on-site duration",
+      )} on site.`;
   }
 }
 

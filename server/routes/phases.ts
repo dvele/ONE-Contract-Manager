@@ -17,10 +17,25 @@ const router = Router();
 
 router.use(requireAuth);
 
+/**
+ * The same window the phase schedule editor offers, enforced here so the API
+ * is not wider than the only UI that writes it. `ISO_DATE` accepts any
+ * four-digit year, so the typo that otherwise reaches the column unchallenged
+ * is a year-magnitude one — `0227-03-05` for `2027-03-05` is a real calendar
+ * date and would anchor a contract schedule to the third century.
+ * Lexicographic comparison is chronological for zero-padded ISO dates.
+ */
+const MIN_OVERRIDE_DATE = "2000-01-01";
+const MAX_OVERRIDE_DATE = "2099-12-31";
+
 const isoDate = z
   .string()
   .regex(ISO_DATE, "Dates must be YYYY-MM-DD")
   .refine(isRealCalendarDate, "Dates must be a real calendar date")
+  .refine(
+    (value) => value >= MIN_OVERRIDE_DATE && value <= MAX_OVERRIDE_DATE,
+    `Dates must be between ${MIN_OVERRIDE_DATE} and ${MAX_OVERRIDE_DATE}`,
+  )
   .nullable()
   .optional();
 
