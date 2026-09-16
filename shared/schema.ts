@@ -331,10 +331,17 @@ export const projects = pgTable("projects", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at"),
   // Schedule Durations (in days)
-  designDuration: integer("design_duration").default(0),
+  //
+  // design/production/delivery carry no column default: each one feeds date
+  // arithmetic in calculateProjectPricing, and a `DEFAULT 0` made "never set"
+  // indistinguishable from "asserted zero" — a row that simply omitted the key
+  // derived a Certificate of Occupancy date equal to its delivery date. NULL
+  // means not set, which derives null, which the exhibits render as TBD. The
+  // other two feed written text and a day count only, and keep their default.
+  designDuration: integer("design_duration"),
   permittingDuration: integer("permitting_duration").default(0),
-  productionDuration: integer("production_duration").default(0),
-  deliveryDuration: integer("delivery_duration").default(0),
+  productionDuration: integer("production_duration"),
+  deliveryDuration: integer("delivery_duration"),
   completionDuration: integer("completion_duration").default(0),
   estimatedDeliveryDate: text("estimated_delivery_date"),
   estimatedCompletionDate: text("estimated_completion_date"),
