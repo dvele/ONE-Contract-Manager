@@ -19,10 +19,46 @@ import { exec } from "child_process";
 import { promisify } from "util";
 // @ts-ignore - mammoth doesn't have type declarations
 import mammoth from "mammoth";
+import type { ReconciliationResult } from "../services/pricingMath";
 
 const execAsync = promisify(exec);
 
 const router = Router();
+
+/**
+ * Refuses to produce a contract whose per-phase tables and contract total
+ * disagree, which every generation entry point below checks.
+ *
+ * A warning in a log is not a decision anyone sees, and a document whose
+ * Exhibit A.2 phase values do not sum to the Total Project Price beside them is
+ * the failure shape of the issued Zaca Preserve agreement. Refusing is the
+ * spec's explicit decision.
+ *
+ * Returns null — generation proceeds — when the project has no phases, when
+ * every discrepancy is explained by units sitting outside a phase, or when
+ * pricing could not be calculated at all: each caller already treats an absent
+ * summary as a reason to fall back, not to refuse.
+ */
+async function reconciliationRefusal(
+  pricingSummary: { reconciliation?: ReconciliationResult } | null | undefined,
+): Promise<{ error: string } | null> {
+  const reconciliation = pricingSummary?.reconciliation;
+  if (!reconciliation || reconciliation.reconciles) return null;
+
+  const { formatCentsAsCurrency } = await import("../lib/mapper");
+  const amount = formatCentsAsCurrency(Math.abs(reconciliation.unexplained));
+  const discrepancy =
+    reconciliation.unexplained > 0
+      ? `${amount} of the contract total belongs to no phase`
+      : `the phases carry ${amount} more than the contract total`;
+
+  return {
+    error:
+      `This project's phase values do not reconcile with its contract total: ${discrepancy}. ` +
+      `Check that every unit is attached to a property in a phase, and that the ` +
+      `pricing figures are current, before generating.`,
+  };
+}
 
 // Exhibits are fetched via the template_exhibits junction keyed by templateId, so
 // every generation path MUST pass templateId or exhibits are silently omitted
@@ -798,6 +834,22 @@ router.post("/contracts", async (req, res) => {
     
     console.log("🚀 STARTING GENERATION. TemplateID:", templateId, "ProjectID:", projectId, "ContractType:", contractType);
 
+    // Checked before the clause snapshot is written, not after: this route
+    // deletes the project's existing drafts as its first act, so refusing later
+    // would leave the project with neither the old draft nor a new one.
+    if (projectId) {
+      const { calculateProjectPricing } = await import('../services/pricingEngine');
+      let pricingSummary: any = null;
+      try {
+        pricingSummary = await calculateProjectPricing(projectId);
+      } catch (pricingError) {
+        console.warn(`⚠️ Pricing engine error (generation not gated):`, pricingError);
+      }
+
+      const refusal = await reconciliationRefusal(pricingSummary);
+      if (refusal) return res.status(409).json(refusal);
+    }
+
     // Normalize status to ensure consistency
     const normalizedStatus = status === "draft" ? "Draft" : status;
     const contractData = { ...req.body, status: normalizedStatus };
@@ -1078,6 +1130,19 @@ router.post("/contracts/:id/regenerate", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Contract has no linked template" });
     }
 
+    if (contract.project_id) {
+      const { calculateProjectPricing } = await import('../services/pricingEngine');
+      let pricingSummary: any = null;
+      try {
+        pricingSummary = await calculateProjectPricing(contract.project_id);
+      } catch (pricingError) {
+        console.warn(`⚠️ Pricing engine error (regeneration not gated):`, pricingError);
+      }
+
+      const refusal = await reconciliationRefusal(pricingSummary);
+      if (refusal) return res.status(409).json(refusal);
+    }
+
     await client.query("BEGIN");
 
     // 2. Fetch the template's current version
@@ -1162,7 +1227,10 @@ router.post("/contracts/download-all-zip", async (req, res) => {
     } catch (pricingError) {
       console.warn(`⚠️ Pricing engine error (using fallback):`, pricingError);
     }
-    
+
+    const zipRefusal = await reconciliationRefusal(pricingSummary);
+    if (zipRefusal) return res.status(409).json(zipRefusal);
+
     // Now call mapProjectToVariables WITH the pricingSummary so tables are populated
     const projectData = mapProjectToVariables(fullProject, pricingSummary || undefined);
     
@@ -1344,7 +1412,10 @@ router.post("/contracts/download-pdf", async (req, res) => {
       } catch (pricingError) {
         console.warn(`⚠️ Pricing engine error (using fallback):`, pricingError);
       }
-      
+
+      const pdfRefusal = await reconciliationRefusal(pricingSummary);
+      if (pdfRefusal) return res.status(409).json(pdfRefusal);
+
       // Now call mapProjectToVariables WITH the pricingSummary and contractType so tables are filtered correctly
       // Contract type filtering: ONE shows all, MANUFACTURING shows offsite only, ONSITE shows onsite only
       const contractFilterType = contractType as 'ONE' | 'MANUFACTURING' | 'ONSITE' | 'MASTER_EF';
@@ -1505,7 +1576,10 @@ router.post("/contracts/draft-preview", async (req, res) => {
     } catch (pricingError) {
       console.warn(`⚠️ Pricing engine error (using fallback):`, pricingError);
     }
-    
+
+    const previewRefusal = await reconciliationRefusal(pricingSummary);
+    if (previewRefusal) return res.status(409).json(previewRefusal);
+
     // Map project to variables WITH pricingSummary and contractType (same as PDF route)
     // Contract type filtering: ONE shows all, MANUFACTURING shows offsite only, ONSITE shows onsite only
     const contractFilterType = contractType as 'ONE' | 'MANUFACTURING' | 'ONSITE' | 'MASTER_EF';
