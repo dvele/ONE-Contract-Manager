@@ -270,10 +270,19 @@ phase[n].targetCO        = phase[n].deliveryWindow + phase[n].onsiteDays
 
 `designDurationDays` is the existing `projects.designDuration` column (the wizard's
 `designPhaseDays`). Manufacturing and on-site durations **move to the phase**: today
-`manufacturingDurationDays` persists as `projects.productionDuration`, and on-site
-duration has no column of its own at all — it survives only inside
-`projects.completionDuration`, which stores design + manufacturing + on-site as a
-single sum. `phases.manufacturingDays` and `phases.onsiteDays` give both a real home.
+`manufacturingDurationDays` persists as `projects.productionDuration` and
+`onsiteDurationDays` as `projects.deliveryDuration`. `phases.manufacturingDays` and
+`phases.onsiteDays` give each a per-phase home, and a phase that sets neither falls
+back to the project-level column.
+
+**Corrected 2026-09-16.** This paragraph previously said on-site duration "has no
+column of its own at all — it survives only inside `projects.completionDuration`".
+That is wrong: `client/src/components/wizard/WizardContext.tsx` writes
+`deliveryDuration: pd.onsiteDurationDays` and reads it straight back.
+`projects.completionDuration` separately stores the design + manufacturing + on-site
+sum. Plan C inherited the error and gave `manufacturingDays` a project-level fallback
+with no counterpart for `onsiteDays`, which derived `targetCO = null` for every
+pre-existing phase; the fallback is now symmetric.
 
 `startOffsetDays` defaults to 0, giving consecutive production runs; a positive value
 inserts a gap and a negative one overlaps phases. Setting explicit offsets reproduces

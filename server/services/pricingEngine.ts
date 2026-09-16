@@ -285,15 +285,19 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
     toDateOnly(project.createdAt);
   const designComplete = addDays(projectStart, project.designDuration);
 
-  // manufacturingDays has no column default (unlike startOffsetDays/deliveryLagDays):
-  // every phase created before this plan has it unset, so it falls back to the
-  // wizard's project-level production duration rather than deriving a null
-  // factoryComplete for every existing project.
+  // Neither manufacturingDays nor onsiteDays has a column default (unlike
+  // startOffsetDays/deliveryLagDays): every phase created before this plan has
+  // both unset, so each falls back to the project-level duration the wizard
+  // already stores rather than deriving a null date for every existing
+  // project. projects.deliveryDuration is where the wizard's on-site duration
+  // lands (WizardContext.tsx writes `deliveryDuration: pd.onsiteDurationDays`
+  // and reads it straight back), so it is the on-site counterpart of
+  // productionDuration.
   const phaseDurations: PhaseDurations[] = phaseRows.map((phase) => ({
     phaseNumber: phase.phaseNumber,
     startOffsetDays: phase.startOffsetDays,
     manufacturingDays: phase.manufacturingDays ?? project.productionDuration,
-    onsiteDays: phase.onsiteDays,
+    onsiteDays: phase.onsiteDays ?? project.deliveryDuration,
     deliveryLagDays: phase.deliveryLagDays,
     factoryStartOverride: phase.factoryStartOverride,
     factoryCompleteOverride: phase.factoryCompleteOverride,
