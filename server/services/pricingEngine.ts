@@ -2,7 +2,16 @@ import { db } from "../db/index";
 import { pool } from "../db";
 import { projects, projectDetails, financials, milestones, phases, properties } from "../../shared/schema";
 import { asc, eq } from "drizzle-orm";
-import { buildPhaseRollups, type PropertyRow, type UnitRow, type PhaseRollup } from "./pricingMath";
+import {
+  buildPhaseRollups,
+  reconcilePhases,
+  sumUnphasedUnitValue,
+  type PropertyRow,
+  type UnitRow,
+  type PhaseRollup,
+  type ReconciliationResult,
+  type StoredMilestone,
+} from "./pricingMath";
 import { addDays, derivePhaseDates, toDateOnly, asCalendarDate, type PhaseDurations } from "./scheduleMath";
 
 export type { PhaseRollup, RollupProperty, RollupUnit } from "./pricingMath";
@@ -32,6 +41,7 @@ export interface PricingSummary {
   unitCount: number;
   unitModelSummary: string;   // e.g., "1x Trinity, 2x Salt Point"
   phases: PhaseRollup[];
+  reconciliation: ReconciliationResult;
 }
 
 /**
@@ -75,6 +85,10 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
   
   // Additional site work (stored in financials.prelimOnsite)
   const additionalSiteWork = financial?.prelimOnsite || 0;
+  // The offsite counterparts, adjusting the model-derived factory and
+  // delivery prices the same way prelimOnsite adjusts on-site.
+  const additionalOffsite = financial?.additionalOffsite || 0;
+  const additionalDelivery = financial?.additionalDelivery || 0;
 
   // Units are scoped to the project's own organization, not a caller's — this
   // function has no caller identity. The plain `pu.organization_id = $2` would
@@ -177,6 +191,14 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
     console.log(`[PricingEngine] Project ${projectId}: No units found, using financials fallback - designFee=${totalDesignFee}, offsite=${totalOffsite}, onsite=${totalOnsite}`);
   }
 
+  // Applied to both branches above: unlike additionalSiteWork, which the
+  // no-units fallback already reads as the whole of totalOnsite, these two
+  // adjust whatever offsite and shipping figures were arrived at. Every one of
+  // them is also distributed across the phases below, so leaving either out
+  // here would put the phase tables and the contract total into disagreement.
+  totalOffsite += additionalOffsite;
+  totalShipping += additionalDelivery;
+
   // projectBudget = full cost of the project (design + offsite + customizations + shipping + onsite)
   const projectBudget = totalDesignFee + totalOffsite + totalCustomizations + totalShipping + totalOnsite;
 
@@ -196,10 +218,29 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
   console.log(`[PricingEngine] Project ${projectId} (${serviceModel}): projectBudget=${projectBudget}, contractValue=${contractValue}`);
 
   // Get milestones for payment schedule
-  const projectMilestones = await db
+  const storedMilestoneRows = await db
     .select()
     .from(milestones)
-    .where(eq(milestones.projectId, projectId));
+    .where(eq(milestones.projectId, projectId))
+    .orderBy(asc(milestones.milestoneNumber), asc(milestones.id));
+
+  // A row carrying a phaseId belongs to that phase's own schedule and is priced
+  // against its phaseValue below. The project-level schedule reads only the
+  // legacy unphased rows, so storing per-phase milestones cannot multiply this
+  // list or bill each of them against the whole contract value.
+  const projectMilestones = storedMilestoneRows.filter((m) => m.phaseId === null);
+
+  const storedMilestones = new Map<number, StoredMilestone[]>();
+  for (const m of storedMilestoneRows) {
+    if (m.phaseId === null) continue;
+    const forPhase = storedMilestones.get(m.phaseId) ?? [];
+    forPhase.push({
+      name: m.name,
+      trigger: m.dueUpon ?? "",
+      percentage: m.percentage ?? 0,
+    });
+    storedMilestones.set(m.phaseId, forPhase);
+  }
 
   const paymentSchedule: PaymentScheduleItem[] = [];
 
@@ -328,8 +369,19 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
     unitRows,
     serviceModel,
     additionalSiteWork,
-    phaseDates
+    phaseDates,
+    { storedMilestones, additionalOffsite, additionalDelivery }
   );
+
+  // Units on an unphased property, or on none, count into contractValue and
+  // into no phase — the one legitimate reason the two can differ. Anything
+  // beyond that is drift, which Task 5 refuses to generate a contract over.
+  const reconciliation = reconcilePhases({
+    phaseValues: phaseRollups.map((p) => p.phaseValue),
+    contractValue,
+    designFee: totalDesignFee,
+    unphasedUnitValue: sumUnphasedUnitValue(propertyRows, unitRows, serviceModel),
+  });
 
   return {
     breakdown: {
@@ -347,5 +399,6 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
     unitCount,
     unitModelSummary,
     phases: phaseRollups,
+    reconciliation,
   };
 }

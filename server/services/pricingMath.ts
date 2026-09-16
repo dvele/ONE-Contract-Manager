@@ -28,8 +28,44 @@ const MILESTONE_TEMPLATE: ReadonlyArray<Omit<ScheduledMilestone, "amount">> = [
   { name: "Retainage", trigger: "CO/Equivalent", percentage: 5 },
 ];
 
-/** Delivery absorbs the rounding residual, so retainage stays an exact 5%. */
-const RESIDUAL_MILESTONE_INDEX = 4;
+/**
+ * Retainage absorbs no residual: it is the figure a client withholds and
+ * verifies against the stated percentage, so it must stay exact. The residual
+ * lands on the last row before it — Delivery, in the template above.
+ */
+function residualIndexFor(rows: ReadonlyArray<{ name: string }>): number {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (!/retainage/i.test(rows[i].name)) return i;
+  }
+  return rows.length - 1;
+}
+
+/**
+ * Prices a set of milestone percentages against one phase's value.
+ *
+ * Percentages are reported to two decimals and amounts derived from that
+ * rounded figure, so the percentage a client reads and the amount beside it
+ * always agree. The amounts sum to `phaseValue` exactly regardless of what the
+ * percentages total — a stored set that does not reach 100 is the route's to
+ * reject, and leaving a phase's milestones short of its own value would put an
+ * uncollectable remainder into a signed agreement.
+ */
+function priceSchedule(
+  phaseValue: number,
+  rows: ReadonlyArray<Omit<ScheduledMilestone, "amount">>
+): ScheduledMilestone[] {
+  if (phaseValue <= 0 || rows.length === 0) return [];
+
+  const milestones: ScheduledMilestone[] = rows.map((m) => {
+    const percentage = Math.round(m.percentage * 100) / 100;
+    return { ...m, percentage, amount: Math.round((phaseValue * percentage) / 100) };
+  });
+
+  const residual = phaseValue - milestones.reduce((sum, m) => sum + m.amount, 0);
+  milestones[residualIndexFor(milestones)].amount += residual;
+
+  return milestones;
+}
 
 /**
  * Applies the standard schedule to one phase's value.
@@ -41,17 +77,7 @@ const RESIDUAL_MILESTONE_INDEX = 4;
  * has nothing to bill
  */
 export function buildMilestoneSchedule(phaseValue: number): ScheduledMilestone[] {
-  if (phaseValue <= 0) return [];
-
-  const milestones: ScheduledMilestone[] = MILESTONE_TEMPLATE.map((m) => ({
-    ...m,
-    amount: Math.round((phaseValue * m.percentage) / 100),
-  }));
-
-  const residual = phaseValue - milestones.reduce((sum, m) => sum + m.amount, 0);
-  milestones[RESIDUAL_MILESTONE_INDEX].amount += residual;
-
-  return milestones;
+  return priceSchedule(phaseValue, MILESTONE_TEMPLATE);
 }
 
 export interface ReconciliationInput {
@@ -91,6 +117,37 @@ export interface ReconciliationResult {
  * is deliberately **no rounding tolerance** — a slack of even one cent would
  * hide exactly the drift this exists to catch.
  */
+/**
+ * The value of units that count into the project totals but into no phase:
+ * those on a property carrying no phase, on no property at all, or on a
+ * property row that is missing. Mirrors how `buildPhaseRollups` composes
+ * `phaseValue`, on-site included only under CMOS, so the two are comparable.
+ *
+ * Project-level adjustments are excluded deliberately — every one of them is
+ * distributed across phases in full, so none of it is ever unphased.
+ */
+export function sumUnphasedUnitValue(
+  propertyRows: PropertyRow[],
+  unitRows: UnitRow[],
+  serviceModel: "CRC" | "CMOS"
+): number {
+  const phasedPropertyIds = new Set(
+    propertyRows.filter((p) => p.phaseId !== null).map((p) => p.id)
+  );
+
+  return unitRows
+    .filter((u) => u.propertyId === null || !phasedPropertyIds.has(u.propertyId))
+    .reduce((sum, u) => {
+      const qty = u.quantity || 1;
+      const perUnit =
+        (u.offsiteBasePrice || 0) +
+        (u.customizationTotal || 0) +
+        (u.shippingSetPrice || 0) +
+        (serviceModel === "CMOS" ? u.onsiteEstPrice || 0 : 0);
+      return sum + perUnit * qty;
+    }, 0);
+}
+
 export function reconcilePhases(input: ReconciliationInput): ReconciliationResult {
   const { phaseValues, contractValue, designFee, unphasedUnitValue } = input;
 
@@ -170,6 +227,44 @@ export interface PhaseRollup {
   dates: PhaseDates;
 }
 
+/** One stored `milestones` row, already scoped to a phase. */
+export interface StoredMilestone {
+  name: string;
+  trigger: string;
+  percentage: number;
+}
+
+export interface PhaseRollupOptions {
+  /** Stored milestone rows keyed by `phaseId`; a phase absent here gets the template. */
+  storedMilestones?: Map<number, StoredMilestone[]>;
+  /** Project-level adjustment on top of the model-derived offsite price, in cents. */
+  additionalOffsite?: number;
+  /** Project-level adjustment on top of the model-derived shipping price, in cents. */
+  additionalDelivery?: number;
+}
+
+/**
+ * Splits a project-level figure across phases in proportion to `weights`,
+ * giving the last phase any rounding residual so the shares sum to `total`
+ * exactly.
+ *
+ * When every weight is zero the whole figure lands on the last phase: there is
+ * no proportion to divide by, and dropping it would silently bill less than the
+ * project total. Accepted deliberately (see
+ * `docs/phase-property-model-open-items.md` §1).
+ */
+function proRate(total: number, weights: number[]): number[] {
+  if (weights.length === 0) return [];
+
+  const weightTotal = weights.reduce((sum, w) => sum + w, 0);
+  const shares = weights.map((w) =>
+    weightTotal > 0 ? Math.round((total * w) / weightTotal) : 0
+  );
+  shares[shares.length - 1] += total - shares.reduce((sum, s) => sum + s, 0);
+
+  return shares;
+}
+
 function emptyPhaseDates(phaseNumber: number): PhaseDates {
   return {
     phaseNumber,
@@ -210,8 +305,11 @@ export function buildPhaseRollups(
   unitRows: UnitRow[],
   serviceModel: "CRC" | "CMOS",
   additionalSiteWork: number,
-  phaseDates: PhaseDates[]
+  phaseDates: PhaseDates[],
+  options: PhaseRollupOptions = {}
 ): PhaseRollup[] {
+  const { storedMilestones, additionalOffsite = 0, additionalDelivery = 0 } = options;
+
   const grouped = phaseRows.map((phase) => {
     const phaseProperties = propertyRows.filter((p) => p.phaseId === phase.id);
     const propertyIds = new Set(phaseProperties.map((p) => p.id));
@@ -249,41 +347,42 @@ export function buildPhaseRollups(
     return { phase, properties, breakdown };
   });
 
-  // additionalSiteWork (project-level, e.g. financials.prelimOnsite) is not
-  // itself attached to any property, so it has no natural home in a phase.
-  // Distribute it in proportion to each phase's share of total on-site cost,
-  // and give the last phase any rounding residual — the same discipline
-  // buildMilestoneSchedule uses for its own residual — so the per-phase
-  // shares always sum to exactly additionalSiteWork.
-  const totalOnsite = grouped.reduce((sum, g) => sum + g.breakdown.onsite, 0);
-  const siteWorkShares = grouped.map((g) =>
-    totalOnsite > 0 ? Math.round((additionalSiteWork * g.breakdown.onsite) / totalOnsite) : 0
-  );
-  if (siteWorkShares.length > 0) {
-    const allocated = siteWorkShares.reduce((sum, s) => sum + s, 0);
-    siteWorkShares[siteWorkShares.length - 1] += additionalSiteWork - allocated;
-  }
+  // The three project-level adjustments are not attached to any property, so
+  // none has a natural home in a phase. Each is distributed in proportion to
+  // the phase cost it adjusts — site work by on-site, the offsite adjustment by
+  // offsite, the delivery adjustment by shipping — so that every one of them
+  // reaches the phase tables and the per-phase shares sum to the whole exactly.
+  const siteWorkShares = proRate(additionalSiteWork, grouped.map((g) => g.breakdown.onsite));
+  const offsiteShares = proRate(additionalOffsite, grouped.map((g) => g.breakdown.offsite));
+  const deliveryShares = proRate(additionalDelivery, grouped.map((g) => g.breakdown.shipping));
 
   return grouped.map(({ phase, properties, breakdown }, i) => {
     const onsite = breakdown.onsite + siteWorkShares[i];
+    const offsite = breakdown.offsite + offsiteShares[i];
+    const shipping = breakdown.shipping + deliveryShares[i];
     const phaseValue =
-      breakdown.offsite +
+      offsite +
       breakdown.customizations +
-      breakdown.shipping +
+      shipping +
       (serviceModel === "CMOS" ? onsite : 0);
 
     const dates =
       phaseDates.find((d) => d.phaseNumber === phase.phaseNumber) ??
       emptyPhaseDates(phase.phaseNumber);
 
+    const stored = storedMilestones?.get(phase.id);
+
     return {
       phaseId: phase.id,
       phaseNumber: phase.phaseNumber,
       name: phase.name,
       properties,
-      breakdown: { ...breakdown, onsite },
+      breakdown: { ...breakdown, offsite, onsite, shipping },
       phaseValue,
-      milestones: buildMilestoneSchedule(phaseValue),
+      milestones:
+        stored && stored.length > 0
+          ? priceSchedule(phaseValue, stored)
+          : buildMilestoneSchedule(phaseValue),
       dates,
     };
   });

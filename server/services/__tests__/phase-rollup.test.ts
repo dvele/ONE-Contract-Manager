@@ -251,4 +251,167 @@ describe("buildPhaseRollups", () => {
       targetCO: null,
     });
   });
+
+  it("prefers a phase's stored milestones over the default template", () => {
+    const storedMilestones = new Map([
+      [1, [
+        { name: "Deposit", trigger: "Execution", percentage: 50 },
+        { name: "Balance", trigger: "Delivery", percentage: 50 },
+      ]],
+    ]);
+
+    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC", 0, [], { storedMilestones });
+
+    expect(phase1.milestones.map((m) => m.name)).toEqual(["Deposit", "Balance"]);
+    expect(phase1.milestones.map((m) => m.amount)).toEqual([500_000_00, 500_000_00]);
+  });
+
+  it("falls back to the template for a phase with no stored milestones", () => {
+    const storedMilestones = new Map([
+      [1, [{ name: "Deposit", trigger: "Execution", percentage: 100 }]],
+    ]);
+
+    const [, phase2] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC", 0, [], { storedMilestones });
+
+    expect(phase2.milestones.map((m) => m.name)).toEqual([
+      "Signing Deposit",
+      "Green Light",
+      "Production Start",
+      "Production Midpoint",
+      "Delivery",
+      "Retainage",
+    ]);
+  });
+
+  it("uses stored percentages as given when they do not total 100", () => {
+    // The route validates the set; the math reports what is stored rather than
+    // silently normalising it, so a bad set stays visible instead of looking correct.
+    const storedMilestones = new Map([
+      [1, [
+        { name: "Deposit", trigger: "Execution", percentage: 40 },
+        { name: "Balance", trigger: "Delivery", percentage: 50 },
+      ]],
+    ]);
+
+    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC", 0, [], { storedMilestones });
+
+    expect(phase1.milestones.map((m) => m.percentage)).toEqual([40, 50]);
+  });
+
+  it("still makes stored milestone amounts sum to the phase value exactly", () => {
+    // A phase value that does not divide evenly, so there is a real residual to
+    // place — a round one leaves nothing to test.
+    const odd = [unit({ id: 100, propertyId: 10, offsiteBasePrice: 1_000_000_07 })];
+    const storedMilestones = new Map([
+      [1, [
+        { name: "A", trigger: "t", percentage: 33.33 },
+        { name: "B", trigger: "t", percentage: 33.33 },
+        { name: "C", trigger: "t", percentage: 33.34 },
+      ]],
+    ]);
+
+    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, odd, "CRC", 0, [], { storedMilestones });
+
+    expect(phase1.phaseValue).toBe(1_000_000_07);
+    expect(phase1.milestones.reduce((s, m) => s + m.amount, 0)).toBe(1_000_000_07);
+  });
+
+  it("leaves a stored retainage exact and puts the residual on the last row before it", () => {
+    const odd = [unit({ id: 100, propertyId: 10, offsiteBasePrice: 1_000_000_07 })];
+    const storedMilestones = new Map([
+      [1, [
+        { name: "Deposit", trigger: "Execution", percentage: 33.33 },
+        { name: "Balance", trigger: "Delivery", percentage: 61.67 },
+        { name: "Retainage", trigger: "CO", percentage: 5 },
+      ]],
+    ]);
+
+    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, odd, "CRC", 0, [], { storedMilestones });
+    const [, balance, retainage] = phase1.milestones;
+
+    expect(retainage.amount).toBe(Math.round((1_000_000_07 * 5) / 100));
+    expect(balance.amount).not.toBe(Math.round((1_000_000_07 * 61.67) / 100));
+    expect(phase1.milestones.reduce((s, m) => s + m.amount, 0)).toBe(1_000_000_07);
+  });
+
+  it("pro-rates the offsite adjustment across phases by their share of offsite cost", () => {
+    // Phase 1's units carry 1,000,000.00 offsite, phase 2's carry 500,000.00 —
+    // a 2:1 split, so 300,000.00 lands as 200,000.00 / 100,000.00.
+    const [phase1, phase2] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC", 0, [], {
+      additionalOffsite: 300_000_00,
+    });
+
+    expect(phase1.breakdown.offsite).toBe(1_200_000_00);
+    expect(phase2.breakdown.offsite).toBe(600_000_00);
+    expect(phase1.phaseValue).toBe(1_200_000_00);
+  });
+
+  it("pro-rates the delivery adjustment across phases by their share of shipping cost", () => {
+    const shipped = [
+      unit({ id: 100, propertyId: 10, offsiteBasePrice: 600_000_00, shippingSetPrice: 20_000_00 }),
+      unit({ id: 101, propertyId: 11, offsiteBasePrice: 400_000_00, shippingSetPrice: 10_000_00 }),
+      unit({ id: 102, propertyId: 12, offsiteBasePrice: 500_000_00, shippingSetPrice: 15_000_00 }),
+    ];
+
+    const [phase1, phase2] = buildPhaseRollups(PHASES, PROPERTIES, shipped, "CRC", 0, [], {
+      additionalDelivery: 90_000_00,
+    });
+
+    expect(phase1.breakdown.shipping).toBe(90_000_00); // 30,000 units + 60,000 share
+    expect(phase2.breakdown.shipping).toBe(45_000_00); // 15,000 units + 30,000 share
+  });
+
+  it("gives the last phase the residual of an offsite adjustment that does not divide evenly", () => {
+    const threePhases = [
+      { id: 1, phaseNumber: 1, name: "Phase 1" },
+      { id: 2, phaseNumber: 2, name: "Phase 2" },
+      { id: 3, phaseNumber: 3, name: "Phase 3" },
+    ];
+    const threeProperties: PropertyRow[] = [
+      { id: 10, phaseId: 1, propertyCode: "P-1", address: null },
+      { id: 11, phaseId: 2, propertyCode: "P-2", address: null },
+      { id: 12, phaseId: 3, propertyCode: "P-3", address: null },
+    ];
+    const threeUnits = [
+      unit({ id: 300, propertyId: 10, offsiteBasePrice: 1 }),
+      unit({ id: 301, propertyId: 11, offsiteBasePrice: 1 }),
+      unit({ id: 302, propertyId: 12, offsiteBasePrice: 1 }),
+    ];
+
+    const rollups = buildPhaseRollups(threePhases, threeProperties, threeUnits, "CRC", 0, [], {
+      additionalOffsite: 100,
+    });
+    const shares = rollups.map((p) => p.breakdown.offsite - 1);
+
+    expect(shares.reduce((sum, s) => sum + s, 0)).toBe(100);
+  });
+
+  it("bills both offsite adjustments in phase value under either model", () => {
+    const shipped = [
+      unit({ id: 100, propertyId: 10, offsiteBasePrice: 600_000_00, onsiteEstPrice: 100_000_00, shippingSetPrice: 20_000_00 }),
+      unit({ id: 101, propertyId: 11, offsiteBasePrice: 400_000_00, onsiteEstPrice: 100_000_00, shippingSetPrice: 10_000_00 }),
+      unit({ id: 102, propertyId: 12, offsiteBasePrice: 500_000_00, onsiteEstPrice: 100_000_00, shippingSetPrice: 15_000_00 }),
+    ];
+    const options = { additionalOffsite: 300_000_00, additionalDelivery: 90_000_00 };
+    const [crc] = buildPhaseRollups(PHASES, PROPERTIES, shipped, "CRC", 0, [], options);
+    const [cmos] = buildPhaseRollups(PHASES, PROPERTIES, shipped, "CMOS", 0, [], options);
+
+    // Phase 1 takes 2/3 of each adjustment: 200,000 offsite and 60,000 delivery,
+    // on top of its 1,000,000 offsite and 30,000 shipping. On-site (200,000) is
+    // billed only under CMOS.
+    expect(crc.phaseValue).toBe(1_290_000_00);
+    expect(cmos.phaseValue).toBe(1_490_000_00);
+  });
+
+  it("puts an adjustment entirely on the last phase when there is no cost to divide by", () => {
+    // Every phase carries zero shipping, so no proportion exists. Dropping the
+    // adjustment would bill less than the project total, so the last phase takes
+    // it whole — the behaviour already accepted for the on-site buffer.
+    const [phase1, phase2] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC", 0, [], {
+      additionalDelivery: 60_000_00,
+    });
+
+    expect(phase1.breakdown.shipping).toBe(0);
+    expect(phase2.breakdown.shipping).toBe(60_000_00);
+  });
 });
