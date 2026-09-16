@@ -293,11 +293,19 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
   // lands (WizardContext.tsx writes `deliveryDuration: pd.onsiteDurationDays`
   // and reads it straight back), so it is the on-site counterpart of
   // productionDuration.
+  //
+  // `|| null` rather than the value itself: these two columns carried a
+  // `DEFAULT 0` until this change, so rows created before it hold 0 for
+  // "never set" rather than NULL, and `??` accepts that 0. Substituting it
+  // makes each phase build and install in no time — targetCO would print the
+  // delivery date under a "Calculated" badge instead of TBD. The route bound
+  // (1-1095) means a stored 0 was never an asserted duration, so reading it
+  // as absent loses nothing.
   const phaseDurations: PhaseDurations[] = phaseRows.map((phase) => ({
     phaseNumber: phase.phaseNumber,
     startOffsetDays: phase.startOffsetDays,
-    manufacturingDays: phase.manufacturingDays ?? project.productionDuration,
-    onsiteDays: phase.onsiteDays ?? project.deliveryDuration,
+    manufacturingDays: phase.manufacturingDays ?? (project.productionDuration || null),
+    onsiteDays: phase.onsiteDays ?? (project.deliveryDuration || null),
     deliveryLagDays: phase.deliveryLagDays,
     factoryStartOverride: phase.factoryStartOverride,
     factoryCompleteOverride: phase.factoryCompleteOverride,
