@@ -1187,11 +1187,15 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           storageFeePerDay: pd.storageFeePerDay || 15000,
           storageFreedays: pd.storageFreedays || 14,
           adminFeePercent: pd.adminFeePercent || 10,
-          // Schedule durations (will be 0 initially, updated in Step 6)
-          designDuration: pd.designPhaseDays || 0,
+          // Schedule durations. The three the server derives dates from send
+          // null, not 0, when Step 6 has not been reached: a 0 there is the
+          // fabricated-date bug the column default used to cause, and the
+          // route rejects it. completionDuration is a written day count, so a
+          // partial sum is the honest answer for a partially filled wizard.
+          designDuration: pd.designPhaseDays || null,
           permittingDuration: pd.permittingDurationDays || 0,
-          productionDuration: pd.manufacturingDurationDays || 0,
-          deliveryDuration: pd.onsiteDurationDays || 0,
+          productionDuration: pd.manufacturingDurationDays || null,
+          deliveryDuration: pd.onsiteDurationDays || null,
           completionDuration: (pd.designPhaseDays || 0) + (pd.manufacturingDurationDays || 0) + (pd.onsiteDurationDays || 0),
           estimatedDeliveryDate: pd.targetDeliveryDate || null,
           estimatedCompletionDate: pd.estimatedCompletionDate || null,
@@ -1214,11 +1218,12 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           storageFeePerDay: pd.storageFeePerDay || 15000,
           storageFreedays: pd.storageFreedays || 14,
           adminFeePercent: pd.adminFeePercent || 10,
-          // Schedule durations on project level
-          designDuration: pd.designPhaseDays || 0,
+          // Schedule durations on project level. Null rather than 0 for the
+          // three the server derives dates from — see the create payload above.
+          designDuration: pd.designPhaseDays || null,
           permittingDuration: pd.permittingDurationDays || 0,
-          productionDuration: pd.manufacturingDurationDays || 0,
-          deliveryDuration: pd.onsiteDurationDays || 0,
+          productionDuration: pd.manufacturingDurationDays || null,
+          deliveryDuration: pd.onsiteDurationDays || null,
           completionDuration: (pd.designPhaseDays || 0) + (pd.manufacturingDurationDays || 0) + (pd.onsiteDurationDays || 0),
           estimatedDeliveryDate: pd.targetDeliveryDate || null,
           estimatedCompletionDate: pd.estimatedCompletionDate || null,
