@@ -1612,14 +1612,18 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         if (data.designPhaseDays < 30 || data.designPhaseDays > 180) {
           errors.designPhaseDays = 'Design phase must be 30-180 days';
         }
-        // manufacturingDurationDays and onsiteDurationDays were range-checked
-        // here while Step 6 offered inputs for them. Those durations now live on
-        // the phase, so a project already storing an out-of-range value would
-        // fail this check with no control anywhere in the wizard to correct it —
-        // Step 8 renders no message for either key, leaving a disabled Next
-        // button and a toast naming nothing. Both values are still saved and
-        // still read (pricingEngine's per-phase fallback among them); only the
-        // unfixable check is gone.
+        // Bounds match MIN/MAX_PRODUCTION_DAYS in Step6DatesSchedule.tsx, which
+        // renders this message beside the field. This catches a project that
+        // loaded with a bad value already stored; the field's own commit guard
+        // stops a new one being typed, because the autosave is ungated and would
+        // otherwise persist it. 0 is the value that matters: it gives every
+        // phase without its own manufacturingDays a zero-day production span.
+        if (data.manufacturingDurationDays < 1 || data.manufacturingDurationDays > 1095) {
+          errors.manufacturingDurationDays = 'Default production duration must be 1-1095 days';
+        }
+        // onsiteDurationDays is deliberately unchecked: it has no control
+        // anywhere in the wizard, so a range check on it can only strand a user
+        // behind a disabled Next button naming a field they cannot reach.
         if (data.warrantyFitFinishMonths < 12 || data.warrantyFitFinishMonths > 36) {
           errors.warrantyFitFinishMonths = 'Fit & finish warranty must be 12-36 months';
         }

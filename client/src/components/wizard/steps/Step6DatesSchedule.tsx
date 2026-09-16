@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useWizard } from '../WizardContext';
 import { PhaseScheduleEditor } from '../PhaseScheduleEditor';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -55,6 +55,26 @@ const SITE_READINESS = [
 ] as const;
 
 /**
+ * Bounds for the default production duration.
+ *
+ * Not the 60–365 that used to guard this field: that range was written for a
+ * project-level schedule input that no longer exists. The field is now the
+ * fallback `pricingEngine` applies to every phase with no `manufacturingDays`
+ * of its own, so its ceiling matches the per-phase bound in
+ * server/routes/phases.ts (1095) — the fallback should be able to express
+ * anything a phase can state directly.
+ *
+ * The floor is 1, not the 0 that `phases.ts` allows. A 0 on one phase is an
+ * explicit assertion about that phase; as the project-wide default it silently
+ * gives every unspecified phase a zero-day production span, which then renders
+ * as a derived date under a "Calculated" badge.
+ */
+const MIN_PRODUCTION_DAYS = 1;
+const MAX_PRODUCTION_DAYS = 1095;
+
+const WHOLE_NUMBER = /^\d+$/;
+
+/**
  * UTC, matching `formatDateOrTBD` in server/lib/mapper.ts: a `YYYY-MM-DD`
  * string parses as UTC midnight, so formatting it in the viewer's own zone
  * prints the previous day anywhere west of UTC.
@@ -71,6 +91,44 @@ export const Step6DatesSchedule: React.FC = () => {
   const { wizardState, updateProjectData, draftProjectId } = useWizard();
 
   const { projectData, validationErrors } = wizardState;
+
+  // An editing buffer, not a second source of truth. The autosave is ungated —
+  // performAutosave's only precondition is a project name — so anything written
+  // into wizard state reaches projects.productionDuration about two seconds
+  // later, and a 0 there gives every phase without its own manufacturingDays a
+  // zero-day span. Keeping the keystrokes local means only a value inside the
+  // bounds is ever committed; an out-of-range one stays in the box, under an
+  // error, and the stored fallback keeps its last good value.
+  const [productionDraft, setProductionDraft] = useState<string | null>(null);
+  const [productionDraftError, setProductionDraftError] = useState<string | null>(null);
+
+  const handleProductionChange = (raw: string) => {
+    setProductionDraft(raw);
+
+    const trimmed = raw.trim();
+    if (!WHOLE_NUMBER.test(trimmed)) {
+      setProductionDraftError(
+        `Enter a whole number of days between ${MIN_PRODUCTION_DAYS} and ${MAX_PRODUCTION_DAYS}.`,
+      );
+      return;
+    }
+
+    const value = Number(trimmed);
+    if (value < MIN_PRODUCTION_DAYS || value > MAX_PRODUCTION_DAYS) {
+      setProductionDraftError(
+        `Enter between ${MIN_PRODUCTION_DAYS} and ${MAX_PRODUCTION_DAYS} days.`,
+      );
+      return;
+    }
+
+    setProductionDraftError(null);
+    updateProjectData({ manufacturingDurationDays: value });
+  };
+
+  // The draft covers what the user is typing now; `validationErrors` covers a
+  // project that loaded with a bad value already stored.
+  const productionError = productionDraftError ?? validationErrors.manufacturingDurationDays;
+  const productionValue = productionDraft ?? (projectData.manufacturingDurationDays || '');
 
   // `effectiveDate`, not `agreementDate`, is what the wizard saves to
   // projectDetails.agreementExecutionDate, and that column is what the server
@@ -241,22 +299,36 @@ export const Step6DatesSchedule: React.FC = () => {
                 type="number"
                 inputMode="numeric"
                 step={1}
-                min={1}
-                max={1095}
+                min={MIN_PRODUCTION_DAYS}
+                max={MAX_PRODUCTION_DAYS}
                 autoComplete="off"
-                value={projectData.manufacturingDurationDays || ''}
-                onChange={(e) =>
-                  updateProjectData({ manufacturingDurationDays: parseInt(e.target.value) || 0 })
-                }
+                value={productionValue}
+                onChange={(e) => handleProductionChange(e.target.value)}
                 placeholder="120…"
-                aria-describedby="manufacturingDurationDays-help"
-                className="tabular-nums"
+                aria-invalid={!!productionError}
+                aria-describedby={
+                  productionError
+                    ? 'manufacturingDurationDays-error'
+                    : 'manufacturingDurationDays-help'
+                }
+                className={`tabular-nums ${productionError ? 'border-destructive' : ''}`}
                 data-testid="input-default-production-days"
               />
-              <p id="manufacturingDurationDays-help" className="text-xs text-muted-foreground">
-                Used by any phase with no manufacturing days of its own. Set a phase&rsquo;s own
-                duration below to override it there.
-              </p>
+              {productionError ? (
+                <p
+                  id="manufacturingDurationDays-error"
+                  role="alert"
+                  className="text-xs text-destructive"
+                >
+                  {productionError} Not saved &mdash; the phases keep using{' '}
+                  {projectData.manufacturingDurationDays || 0} days.
+                </p>
+              ) : (
+                <p id="manufacturingDurationDays-help" className="text-xs text-muted-foreground">
+                  Used by any phase with no manufacturing days of its own. Set a phase&rsquo;s own
+                  duration below to override it there.
+                </p>
+              )}
             </div>
           </div>
 

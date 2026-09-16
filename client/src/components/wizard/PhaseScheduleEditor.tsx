@@ -244,13 +244,22 @@ export const PhaseScheduleEditor: React.FC<{ projectId: number }> = ({ projectId
     }
 
     const value = Number(trimmed);
+
+    // Unchanged, so nothing was typed and there is nothing to validate. This has
+    // to precede the range check: a row written before the API bounded these
+    // fields can hold a value outside them, and tabbing past it must not raise
+    // an error about a value the user never entered.
+    if (phase[spec.field] === value) {
+      setFieldError(key, null);
+      return;
+    }
+
     if (value < spec.min || value > spec.max) {
       setFieldError(key, `Enter between ${spec.min} and ${spec.max} days, or clear the field.`);
       return;
     }
 
     setFieldError(key, null);
-    if (phase[spec.field] === value) return;
     patchPhase.mutate({ phaseId: phase.id, field: spec.field, value });
   };
 
@@ -260,6 +269,14 @@ export const PhaseScheduleEditor: React.FC<{ projectId: number }> = ({ projectId
     // An emptied date input reads as "", which must reach the API as null so the
     // column clears and the phase returns to its derived date.
     const value = raw === "" ? null : raw;
+
+    // Same ordering as saveDuration: an untouched field is not a typo. A legacy
+    // override can sit outside the bounds below, and tabbing through it must
+    // not accuse the user of entering it.
+    if (phase[spec.override] === value) {
+      setFieldError(key, null);
+      return;
+    }
 
     if (value !== null) {
       if (!ISO_DATE.test(value)) {
@@ -276,7 +293,6 @@ export const PhaseScheduleEditor: React.FC<{ projectId: number }> = ({ projectId
     }
 
     setFieldError(key, null);
-    if (phase[spec.override] === value) return;
     patchPhase.mutate({ phaseId: phase.id, field: spec.override, value });
   };
 
