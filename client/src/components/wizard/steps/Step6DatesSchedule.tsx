@@ -84,6 +84,18 @@ const SITE_READINESS = [
 const MIN_PRODUCTION_DAYS = 1;
 const MAX_PRODUCTION_DAYS = 1095;
 
+/**
+ * Bounds for the design duration, matching the range the field has always
+ * stated to the user and the "Typical: 30–90 days" help text beside it.
+ *
+ * A floor above 0 is what matters: `pricingEngine` derives design completion as
+ * project start + this many days, so a 0 returns the project start unchanged
+ * and collapses every phase's factory start onto it — four derived dates per
+ * phase, all wrong, all rendered under a "Calculated" badge.
+ */
+const MIN_DESIGN_DAYS = 30;
+const MAX_DESIGN_DAYS = 180;
+
 const WHOLE_NUMBER = /^\d+$/;
 
 /**
@@ -104,15 +116,44 @@ export const Step6DatesSchedule: React.FC = () => {
 
   const { projectData, validationErrors } = wizardState;
 
-  // An editing buffer, not a second source of truth. The autosave is ungated —
+  // Editing buffers, not a second source of truth. The autosave is ungated —
   // performAutosave's only precondition is a project name — so anything written
-  // into wizard state reaches projects.productionDuration about two seconds
-  // later, and a 0 there gives every phase without its own manufacturingDays a
-  // zero-day span. Keeping the keystrokes local means only a value inside the
-  // bounds is ever committed; an out-of-range one stays in the box, under an
-  // error, and the stored fallback keeps its last good value.
+  // into wizard state reaches the projects row about two seconds later, and
+  // `parseInt("") || 0` would make clearing either field commit a 0: a 0
+  // production duration gives every phase without its own manufacturingDays a
+  // zero-day span, and a 0 design duration collapses every phase's factory
+  // start onto the project start. Keeping the keystrokes local means only a
+  // value inside the bounds is ever committed; an out-of-range one stays in the
+  // box, under an error, and the stored value keeps its last good reading.
+  //
+  // A `validateStep` entry would not do this job: `updateProjectData` clears
+  // the whole `validationErrors` map on any field change, so a step-scoped
+  // error here would disable Next and name no field.
   const [productionDraft, setProductionDraft] = useState<string | null>(null);
   const [productionDraftError, setProductionDraftError] = useState<string | null>(null);
+  const [designDraft, setDesignDraft] = useState<string | null>(null);
+  const [designDraftError, setDesignDraftError] = useState<string | null>(null);
+
+  const handleDesignChange = (raw: string) => {
+    setDesignDraft(raw);
+
+    const trimmed = raw.trim();
+    if (!WHOLE_NUMBER.test(trimmed)) {
+      setDesignDraftError(
+        `Enter a whole number of days between ${MIN_DESIGN_DAYS} and ${MAX_DESIGN_DAYS}.`,
+      );
+      return;
+    }
+
+    const value = Number(trimmed);
+    if (value < MIN_DESIGN_DAYS || value > MAX_DESIGN_DAYS) {
+      setDesignDraftError(`Enter between ${MIN_DESIGN_DAYS} and ${MAX_DESIGN_DAYS} days.`);
+      return;
+    }
+
+    setDesignDraftError(null);
+    updateProjectData({ designPhaseDays: value });
+  };
 
   const handleProductionChange = (raw: string) => {
     setProductionDraft(raw);
@@ -141,6 +182,54 @@ export const Step6DatesSchedule: React.FC = () => {
   // project that loaded with a bad value already stored.
   const productionError = productionDraftError ?? validationErrors.manufacturingDurationDays;
   const productionValue = productionDraft ?? (projectData.manufacturingDurationDays || '');
+  const designError = designDraftError ?? validationErrors.designPhaseDays;
+  const designValue = designDraft ?? (projectData.designPhaseDays || '');
+
+  // Same buffering as above, one entry per C.4 field. Clearing one commits null
+  // rather than the 0 that `parseInt("") || 0` used to produce: mapper.ts reads
+  // these with `??`, so a 0 survives the default and Exhibit C.4 would state a
+  // site condition is due 0 days before delivery.
+  const [siteReadinessDrafts, setSiteReadinessDrafts] = useState<Record<string, string>>({});
+  const [siteReadinessErrors, setSiteReadinessErrors] = useState<Record<string, string>>({});
+
+  const setSiteReadinessError = (field: string, message: string | null) =>
+    setSiteReadinessErrors((previous) => {
+      if (message === null) {
+        if (!(field in previous)) return previous;
+        const { [field]: _removed, ...rest } = previous;
+        return rest;
+      }
+      return { ...previous, [field]: message };
+    });
+
+  const handleSiteReadinessChange = (
+    field: (typeof SITE_READINESS)[number]['field'],
+    max: number,
+    raw: string,
+  ) => {
+    setSiteReadinessDrafts((previous) => ({ ...previous, [field]: raw }));
+
+    const trimmed = raw.trim();
+    if (trimmed === '') {
+      setSiteReadinessError(field, null);
+      updateProjectData({ [field]: null });
+      return;
+    }
+
+    if (!WHOLE_NUMBER.test(trimmed)) {
+      setSiteReadinessError(field, `Enter a whole number of days between 1 and ${max}.`);
+      return;
+    }
+
+    const value = Number(trimmed);
+    if (value < 1 || value > max) {
+      setSiteReadinessError(field, `Enter between 1 and ${max} days.`);
+      return;
+    }
+
+    setSiteReadinessError(field, null);
+    updateProjectData({ [field]: value });
+  };
 
   // `effectiveDate`, not `agreementDate`, is what the wizard saves to
   // projectDetails.agreementExecutionDate, and that column is what the server
@@ -278,22 +367,23 @@ export const Step6DatesSchedule: React.FC = () => {
                 type="number"
                 inputMode="numeric"
                 step={1}
-                min={30}
-                max={180}
+                min={MIN_DESIGN_DAYS}
+                max={MAX_DESIGN_DAYS}
                 autoComplete="off"
-                value={projectData.designPhaseDays || ''}
-                onChange={(e) => updateProjectData({ designPhaseDays: parseInt(e.target.value) || 0 })}
+                value={designValue}
+                onChange={(e) => handleDesignChange(e.target.value)}
                 placeholder="60…"
-                aria-invalid={!!validationErrors.designPhaseDays}
+                aria-invalid={!!designError}
                 aria-describedby={
-                  validationErrors.designPhaseDays ? 'designPhaseDays-error' : 'designPhaseDays-help'
+                  designError ? 'designPhaseDays-error' : 'designPhaseDays-help'
                 }
-                className={`tabular-nums ${validationErrors.designPhaseDays ? 'border-destructive' : ''}`}
+                className={`tabular-nums ${designError ? 'border-destructive' : ''}`}
                 data-testid="input-design-days"
               />
-              {validationErrors.designPhaseDays ? (
-                <p id="designPhaseDays-error" className="text-xs text-destructive">
-                  {validationErrors.designPhaseDays}
+              {designError ? (
+                <p id="designPhaseDays-error" role="alert" className="text-xs text-destructive">
+                  {designError} Not saved &mdash; the schedule keeps using{' '}
+                  {projectData.designPhaseDays || 0} days.
                 </p>
               ) : (
                 <p id="designPhaseDays-help" className="text-xs text-muted-foreground">
@@ -459,32 +549,51 @@ export const Step6DatesSchedule: React.FC = () => {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {SITE_READINESS.map((condition) => (
-              <div key={condition.field} className="space-y-1">
-                <Label htmlFor={condition.field}>{condition.label}</Label>
-                <Input
-                  id={condition.field}
-                  name={condition.field}
-                  type="number"
-                  inputMode="numeric"
-                  step={1}
-                  min={1}
-                  max={condition.max}
-                  autoComplete="off"
-                  value={projectData[condition.field] || ''}
-                  onChange={(e) =>
-                    updateProjectData({ [condition.field]: parseInt(e.target.value) || 0 })
-                  }
-                  placeholder={condition.placeholder}
-                  aria-describedby={`${condition.field}-help`}
-                  className="tabular-nums"
-                  data-testid={condition.testId}
-                />
-                <p id={`${condition.field}-help`} className="text-xs text-muted-foreground">
-                  Default: {condition.placeholder.replace('…', '')} days
-                </p>
-              </div>
-            ))}
+            {SITE_READINESS.map((condition) => {
+              const error = siteReadinessErrors[condition.field];
+              return (
+                <div key={condition.field} className="space-y-1">
+                  <Label htmlFor={condition.field}>{condition.label}</Label>
+                  <Input
+                    id={condition.field}
+                    name={condition.field}
+                    type="number"
+                    inputMode="numeric"
+                    step={1}
+                    min={1}
+                    max={condition.max}
+                    autoComplete="off"
+                    value={
+                      siteReadinessDrafts[condition.field] ?? (projectData[condition.field] ?? '')
+                    }
+                    onChange={(e) =>
+                      handleSiteReadinessChange(condition.field, condition.max, e.target.value)
+                    }
+                    placeholder={condition.placeholder}
+                    aria-invalid={!!error}
+                    aria-describedby={
+                      error ? `${condition.field}-error` : `${condition.field}-help`
+                    }
+                    className={`tabular-nums ${error ? 'border-destructive' : ''}`}
+                    data-testid={condition.testId}
+                  />
+                  {error ? (
+                    <p
+                      id={`${condition.field}-error`}
+                      role="alert"
+                      className="text-xs text-destructive"
+                    >
+                      {error} Not saved.
+                    </p>
+                  ) : (
+                    <p id={`${condition.field}-help`} className="text-xs text-muted-foreground">
+                      Empty uses the exhibit&rsquo;s default of{' '}
+                      {condition.placeholder.replace('…', '')} days.
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>

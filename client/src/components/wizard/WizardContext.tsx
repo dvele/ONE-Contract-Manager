@@ -231,12 +231,15 @@ export interface ProjectData {
   insuranceProvider: string;
   insurancePolicyNumber: string;
   insuranceCoverageAmount: number;
-  // Exhibit C.4 - Interface Deadlines (days before delivery)
-  foundationReadyDays: number;
-  utilityStubbedDays: number;
-  siteAccessReadyDays: number;
-  permitsScheduledDays: number;
-  craneAccessReadyDays: number;
+  // Exhibit C.4 - Interface Deadlines (days before delivery). Nullable: clearing
+  // one means "no figure of our own", which hands the exhibit back to the
+  // defaults mapper.ts applies (`?? 14`, `?? 7`, `?? 30`). A 0 would satisfy
+  // that nullish check and print "0 days before delivery".
+  foundationReadyDays: number | null;
+  utilityStubbedDays: number | null;
+  siteAccessReadyDays: number | null;
+  permitsScheduledDays: number | null;
+  craneAccessReadyDays: number | null;
   // Exhibit D.1 - Design/Pre-Production Milestone Target Dates
   designKickoffDate: string;
   schematicDesignDate: string;
