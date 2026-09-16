@@ -283,7 +283,23 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
   const projectStart =
     asCalendarDate(scheduleDetails?.agreementExecutionDate) ??
     toDateOnly(project.createdAt);
-  const designComplete = addDays(projectStart, project.designDuration);
+  // `|| null` on all three project-level durations below, for one reason:
+  // design_duration, production_duration and delivery_duration each carried a
+  // `DEFAULT 0` until this change, so a row created before it holds 0 for
+  // "never set" rather than NULL — and 0 is a number, so `??` accepts it and
+  // `addDays` happily adds it. Each substitution invents a date the project
+  // does not have, printed under a "Calculated" badge where the chain should
+  // render TBD: a zero here collapses design onto the execution date and drags
+  // every phase's factory start with it, a zero production span completes a
+  // phase the day it starts, and a zero on-site span makes targetCO the
+  // delivery date itself. The route bound is 1-1095, so a stored 0 was never
+  // an asserted duration and reading it as absent loses nothing.
+  //
+  // Existing rows still hold those zeros — dropping a column default does not
+  // rewrite them, and the PATCH route's unchanged-value exemption never holds
+  // a stored 0 to the bound. This coercion is what makes them derive TBD; it
+  // deliberately does not depend on a backfill having run.
+  const designComplete = addDays(projectStart, project.designDuration || null);
 
   // Neither manufacturingDays nor onsiteDays has a column default (unlike
   // startOffsetDays/deliveryLagDays): every phase created before this plan has
@@ -293,14 +309,6 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
   // lands (WizardContext.tsx writes `deliveryDuration: pd.onsiteDurationDays`
   // and reads it straight back), so it is the on-site counterpart of
   // productionDuration.
-  //
-  // `|| null` rather than the value itself: these two columns carried a
-  // `DEFAULT 0` until this change, so rows created before it hold 0 for
-  // "never set" rather than NULL, and `??` accepts that 0. Substituting it
-  // makes each phase build and install in no time — targetCO would print the
-  // delivery date under a "Calculated" badge instead of TBD. The route bound
-  // (1-1095) means a stored 0 was never an asserted duration, so reading it
-  // as absent loses nothing.
   const phaseDurations: PhaseDurations[] = phaseRows.map((phase) => ({
     phaseNumber: phase.phaseNumber,
     startOffsetDays: phase.startOffsetDays,
