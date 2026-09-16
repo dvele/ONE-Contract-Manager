@@ -24,6 +24,8 @@ import {
 import { buildSignatureBlock as buildStyledSignatureBlock } from "./tableStyles";
 import {
   deriveDesignMilestones,
+  earliestDate,
+  latestDate,
   toDateOnly,
   asCalendarDate,
   type PhaseDates,
@@ -680,21 +682,6 @@ const D1_REVIEW_PERIODS = {
   permitSetReviewDays: 10,
   greenLightReviewDays: 5,
 };
-
-/**
- * Earliest and latest of a `YYYY-MM-DD` list, ignoring nulls. Lexicographic
- * comparison is chronological for zero-padded ISO dates. An empty list (a
- * project with no phases) yields null, which renders as TBD.
- */
-function earliestDate(dates: (string | null)[]): string | null {
-  const present = dates.filter((d): d is string => d !== null);
-  return present.length === 0 ? null : present.reduce((a, b) => (b < a ? b : a));
-}
-
-function latestDate(dates: (string | null)[]): string | null {
-  const present = dates.filter((d): d is string => d !== null);
-  return present.length === 0 ? null : present.reduce((a, b) => (b > a ? b : a));
-}
 
 // =============================================================================
 // MAIN MAPPER FUNCTION

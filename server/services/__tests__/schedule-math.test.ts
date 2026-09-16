@@ -5,6 +5,8 @@ import {
   asCalendarDate,
   derivePhaseDates,
   deriveDesignMilestones,
+  earliestDate,
+  latestDate,
   toDateOnly,
   ISO_DATE,
   type PhaseDurations,
@@ -109,6 +111,64 @@ describe("addBusinessDays", () => {
 
   it("rejects a calendar-impossible day the same way addDays does", () => {
     expect(addBusinessDays("2026-02-30", 1)).toBeNull();
+  });
+
+  it("returns the input unchanged for a negative count", () => {
+    // Pins the documented precondition rather than endorsing it: the loop
+    // counts forward only. Unreachable today — every caller passes one of
+    // D.1's positive review periods.
+    expect(addBusinessDays("2026-01-08", -5)).toBe("2026-01-08");
+  });
+});
+
+describe("formatting a derived date", () => {
+  it("returns null rather than a truncated expanded year past 9999", () => {
+    // toISOString() switches to "+010002-12-31T…" beyond year 9999, which
+    // slicing to ten characters turns into "+010002-12".
+    expect(addDays("9999-12-31", 1095)).toBeNull();
+    expect(addDays("9999-01-01", 365)).toBeNull();
+  });
+
+  it("returns null rather than throwing on a duration Date cannot represent", () => {
+    // toISOString() raises RangeError on an invalid Date; an unbounded int4
+    // duration column can reach one.
+    expect(addDays("2026-01-01", 100_000_000)).toBeNull();
+    expect(addDays("2026-01-01", -100_000_000)).toBeNull();
+  });
+
+  it("still renders a date just inside the representable range", () => {
+    expect(addDays("9999-12-30", 1)).toBe("9999-12-31");
+  });
+});
+
+describe("earliestDate / latestDate", () => {
+  it("yields null for an empty list, so a project with no phases renders TBD", () => {
+    expect(earliestDate([])).toBeNull();
+    expect(latestDate([])).toBeNull();
+  });
+
+  it("yields null when every entry is null", () => {
+    expect(earliestDate([null, null, null])).toBeNull();
+    expect(latestDate([null, null, null])).toBeNull();
+  });
+
+  it("ignores nulls among real dates rather than being swallowed by them", () => {
+    expect(earliestDate([null, "2026-05-02", null, "2026-03-11"])).toBe("2026-03-11");
+    expect(latestDate([null, "2026-05-02", null, "2026-03-11"])).toBe("2026-05-02");
+  });
+
+  it("orders across a month boundary, where string length would not", () => {
+    // Zero-padding is what makes the lexicographic comparison chronological:
+    // "2026-09-30" precedes "2026-10-01" as text and as a date.
+    expect(earliestDate(["2026-10-01", "2026-09-30"])).toBe("2026-09-30");
+    expect(latestDate(["2026-10-01", "2026-09-30"])).toBe("2026-10-01");
+    expect(earliestDate(["2027-01-01", "2026-12-31"])).toBe("2026-12-31");
+    expect(latestDate(["2027-01-01", "2026-12-31"])).toBe("2027-01-01");
+  });
+
+  it("returns the single date when the list holds one", () => {
+    expect(earliestDate(["2026-03-01"])).toBe("2026-03-01");
+    expect(latestDate(["2026-03-01"])).toBe("2026-03-01");
   });
 });
 

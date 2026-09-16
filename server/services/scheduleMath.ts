@@ -83,6 +83,10 @@ export function addDays(date: string | null, days: number | null): string | null
  *
  * Public holidays are not modelled — the exhibit's review periods are stated in
  * business days and no holiday calendar exists in this system.
+ *
+ * `days` must be zero or positive: the loop counts forward only, so a negative
+ * count returns the input date unchanged rather than stepping backwards. Every
+ * caller passes one of D.1's review periods, which are positive constants.
  */
 export function addBusinessDays(date: string | null, days: number | null): string | null {
   if (date === null || days === null) return null;
@@ -192,8 +196,41 @@ function parseDate(value: string): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function formatDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
+/**
+ * Renders a UTC `Date` as `YYYY-MM-DD`, or null when it cannot be.
+ *
+ * Both failures are reachable from an unbounded `int4` duration column.
+ * `setUTCDate` past ±8,640,000,000,000,000 ms yields an invalid `Date` whose
+ * `toISOString()` throws `RangeError`, which would surface as a 500 on every
+ * route that prices a project. Past year 9999 it instead returns the expanded
+ * form `+010002-12-31T…`, which `slice(0, 10)` truncates to `"+010002-12"` — a
+ * malformed date that would flow into the rollup and print in an exhibit.
+ * Checking the rendered value against `ISO_DATE` catches the second; a null
+ * here means "no derivable date", which the chain already renders as TBD.
+ */
+function formatDate(date: Date): string | null {
+  if (Number.isNaN(date.getTime())) return null;
+  const rendered = date.toISOString().slice(0, 10);
+  return ISO_DATE.test(rendered) ? rendered : null;
+}
+
+/**
+ * Earliest and latest of a `YYYY-MM-DD` list, ignoring nulls. Lexicographic
+ * comparison is chronological for zero-padded ISO dates. An empty list (a
+ * project with no phases) yields null, which renders as TBD.
+ *
+ * Here rather than in `server/lib/mapper.ts`, which reads the database and so
+ * cannot be imported by a hermetic test — these two decide what Exhibit D.2
+ * prints for the whole project.
+ */
+export function earliestDate(dates: (string | null)[]): string | null {
+  const present = dates.filter((d): d is string => d !== null);
+  return present.length === 0 ? null : present.reduce((a, b) => (b < a ? b : a));
+}
+
+export function latestDate(dates: (string | null)[]): string | null {
+  const present = dates.filter((d): d is string => d !== null);
+  return present.length === 0 ? null : present.reduce((a, b) => (b > a ? b : a));
 }
 
 /**
