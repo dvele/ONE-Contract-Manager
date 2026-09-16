@@ -2,9 +2,9 @@ import { Router, Request, Response } from "express";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index";
-import { phases, properties, projectUnits, projects } from "../../shared/schema";
+import { properties, projectUnits, projects } from "../../shared/schema";
 import { requireAuth } from "../middleware/auth";
-import { UNIQUE_VIOLATION } from "../lib/unit-attachment";
+import { phaseAccessible, UNIQUE_VIOLATION } from "../lib/unit-attachment";
 
 /**
  * Project properties — the lots a project builds on, identified as P-1..P-n.
@@ -30,30 +30,6 @@ function parseId(raw: string | string[]): number | null {
   const value = Array.isArray(raw) ? raw[0] : raw;
   if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) return null;
   return parseInt(value, 10);
-}
-
-/**
- * A property may only be assigned to a phase in its own project and organization.
- * Returns false when the phase is missing, belongs to another organization, or
- * belongs to a different project. Mirrors `propertyAccessible` in
- * `server/lib/unit-attachment.ts`.
- */
-async function phaseAccessible(
-  phaseId: number,
-  organizationId: number,
-  projectId: number,
-): Promise<boolean> {
-  const [phase] = await db
-    .select({ id: phases.id })
-    .from(phases)
-    .where(
-      and(
-        eq(phases.id, phaseId),
-        eq(phases.organizationId, organizationId),
-        eq(phases.projectId, projectId),
-      ),
-    );
-  return !!phase;
 }
 
 const MAX_PROPERTY_CODE_ASSIGNMENT_RETRIES = 3;

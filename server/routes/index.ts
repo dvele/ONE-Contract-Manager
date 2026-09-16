@@ -3,6 +3,7 @@ import projectsRouter from "./projects";
 import financialsRouter from "./financials";
 import phasesRouter from "./phases";
 import propertiesRouter from "./properties";
+import milestonesRouter from "./milestones";
 import contractsRouter from "./contracts";
 import systemRouter from "./system";
 import homeModelsRouter from "./home-models";
@@ -24,6 +25,7 @@ router.use(projectsRouter);
 router.use(financialsRouter);
 router.use(phasesRouter);
 router.use(propertiesRouter);
+router.use(milestonesRouter);
 router.use(contractsRouter);
 router.use(systemRouter);
 

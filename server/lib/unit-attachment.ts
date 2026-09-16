@@ -89,6 +89,36 @@ export async function propertyAccessible(
   return result.rows.length > 0;
 }
 
+/**
+ * The ids of every phase belonging to this project and organization.
+ *
+ * `phases.organizationId` is `.notNull()`, so unlike `projects` there is no
+ * pre-multi-tenancy row to tolerate here.
+ */
+export async function phaseIdsForProject(
+  projectId: number,
+  organizationId: number,
+): Promise<Set<number>> {
+  const result = await pool.query(
+    `SELECT id FROM phases WHERE project_id = $1 AND organization_id = $2`,
+    [projectId, organizationId],
+  );
+  return new Set<number>(result.rows.map((row) => row.id));
+}
+
+/**
+ * A phase may only be referenced from within its own project and organization.
+ * Returns false when the phase is missing, belongs to another organization, or
+ * belongs to a different project.
+ */
+export async function phaseAccessible(
+  phaseId: number,
+  organizationId: number,
+  projectId: number,
+): Promise<boolean> {
+  return (await phaseIdsForProject(projectId, organizationId)).has(phaseId);
+}
+
 /** Postgres unique_violation, raised by any of this schema's unique constraints. */
 export const UNIQUE_VIOLATION = "23505";
 
