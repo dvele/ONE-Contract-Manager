@@ -54,6 +54,58 @@ export function buildMilestoneSchedule(phaseValue: number): ScheduledMilestone[]
   return milestones;
 }
 
+export interface ReconciliationInput {
+  /** Each phase's `phaseValue`, in cents. */
+  phaseValues: number[];
+  contractValue: number;
+  designFee: number;
+  /** Value of units whose property carries no phase, or which have no property. */
+  unphasedUnitValue: number;
+}
+
+export interface ReconciliationResult {
+  reconciles: boolean;
+  /** `contractValue − designFee − Σ phaseValues`; negative when phases exceed the contract. */
+  shortfall: number;
+  /** The part of the shortfall the unphased units do not account for. */
+  unexplained: number;
+  explainedByUnphased: boolean;
+}
+
+/**
+ * Decides whether a project's phase values agree with its contract total, which
+ * is what allows a contract to be generated at all.
+ *
+ * The identity is conditional: `Σ phaseValue = contractValue − designFee` holds
+ * only when every unit sits on a property that belongs to a phase. Units on
+ * unphased properties, or attached to no property, count into the project
+ * totals and into no phase — correct behaviour rather than drift. So a
+ * shortfall is reported alongside what explains it, and only the unexplained
+ * remainder means the two disagree.
+ *
+ * A project with no phases is the documented legacy shape: there are no phase
+ * tables to contradict the total, so it always reconciles.
+ *
+ * Every figure is an integer number of cents and both `buildMilestoneSchedule`
+ * and the site-work pro-ration reconcile to the cent by construction, so there
+ * is deliberately **no rounding tolerance** — a slack of even one cent would
+ * hide exactly the drift this exists to catch.
+ */
+export function reconcilePhases(input: ReconciliationInput): ReconciliationResult {
+  const { phaseValues, contractValue, designFee, unphasedUnitValue } = input;
+
+  const phaseTotal = phaseValues.reduce((sum, v) => sum + v, 0);
+  const shortfall = contractValue - designFee - phaseTotal;
+  const unexplained = shortfall - unphasedUnitValue;
+
+  return {
+    reconciles: phaseValues.length === 0 || unexplained === 0,
+    shortfall,
+    unexplained,
+    explainedByUnphased: shortfall !== 0 && unexplained === 0,
+  };
+}
+
 export interface PhaseRow {
   id: number;
   phaseNumber: number;
