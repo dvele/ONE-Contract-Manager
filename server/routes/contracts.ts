@@ -1538,10 +1538,213 @@ router.post("/contracts/download-pdf", async (req, res) => {
     
   } catch (error) {
     console.error("Error generating PDF:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: "Failed to generate document",
       message: error instanceof Error ? error.message : "Unknown error"
     });
+  }
+});
+
+// Export a contract to a Google Doc in the project's own Onedot Drive folder.
+// Mirrors download-pdf's opening (project, pricing, reconciliation), then
+// generates HTML instead of a PDF and hands it to Drive instead of the client.
+router.post("/contracts/export-google-doc", async (req, res) => {
+  try {
+    const { isConfigured, documentTitle, exportHtmlToGoogleDoc, NotConfigured, ExportFailed } =
+      await import('../lib/googleDrive');
+
+    if (!isConfigured()) {
+      return res.status(503).json({ error: "Google Doc export is not configured" });
+    }
+
+    const { contractType, projectId } = req.body;
+
+    if (!contractType) {
+      return res.status(400).json({ error: "contractType is required" });
+    }
+    if (!projectId) {
+      return res.status(400).json({ error: "projectId is required" });
+    }
+
+    const { projectAccessible } = await import('../lib/unit-attachment');
+    if (!(await projectAccessible(projectId, req.organizationId))) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    const fullProject = await getProjectWithRelations(projectId);
+    if (!fullProject) {
+      return res.status(404).json({ error: "Project not found" });
+    }
+
+    const { mapProjectToVariables, formatCentsAsCurrency, centsToDollars } = await import('../lib/mapper');
+    const { calculateProjectPricing } = await import('../services/pricingEngine');
+
+    let pricingSummary: any = null;
+    try {
+      pricingSummary = await calculateProjectPricing(projectId);
+      console.log(`✓ Pricing calculated for Google Doc export: contractValue=${pricingSummary.contractValue}, paymentSchedule=${pricingSummary.paymentSchedule?.length || 0} items`);
+    } catch (pricingError) {
+      console.warn(`⚠️ Pricing engine error (using fallback):`, pricingError);
+    }
+
+    const exportRefusal = await reconciliationRefusal(pricingSummary);
+    if (exportRefusal) return res.status(409).json(exportRefusal);
+
+    const { fetchOnedotProjects, findFolderId } = await import('../lib/onedot');
+    const onedotProjects = await fetchOnedotProjects();
+    const folderId =
+      findFolderId(onedotProjects, fullProject.project.projectNumber) ??
+      process.env.GOOGLE_DRIVE_FALLBACK_FOLDER_ID ??
+      null;
+
+    if (!folderId) {
+      return res.status(409).json({
+        error:
+          `No Google Drive folder for project ${fullProject.project.projectNumber}. ` +
+          `Add one in Onedot, or set GOOGLE_DRIVE_FALLBACK_FOLDER_ID.`,
+      });
+    }
+
+    // Contract type filtering: ONE shows all, MANUFACTURING shows offsite only, ONSITE shows onsite only
+    const contractFilterType = contractType as 'ONE' | 'MANUFACTURING' | 'ONSITE' | 'MASTER_EF';
+    const projectData = mapProjectToVariables(fullProject, pricingSummary || undefined, contractFilterType);
+
+    console.log(`\n=== Generating ${contractType} contract for Google Doc export, project ${projectId} ===`);
+    console.log(`Project: ${projectData.PROJECT_NUMBER} - ${projectData.PROJECT_NAME}`);
+    console.log(`Service Model: ${projectData.ON_SITE_SELECTION}`);
+
+    try {
+      const projectUnitsData = await db
+        .select({
+          unitLabel: projectUnits.unitLabel,
+          modelName: homeModels.name,
+        })
+        .from(projectUnits)
+        .innerJoin(homeModels, eq(projectUnits.modelId, homeModels.id))
+        .where(eq(projectUnits.projectId, projectId));
+
+      if (pricingSummary && pricingSummary.unitCount > 0) {
+        projectData.DESIGN_FEE = centsToDollars(pricingSummary.breakdown.totalDesignFee);
+        projectData.DESIGN_FEE_WRITTEN = formatCentsAsCurrency(pricingSummary.breakdown.totalDesignFee);
+        projectData.PRELIM_OFFSITE = centsToDollars(pricingSummary.breakdown.totalOffsite);
+        projectData.PRELIM_OFFSITE_WRITTEN = formatCentsAsCurrency(pricingSummary.breakdown.totalOffsite);
+        projectData.PRELIMINARY_OFFSITE_PRICE = formatCentsAsCurrency(pricingSummary.breakdown.totalOffsite);
+        projectData.deliveryInstallationPrice = centsToDollars(pricingSummary.breakdown.totalShipping);
+        projectData.PRELIM_ONSITE = centsToDollars(pricingSummary.breakdown.totalOnsite);
+        projectData.PRELIM_ONSITE_WRITTEN = formatCentsAsCurrency(pricingSummary.breakdown.totalOnsite);
+        projectData.PRELIMINARY_ONSITE_PRICE = formatCentsAsCurrency(pricingSummary.breakdown.totalOnsite);
+        projectData.PRELIM_CONTRACT_PRICE = centsToDollars(pricingSummary.grandTotal);
+        projectData.PRELIM_CONTRACT_PRICE_WRITTEN = formatCentsAsCurrency(pricingSummary.grandTotal);
+        projectData.PRELIMINARY_CONTRACT_PRICE = formatCentsAsCurrency(pricingSummary.grandTotal);
+        projectData.PRELIMINARY_TOTAL_PRICE = formatCentsAsCurrency(pricingSummary.grandTotal);
+        projectData.FINAL_CONTRACT_PRICE = centsToDollars(pricingSummary.grandTotal);
+        projectData.FINAL_CONTRACT_PRICE_WRITTEN = formatCentsAsCurrency(pricingSummary.grandTotal);
+        projectData.CONTRACT_PRICE = formatCentsAsCurrency(pricingSummary.grandTotal);
+
+        pricingSummary.paymentSchedule.forEach((milestone: { name: string; percentage: number; amount: number; phase?: string }, index: number) => {
+          const num = index + 1;
+          projectData[`MILESTONE_${num}_NAME`] = milestone.name;
+          projectData[`MILESTONE_${num}_PERCENT`] = `${milestone.percentage}%`;
+          projectData[`MILESTONE_${num}_AMOUNT`] = formatCentsAsCurrency(milestone.amount);
+          projectData[`MILESTONE_${num}_PHASE`] = milestone.phase || null;
+          projectData[`CLIENT_MILESTONE_${num}_NAME`] = milestone.name;
+          projectData[`CLIENT_MILESTONE_${num}_PERCENT`] = `${milestone.percentage}%`;
+          projectData[`CLIENT_MILESTONE_${num}_AMOUNT`] = formatCentsAsCurrency(milestone.amount);
+
+          if (milestone.name === 'Retainage' || milestone.name.toLowerCase().includes('retainage')) {
+            projectData.RETAINAGE_PERCENT = `${milestone.percentage}%`;
+            projectData.RETAINAGE_AMOUNT = formatCentsAsCurrency(milestone.amount);
+          }
+        });
+
+        const unitCounts: Record<string, { count: number; labels: string[] }> = {};
+        projectUnitsData.forEach(unit => {
+          if (!unitCounts[unit.modelName]) {
+            unitCounts[unit.modelName] = { count: 0, labels: [] };
+          }
+          unitCounts[unit.modelName].count++;
+          unitCounts[unit.modelName].labels.push(unit.unitLabel ?? "");
+        });
+
+        const unitSummaryParts = Object.entries(unitCounts).map(([model, data]) =>
+          `${data.count}x ${model} (${data.labels.join(', ')})`
+        );
+        const unitSummary = `${pricingSummary.unitCount} Unit${pricingSummary.unitCount !== 1 ? 's' : ''}: ${unitSummaryParts.join(', ')}`;
+
+        projectData.HOME_MODEL = unitSummary;
+        projectData.UNIT_MODEL_LIST = pricingSummary.unitModelSummary || unitSummary;
+        projectData.TOTAL_UNITS = pricingSummary.unitCount;
+
+        projectData.TOTAL_PROJECT_BUDGET = centsToDollars(pricingSummary.projectBudget);
+        projectData.TOTAL_PROJECT_BUDGET_WRITTEN = formatCentsAsCurrency(pricingSummary.projectBudget);
+        projectData.TOTAL_CONTRACT_PRICE = centsToDollars(pricingSummary.contractValue);
+        projectData.TOTAL_CONTRACT_PRICE_WRITTEN = formatCentsAsCurrency(pricingSummary.contractValue);
+        projectData.PRICING_SERVICE_MODEL = pricingSummary.serviceModel;
+
+        projectData.CONTRACT_PRICE = formatCentsAsCurrency(pricingSummary.contractValue);
+        projectData.PRELIM_CONTRACT_PRICE = centsToDollars(pricingSummary.contractValue);
+        projectData.PRELIM_CONTRACT_PRICE_WRITTEN = formatCentsAsCurrency(pricingSummary.contractValue);
+        projectData.PRELIMINARY_CONTRACT_PRICE = formatCentsAsCurrency(pricingSummary.contractValue);
+        projectData.PRELIMINARY_TOTAL_PRICE = formatCentsAsCurrency(pricingSummary.contractValue);
+        projectData.FINAL_CONTRACT_PRICE = centsToDollars(pricingSummary.contractValue);
+        projectData.FINAL_CONTRACT_PRICE_WRITTEN = formatCentsAsCurrency(pricingSummary.contractValue);
+
+        console.log(`Pricing Engine injected: Contract Value = ${formatCentsAsCurrency(pricingSummary.contractValue)}, Project Budget = ${formatCentsAsCurrency(pricingSummary.projectBudget)}, Service Model = ${pricingSummary.serviceModel}, Units = ${pricingSummary.unitCount}`);
+      }
+    } catch (pricingError) {
+      console.warn('Pricing engine calculation failed, using legacy values:', pricingError);
+    }
+
+    const { generateContract, getContractFilename } = await import('../lib/contractGenerator');
+
+    const templateId = await resolveTemplateId(contractType, req.body.templateId);
+    const buffer = await generateContract({
+      contractType: contractFilterType,
+      projectData,
+      format: 'html',
+      templateId,
+    });
+    const html = buffer.toString('utf-8');
+    const title = documentTitle(getContractFilename(contractType, projectData, 'pdf'));
+
+    let docId: string;
+    let webViewLink: string;
+    try {
+      ({ docId, webViewLink } = await exportHtmlToGoogleDoc({ html, title, folderId }));
+    } catch (driveError) {
+      if (driveError instanceof NotConfigured) {
+        return res.status(503).json({ error: "Google Doc export is not configured" });
+      }
+      if (driveError instanceof ExportFailed) {
+        return res.status(502).json({ error: driveError.message });
+      }
+      throw driveError;
+    }
+
+    // The newest row for this project/type, if one was ever saved — exporting
+    // does not create one. Contracts.organization_id is nullable and unset at
+    // INSERT time (see the regenerate route above), so this is keyed on
+    // project + type alone, not the caller's organization.
+    const existingContract = await pool.query(
+      `SELECT id FROM contracts
+       WHERE project_id = $1 AND UPPER(contract_type) = UPPER($2)
+       ORDER BY generated_at DESC LIMIT 1`,
+      [projectId, contractType]
+    );
+
+    if (existingContract.rows.length > 0) {
+      await db
+        .update(contracts)
+        .set({ googleDocId: docId, googleDocUrl: webViewLink })
+        .where(eq(contracts.id, existingContract.rows[0].id));
+    }
+
+    console.log(`Exported ${contractType} contract for project ${projectId} to Google Doc ${docId}`);
+
+    res.json({ docId, webViewLink });
+  } catch (error) {
+    console.error("Error exporting Google Doc:", error);
+    res.status(500).json({ error: "Failed to export Google Doc" });
   }
 });
 
