@@ -75,7 +75,15 @@ Package, and `mapper.ts` binds `PERMIT_SUBMITTAL_DATE` to the permit-set milesto
 (D-3) and `DESIGN_DEVELOPMENT_DATE` to the green-light package (D-4). They print in
 ascending order. An earlier ledger entry claiming the two were transposed is wrong.
 
-What is unresolved is what D-4's cell should say:
+**Decided 2026-09-21: D-4's Target Date cell resolves `GREEN_LIGHT_DATE` when it is
+set, and falls back to `DESIGN_DEVELOPMENT_DATE`'s derivation otherwise.** A
+hand-entered date wins over a derived one — the same asserted-overrides-derived rule
+Plan C established for the four phase dates — and the derivation keeps the cell from
+printing TBD on the projects where nobody filled the field in, which today is most of
+them. Renaming `design_development_date` is **not** part of Plan E; the variable stays
+misnamed and the two paragraphs below stay true.
+
+The reasoning that was unresolved until then:
 
 1. **`DESIGN_DEVELOPMENT_DATE` is misnamed.** It derives ten business days *after*
    `PERMIT_SUBMITTAL_DATE`, which the two names imply backwards — design development
