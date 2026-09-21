@@ -255,10 +255,57 @@ Unrelated to this work, but they cost a day and will cost the next person the sa
 
 ## 7. What to exercise first
 
-1. **Regenerate a contract for an existing project and diff it against a pre-branch
-   generation.** Both plans claim the document does not change. That claim is supported
-   statically — no consumer reads `phases[]`, and `mapper.ts` and `tableGenerators.ts`
-   are untouched — but it has never been confirmed empirically.
+1. **Done (2026-09-21, Plan E task 9).** The MASTER_EF document was regenerated from a
+   local reconstruction of the issued 2026-864 Zaca Preserve project (21 units: 14×
+   Lumina, 7× Gabriel; `$200,000` design fee; `$14,596,900` contract value, reproducing
+   the issued figures to the cent) and diffed both against the issued PDF and against a
+   pre-rewire generation. Plan D's reconciliation gate did not fire. The before/after
+   diff contains ten hunks and every one maps to a named defect — no unexplained change.
+   Seventeen of twenty checked conditions are fixed: A.2's quantities and four dates,
+   A.4's sum and currency formatting and non-zero Delivery/Assembly, A.5's single
+   design-fee row and priced per-phase milestones, B.1's per-unit rows, C.2's checkmarks
+   (inline SVG, no more `&#10004;` tofu), C.4's day counts, D.1/D.2's eight target dates
+   including D-4's green-light date, and all three signature-block defects. What the
+   comparison found still broken:
+
+   - **A.1 still prints the site address twice.** Exhibit 78's `Site(s)` row is
+     `{{SITE_ADDRESS}}, {{SITE_CITY}}, {{SITE_STATE}} {{SITE_ZIP}}`, and `SITE_ADDRESS`
+     is already a full address. `buildFullAddress`'s dedup guard cannot see the
+     template's trailing three variables. The fix is that one row of the body. Nothing
+     tests `buildFullAddress` or `SITE_ADDRESS`.
+   - **The cover page prints the Effective Date one day early** west of UTC:
+     `September 2, 2026` on the cover against `2026-09-03` in the body. `formatDate` in
+     `server/lib/contractGenerator.ts` calls `toLocaleDateString` with no `timeZone`.
+     The UTC fix recorded in §3 reached `mapper.ts` and missed this caller, which renders
+     the title page.
+   - **The doubled-LLC-suffix / PO-box fix reaches only the client generator.**
+     `POST /projects` has a second one that still yields `DP Zaca Preserve LLC LLC` and
+     `DP PO Box 953 - Zaca Preserve LLC`; only `client/src/lib/llcUtils.ts` was fixed and
+     only it is tested.
+   - **C.2's rewiring deleted the exhibit's `Notes / Acceptance Standard` column** (20
+     rows of per-row legal text: `Per Exhibit B`, `Must meet Dvele tolerances`, …) and
+     its `Factory fabrication — Dvele` row. The generated matrix is three columns from
+     the wizard defaults; the regenerated Exhibit C.2 no longer allocates factory
+     fabrication to Dvele. A deliberate product decision, not a side effect of fixing
+     the checkmarks, is what this needs.
+   - **A.4 dropped the admin-fee percentage**: `At cost plus admin fee of 10%` became
+     `At cost plus admin fee`. `generateExhibitA4TableHtml` hardcodes the string and
+     never reads `projects.admin_fee_percent`.
+   - Minor: A.5's `%` column sums to 100% over `contractValue − designFee` while the
+     Total row prints `100%` beside `contractValue`; and `BUYER_TYPE` compares
+     `buyerType === "developer"` case-sensitively against an unconstrained `text`
+     column, so a stored `Developer` labels a developer agreement `End Customer`.
+
+   Two prerequisites the comparison had to supply, both absent from the seeder:
+   `template_exhibits` is empty, so `fetchExhibitsForContract` returns nothing and a
+   generated contract carries **no exhibits at all** until the junction is populated
+   (MASTER_EF template 26 → exhibits 78–83; ONE template 24 → 71–77); and `home_models`
+   is empty, so no project can be priced. Separately,
+   `POST /contracts/draft-preview` ignores `req.body.templateId` and never calls
+   `resolveTemplateId` — it reads `template_id` only off the newest saved `contracts`
+   row, so the first preview of a project renders with no exhibits.
+
+   Full report: `.superpowers/sdd/2026-09-21-phase-property-model-plan-e/task-9-report.md`.
 2. Step 4 end to end: properties, phases, unit attachment, a New Configuration, phase
    rename and delete.
 3. Step 4 with the legacy quantity-based list and the new editor both populated. This
