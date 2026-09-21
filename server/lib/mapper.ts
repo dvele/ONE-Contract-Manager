@@ -19,7 +19,6 @@ import {
   generateExhibitB1TableHtml,
   generateResponsibilityMatrixHtml,
   type ResponsibilityMatrixItem,
-  type ProjectUnit as TGProjectUnit,
 } from "./tableGenerators";
 import { buildSignatureBlock as buildStyledSignatureBlock } from "./tableStyles";
 import {
@@ -477,9 +476,18 @@ export function buildFullAddress(
 ): string {
   const parts = [address, city, state, zip].filter(Boolean);
   if (parts.length === 0) return "";
-  // Format as: "123 Main St, City, ST 12345"
+
+  // The address field is free text and users routinely paste the whole address
+  // into it. Re-appending a city already present prints it twice on A.1.
+  const line = (address || "").trim();
+  const alreadyComplete =
+    !!city && !!zip &&
+    line.toLowerCase().includes(city.toLowerCase()) &&
+    line.includes(zip);
+  if (alreadyComplete) return line;
+
   if (city && state && zip) {
-    return `${address || ""}, ${city}, ${state} ${zip}`.replace(/^, /, "");
+    return `${line}, ${city}, ${state} ${zip}`.replace(/^, /, "");
   }
   return parts.join(", ");
 }
@@ -649,6 +657,7 @@ export interface PricingSummaryForMapper {
     totalOffsite: number;
     totalOnsite: number;
     totalCustomizations: number;
+    totalShipping: number;
   };
   grandTotal: number;
   projectBudget: number;
@@ -663,10 +672,31 @@ export interface PricingSummaryForMapper {
   unitCount: number;
   unitModelSummary: string;
   // Structurally satisfied by pricingEngine's `PhaseRollup[]`. Declared as the
-  // narrow shape this file reads so mapper.ts gains no import from a
-  // database-bound module. Optional because several callers still map a
-  // project with no pricing run.
-  phases?: { dates: PhaseDates }[];
+  // narrow shape this file and the A.2/A.5/B.1 table generators read, so
+  // mapper.ts gains no import from a database-bound module. Optional because
+  // several callers still map a project with no pricing run.
+  phases?: {
+    phaseNumber: number;
+    properties: {
+      propertyCode: string;
+      address: string | null;
+      units: {
+        unitLabel: string | null;
+        sourceName: string | null;
+        squareFootage: number | null;
+        bedrooms: number | null;
+        bathrooms: number | null;
+        quantity: number;
+      }[];
+    }[];
+    milestones: {
+      name: string;
+      trigger: string;
+      percentage: number;
+      amount: number;
+    }[];
+    dates: PhaseDates;
+  }[];
 }
 
 // =============================================================================
@@ -1075,7 +1105,9 @@ export function mapProjectToVariables(
     PRODUCTION_PRICE: pricingSummary
       ? formatCurrency(pricingSummary.breakdown.totalOffsite / 100)
       : formatCentsAsCurrency(financials?.prelimOffsite),
-    LOGISTICS_PRICE: formatCurrency(0), // Placeholder - logistics portion TBD
+    LOGISTICS_PRICE: formatCentsAsCurrency(
+      pricingSummary?.breakdown.totalShipping ?? financials?.prelimOffsite ?? null
+    ),
     ONSITE_PRICE: pricingSummary
       ? formatCurrency(pricingSummary.breakdown.totalOnsite / 100)
       : formatCentsAsCurrency(financials?.prelimOnsite),
@@ -1157,10 +1189,7 @@ export function mapProjectToVariables(
     MILESTONE_SCHEDULE_TABLE: "",
 
     EXHIBIT_A2_TABLE: generateExhibitA2TableHtml(
-      units?.map((u) => ({
-        modelName: u.homeModel?.modelName || "Unknown Model",
-        quantity: u.quantity || 1,
-      })) || null,
+      pricingSummary?.phases || null,
       buildFullAddress(
         projectDetails?.deliveryAddress,
         projectDetails?.deliveryCity,
@@ -1173,20 +1202,12 @@ export function mapProjectToVariables(
       pricingSummary?.serviceModel || project.onSiteSelection || "CRC"
     ),
     EXHIBIT_A5_TABLE: generateExhibitA5TableHtml(
-      pricingSummary?.paymentSchedule || null,
+      pricingSummary?.phases || null,
       pricingSummary || null,
       pricingSummary?.serviceModel || project.onSiteSelection || "CRC"
     ),
     EXHIBIT_B1_TABLE: generateExhibitB1TableHtml(
-      units?.map((u) => ({
-        unitLabel: u.unitLabel || `Unit ${u.id}`,
-        modelName: u.homeModel?.modelName || "Unknown Model",
-        bedrooms: u.homeModel?.bedrooms,
-        bathrooms: u.homeModel?.bathrooms,
-        squareFootage: u.homeModel?.squareFootage,
-        estimatedPrice: 0,
-        quantity: u.quantity || 1,
-      })) || null
+      pricingSummary?.phases || null
     ),
 
     WHAT_HAPPENS_NEXT_TABLE: "{{TABLE_WHAT_HAPPENS_NEXT}}",
@@ -1197,7 +1218,10 @@ export function mapProjectToVariables(
         ? client.legalName ||
             `${client.firstName || ""} ${client.lastName || ""}`.trim()
         : "",
-      client?.entityType || ""
+      // Left blank deliberately: the signer's title is not recorded anywhere,
+      // and `client.entityType` is the entity's form ("LLC"), which printed as
+      // `Title: LLC` on the issued agreement.
+      ""
     ),
 
     EXHIBIT_A_SIGNATURE_TABLE: buildExhibitASignatureBlock(
@@ -1455,8 +1479,14 @@ export function mapProjectToVariables(
       asCalendarDate(projectDetails?.schematicDesignDate) ??
         designMilestones.schematic
     ),
+    // D.1's D-4 row is the Green Light Package, and a hand-entered date
+    // outranks a derived one — the rule Plan C established for the four phase
+    // dates. The wizard's own D-4 field writes `designDevelopmentDate`, so it
+    // wins; `greenLightDate` is the older hand-entered column and comes
+    // second; the derivation is last.
     DESIGN_DEVELOPMENT_DATE: formatDateOrTBD(
       asCalendarDate(projectDetails?.designDevelopmentDate) ??
+        asCalendarDate(projectDetails?.greenLightDate) ??
         designMilestones.greenLightPackage
     ),
     PERMIT_SUBMITTAL_DATE: formatDateOrTBD(

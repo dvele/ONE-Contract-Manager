@@ -283,11 +283,6 @@ export function generateUnitDetailsHtml(units: UnitDetail[] | null): string {
   });
 }
 
-export interface ProjectUnit {
-  modelName: string;
-  quantity?: number;
-}
-
 /** One phase as `buildPhaseRollups` returns it; the fields A.2 and B.1 render. */
 export interface ExhibitPhase {
   phaseNumber: number;
