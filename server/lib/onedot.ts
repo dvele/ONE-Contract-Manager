@@ -13,6 +13,26 @@ export interface OnedotProject {
   google_drive_folder: string | null;
 }
 
+/**
+ * The project number Onedot would know, or null when there is none.
+ *
+ * The wizard suffixes every draft it creates — `${projectNumber}-DRAFT-${id}`
+ * when the user has entered a number, `DRAFT-${Date.now()}-${id}` when they
+ * have not (WizardContext.tsx:1174-1176 and :1765-1766). `projects.
+ * project_number` is UNIQUE and `PATCH /projects` silently drops a colliding
+ * number, so only the first package for a project ever stores the clean one.
+ * Onedot knows the base number and nothing else.
+ */
+export function onedotProjectNumber(n: string | null | undefined): string | null {
+  // Trim before stripping, not after: the suffix is anchored to the end of the
+  // string, so trailing whitespace would hide it from the pattern. The suffix
+  // can appear more than once — resuming a draft loads the stored suffixed
+  // number back into the wizard and saveDraft re-suffixes it.
+  const base = (n ?? "").trim().replace(/(-DRAFT-[A-Z0-9]+)+$/i, "");
+  // `DRAFT-<timestamp>-<id>` carries no project number at all.
+  return base === "" || /^DRAFT-/i.test(base) ? null : base;
+}
+
 /** The project's Drive folder, or null when Onedot has no folder for it. */
 export function findFolderId(
   projects: OnedotProject[],
