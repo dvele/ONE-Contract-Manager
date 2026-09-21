@@ -142,3 +142,38 @@ and `files.delete` returns 404.
 | Replacing the PDF download | The ask was to add a Google Doc path, not remove the PDF. Both stay until someone decides otherwise. |
 | Renaming `/api/odoo/projects` to `/api/onedot/projects` | The upstream is Onedot; the path, the file and the client's query key are all misnamed. Churn without benefit today. |
 | Using the OAuth credentials already in `.env` | They are a user grant, not a service account: files would be owned by a person, the scope is unknown, and the token dies on a password change. |
+
+---
+
+## 6. Two decisions left to the author (raised by the final re-review, 2026-09-21)
+
+Neither is a defect in this work. Both are judgements with a blast radius beyond it.
+
+- **Should `POST /contracts` refuse an exhibit-less document, the way the export route now does?**
+  `resolveTemplateId` returns `undefined` when no active template exists for a contract type, and
+  `POST /contracts` proceeds on a `console.warn`, **persisting a `contracts` row** for a document with
+  no exhibits at all. That is the export route's failure mode, not `download-pdf`'s: durable, not
+  transient. The export route was given a 409 for it; `POST /contracts` was left alone because it is
+  the app's main generation path and refusing there could break a workflow where a template
+  legitimately has no exhibits configured. Worth deciding deliberately rather than by omission.
+
+- **Should an unset `ONEDOT_API_KEY` return 503 rather than the outage 502?**
+  `fetchOnedotProjects()` throws for both a missing key and an upstream failure, and the export route
+  maps both to `502 "Could not reach Onedot"` — reporting a missing configuration as someone else's
+  outage. That is the same feature-off-versus-broken distinction the route draws carefully for Google
+  (503 for `NotConfigured`). The counter-argument is that Onedot is not optional the way Google export
+  is: Step 1's project dropdown needs it, so an unset key is a broken install rather than a disabled
+  feature.
+
+## 7. The wizard is still writing mangled project numbers
+
+The normalizer added in the fix wave makes the **export** correct despite this; it does not stop it.
+`WizardContext.tsx:1764-1766` (`saveDraft`) appends `-DRAFT-<id>` with none of the guard the autosave
+path at `:1173-1177` has, and it POSTs a **new** project rather than patching the resumed one. So
+resuming a draft and saving it again yields `25-002-DRAFT-ABC123-DRAFT-XYZ789`, and the database keeps
+accumulating both suffixed numbers and duplicate projects. `projects.project_number` is `UNIQUE` and
+`server/routes/projects.ts:381-394` silently drops the field from an update when another row holds it,
+which is why the clean number is only ever written once per number.
+
+That is the root cause. Fixing it properly means making `saveDraft` patch rather than create, which is
+a wizard change well outside this plan.
