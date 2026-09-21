@@ -1590,18 +1590,36 @@ router.post("/contracts/export-google-doc", async (req, res) => {
     const exportRefusal = await reconciliationRefusal(pricingSummary);
     if (exportRefusal) return res.status(409).json(exportRefusal);
 
-    const { fetchOnedotProjects, findFolderId } = await import('../lib/onedot');
-    const onedotProjects = await fetchOnedotProjects();
-    const folderId =
-      findFolderId(onedotProjects, fullProject.project.projectNumber) ??
-      process.env.GOOGLE_DRIVE_FALLBACK_FOLDER_ID ??
-      null;
+    const { fetchOnedotProjects, findFolderId, onedotProjectNumber } = await import('../lib/onedot');
 
+    const storedNumber = fullProject.project.projectNumber;
+    const projectNumber = onedotProjectNumber(storedNumber);
+    if (!projectNumber) {
+      return res.status(409).json({
+        error:
+          `Project ${projectId} has no usable project number — it is stored as ` +
+          `"${storedNumber ?? ""}", which is a wizard draft placeholder. ` +
+          `Give the project its real number, then export again.`,
+      });
+    }
+
+    let onedotProjects;
+    try {
+      onedotProjects = await fetchOnedotProjects();
+    } catch (onedotError) {
+      const detail = onedotError instanceof Error ? onedotError.message : String(onedotError);
+      console.error("[export-google-doc] Onedot project list unavailable:", detail);
+      return res.status(502).json({
+        error: "Could not reach Onedot to resolve the project's Google Drive folder",
+      });
+    }
+
+    const folderId = findFolderId(onedotProjects, projectNumber);
     if (!folderId) {
       return res.status(409).json({
         error:
-          `No Google Drive folder for project ${fullProject.project.projectNumber}. ` +
-          `Add one in Onedot, or set GOOGLE_DRIVE_FALLBACK_FOLDER_ID.`,
+          `Onedot has no Google Drive folder for project ${projectNumber}. ` +
+          `Add the folder to that project in Onedot, then export again.`,
       });
     }
 
@@ -1698,6 +1716,18 @@ router.post("/contracts/export-google-doc", async (req, res) => {
     const { generateContract, getContractFilename } = await import('../lib/contractGenerator');
 
     const templateId = await resolveTemplateId(contractType, req.body.templateId);
+    // Exhibits are selected through the template_exhibits junction, so no
+    // template means a document with no exhibits at all. A Doc persists in the
+    // project's shared Drive folder and its URL is written onto the contracts
+    // row, so unlike download-pdf this must refuse rather than warn.
+    if (!templateId) {
+      return res.status(409).json({
+        error:
+          `No active contract template for ${contractType}, so the document would be generated ` +
+          `with no exhibits. Activate a template for this contract type, then export again.`,
+      });
+    }
+
     const buffer = await generateContract({
       contractType: contractFilterType,
       projectData,
@@ -1726,9 +1756,11 @@ router.post("/contracts/export-google-doc", async (req, res) => {
     // INSERT time (see the regenerate route above), so this is keyed on
     // project + type alone, not the caller's organization.
     const existingContract = await pool.query(
+      // DESC is NULLS FIRST in Postgres, so an unstamped row would outrank
+      // genuinely newer ones; id breaks the remaining ties.
       `SELECT id FROM contracts
        WHERE project_id = $1 AND UPPER(contract_type) = UPPER($2)
-       ORDER BY generated_at DESC LIMIT 1`,
+       ORDER BY generated_at DESC NULLS LAST, id DESC LIMIT 1`,
       [projectId, contractType]
     );
 
