@@ -19,13 +19,20 @@ router.get("/odoo/projects", async (_req, res) => {
   try {
     const raw = await fetchOnedotProjects();
     // Populated on 42 of 44 projects; null is a real answer, not an error.
-    const projects: OdooProjectShaped[] = raw.map((p) => ({
-      id: p.id,
-      projectNumber: p.project_number.trim(),
-      projectName: p.project_name.trim(),
-      displayName: `${p.project_number.trim()} - ${p.project_name.trim()}`,
-      googleDriveFolder: p.google_drive_folder || null,
-    }));
+    const projects: OdooProjectShaped[] = raw.map((p) => {
+      // Guarded the way findFolderId guards them: a single null upstream would
+      // otherwise throw inside the map, surface as a 500, and take out Step 1's
+      // project dropdown for the whole app.
+      const projectNumber = (p.project_number ?? "").trim();
+      const projectName = (p.project_name ?? "").trim();
+      return {
+        id: p.id,
+        projectNumber,
+        projectName,
+        displayName: `${projectNumber} - ${projectName}`,
+        googleDriveFolder: p.google_drive_folder || null,
+      };
+    });
 
     res.json(projects);
   } catch (err) {
