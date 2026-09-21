@@ -9,6 +9,7 @@
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "test": "vitest run",
+    "test:tz": "TZ=America/Los_Angeles vitest run",
     "test:watch": "vitest",
     "db:push": "drizzle-kit push"
   },

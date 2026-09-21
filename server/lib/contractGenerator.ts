@@ -1,5 +1,6 @@
 import puppeteer from 'puppeteer';
 import { buildSignatureBlock } from './tableStyles';
+import { formatDateWritten } from './mapper';
 import { pool } from '../db';
 
 interface ContractGenerationOptions {
@@ -3924,15 +3925,18 @@ function formatCurrency(value: string | number | undefined): string {
   }).format(num);
 }
 
+/**
+ * Delegates to mapper's `formatDateWritten` rather than repeating its
+ * Intl options: this was a third copy of the same written-date formatter, and
+ * the copy that still omitted `timeZone: "UTC"` printed the cover page's
+ * Effective Date a day early west of UTC while the body printed it correctly.
+ * The guard is the one behaviour mapper's does not have — an unparseable
+ * string renders as nothing here, not as "Invalid Date".
+ */
 function formatDate(dateString: string | undefined): string {
   if (!dateString) return '';
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) return '';
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+  if (isNaN(new Date(dateString).getTime())) return '';
+  return formatDateWritten(dateString);
 }
 
 function formatAddress(projectData: Record<string, any>): string {

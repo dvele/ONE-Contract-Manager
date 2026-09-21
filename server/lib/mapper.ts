@@ -388,6 +388,10 @@ export function centsToDollars(
 
 /**
  * Format a date string to short form: "2025-01-15" -> "01/15/2025"
+ *
+ * UTC for the same reason as `formatDateOrTBD` below: a `YYYY-MM-DD` string is
+ * a calendar date parsed as UTC midnight, and rendering it in a host zone west
+ * of UTC prints the previous day.
  */
 export function formatDate(dateStr: string | Date | null | undefined): string {
   if (!dateStr) return "";
@@ -396,6 +400,7 @@ export function formatDate(dateStr: string | Date | null | undefined): string {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
+    timeZone: "UTC",
   });
 }
 
@@ -1418,8 +1423,11 @@ export function mapProjectToVariables(
         (project.productionDuration || 0) +
         (project.deliveryDuration || 0);
       if (totalDays === 0) return "";
+      // UTC arithmetic to match formatDate's UTC rendering: setDate/getDate
+      // preserve local wall time, so adding days across a DST boundary moves
+      // the underlying instant an hour and prints the day before.
       const deliveryDate = new Date(startDate);
-      deliveryDate.setDate(deliveryDate.getDate() + totalDays);
+      deliveryDate.setUTCDate(deliveryDate.getUTCDate() + totalDays);
       return formatDate(deliveryDate);
     })(),
     COMPLETION_DATE: (() => {
@@ -1438,7 +1446,7 @@ export function mapProjectToVariables(
         (project.completionDuration || 0);
       if (totalDays === 0) return "";
       const completionDate = new Date(startDate);
-      completionDate.setDate(completionDate.getDate() + totalDays);
+      completionDate.setUTCDate(completionDate.getUTCDate() + totalDays);
       return formatDate(completionDate);
     })(),
     PROJECT_START_DATE: projectDetails?.agreementExecutionDate
@@ -1460,7 +1468,7 @@ export function mapProjectToVariables(
         (project.completionDuration || 0);
       if (totalDays === 0) return "";
       const endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + totalDays);
+      endDate.setUTCDate(endDate.getUTCDate() + totalDays);
       return formatDate(endDate);
     })(),
 
