@@ -7,6 +7,7 @@ import type {
   WarrantyTerm,
   Contractor,
 } from "../../shared/schema";
+import { getDefaultMatrix } from "../../shared/responsibilityMatrix";
 import {
   generatePricingTableHtml,
   generatePaymentScheduleHtml,
@@ -1184,18 +1185,31 @@ export function mapProjectToVariables(
         quantity: u.quantity || 1,
       })) || null
     ),
-    RESPONSIBILITY_MATRIX_TABLE: generateResponsibilityMatrixHtml(
-      (() => {
+    RESPONSIBILITY_MATRIX_TABLE: (() => {
+      const serviceModel =
+        (pricingSummary?.serviceModel || project.onSiteSelection) === "CMOS"
+          ? "CMOS"
+          : "CRC";
+      const stored = (() => {
         try {
           const raw = projectDetails?.responsibilityMatrix;
           if (!raw) return null;
-          return JSON.parse(raw) as ResponsibilityMatrixItem[];
+          const parsed = JSON.parse(raw) as ResponsibilityMatrixItem[];
+          return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
         } catch {
           return null;
         }
-      })(),
-      pricingSummary?.serviceModel || project.onSiteSelection || "CRC"
-    ),
+      })();
+      // Exhibit C.5 reads "Responsibilities ... are allocated exclusively as
+      // set forth in this Exhibit C", so a C.2 rendering "matrix not
+      // configured" is an exclusive allocation to an empty table. The wizard
+      // seeds a project with these same defaults; a project that never reached
+      // that step takes them here.
+      return generateResponsibilityMatrixHtml(
+        stored ?? getDefaultMatrix(serviceModel),
+        serviceModel
+      );
+    })(),
     MILESTONE_SCHEDULE_TABLE: "",
 
     EXHIBIT_A2_TABLE: generateExhibitA2TableHtml(
