@@ -1748,6 +1748,14 @@ router.post("/contracts/export-google-doc", async (req, res) => {
   }
 });
 
+// Lets the client hide the export button when the feature has no key
+// configured. Reports only a boolean — never client_email or any part of
+// the key.
+router.get("/contracts/google-doc-export/status", async (_req, res) => {
+  const { isConfigured } = await import('../lib/googleDrive');
+  res.json({ configured: isConfigured() });
+});
+
 // Draft Preview - Generate HTML preview of contract without PDF conversion
 // Uses the same data enrichment as the PDF route to ensure parity
 router.post("/contracts/draft-preview", async (req, res) => {

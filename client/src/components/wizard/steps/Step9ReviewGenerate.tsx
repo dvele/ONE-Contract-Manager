@@ -39,6 +39,8 @@ import {
   Sparkles,
   X,
   ChevronRight,
+  FileUp,
+  ExternalLink,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -100,6 +102,10 @@ export const Step9ReviewGenerate: React.FC = () => {
   const { data: pricingSummary } = useQuery<PricingSummary>({
     queryKey: ["/api/projects", draftProjectId, "pricing-summary"],
     enabled: !!draftProjectId,
+  });
+
+  const { data: googleDocStatus } = useQuery<{ configured: boolean }>({
+    queryKey: ["/api/contracts/google-doc-export/status"],
   });
 
   const toggleSection = (section: keyof ExpandedSections) => {
@@ -221,6 +227,30 @@ export const Step9ReviewGenerate: React.FC = () => {
   };
 
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
+  const [isExportingDoc, setIsExportingDoc] = useState<string | null>(null);
+  const [googleDocLinks, setGoogleDocLinks] = useState<Record<string, string>>(
+    {}
+  );
+  const [googleDocErrors, setGoogleDocErrors] = useState<
+    Record<string, string>
+  >({});
+
+  /**
+   * `apiRequest` throws `Error("409: {\"error\":\"…\"}")`. Recover the route's own
+   * message so the reader sees the project number or unexplained amount rather
+   * than a generic failure.
+   */
+  const serverMessage = (error: unknown, fallback: string): string => {
+    if (!(error instanceof Error)) return fallback;
+    const body = error.message.slice(error.message.indexOf(":") + 1).trim();
+    try {
+      const parsed = JSON.parse(body);
+      if (parsed && typeof parsed.error === "string") return parsed.error;
+    } catch {
+      // Not a JSON body — fall through to the caller's message.
+    }
+    return fallback;
+  };
 
   const getContractTypeForApi = (type: string): string => {
     const typeMap: Record<string, string> = {
@@ -258,6 +288,38 @@ export const Step9ReviewGenerate: React.FC = () => {
       console.error("Download error:", error);
     } finally {
       setTimeout(() => setIsDownloading(null), 2000);
+    }
+  };
+
+  const handleExportGoogleDoc = async (contractType: string) => {
+    if (!draftProjectId) {
+      console.error("No project ID available for Google Doc export");
+      return;
+    }
+    setIsExportingDoc(contractType);
+    setGoogleDocErrors((prev) => {
+      const { [contractType]: _removed, ...rest } = prev;
+      return rest;
+    });
+    try {
+      const response = await apiRequest(
+        "POST",
+        "/api/contracts/export-google-doc",
+        {
+          contractType: getContractTypeForApi(contractType),
+          projectId: draftProjectId,
+        }
+      );
+      const { webViewLink } = await response.json();
+      setGoogleDocLinks((prev) => ({ ...prev, [contractType]: webViewLink }));
+    } catch (error) {
+      console.error("Google Doc export error:", error);
+      setGoogleDocErrors((prev) => ({
+        ...prev,
+        [contractType]: serverMessage(error, "Failed to export Google Doc"),
+      }));
+    } finally {
+      setIsExportingDoc(null);
     }
   };
 
@@ -409,42 +471,84 @@ export const Step9ReviewGenerate: React.FC = () => {
             {contracts.map((contract) => (
               <div
                 key={contract.type}
-                className="flex items-center justify-between rounded-lg border p-4">
-                <div className="flex items-center gap-3">
-                  <FileText className="h-8 w-8" />
-                  <div>
-                    <p className="font-medium">{contract.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {contract.clauseCount} clauses
-                    </p>
+                className="space-y-2 rounded-lg border p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-8 w-8" />
+                    <div>
+                      <p className="font-medium">{contract.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {contract.clauseCount} clauses
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() =>
+                        handleDownload(contract.type, contract.name)
+                      }
+                      disabled={isDownloading !== null}
+                      data-testid={`button-download-${contract.type.toLowerCase()}`}>
+                      {isDownloading === contract.type ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4" />
+                      )}
+                      {isDownloading === contract.type
+                        ? "Generating..."
+                        : "Download"}
+                    </Button>
+                    {googleDocStatus?.configured && (
+                      <Button
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => handleExportGoogleDoc(contract.type)}
+                        disabled={isExportingDoc === contract.type}
+                        data-testid={`button-export-google-doc-${contract.type.toLowerCase()}`}>
+                        {isExportingDoc === contract.type ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileUp className="h-4 w-4" />
+                        )}
+                        {isExportingDoc === contract.type
+                          ? "Saving…"
+                          : "Export to Google Doc"}
+                      </Button>
+                    )}
+                    {generatedContracts.find((c) => c.type === contract.type)
+                      ?.id && (
+                      <Button variant="outline" className="gap-2" asChild>
+                        <Link
+                          to={`/contracts/${generatedContracts.find((c) => c.type === contract.type)?.id}/edit`}>
+                          Next steps <ChevronRight />
+                        </Link>
+                      </Button>
+                    )}
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="gap-2"
-                    onClick={() => handleDownload(contract.type, contract.name)}
-                    disabled={isDownloading !== null}
-                    data-testid={`button-download-${contract.type.toLowerCase()}`}>
-                    {isDownloading === contract.type ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                    {isDownloading === contract.type
-                      ? "Generating..."
-                      : "Download"}
-                  </Button>
-                  {generatedContracts.find((c) => c.type === contract.type)
-                    ?.id && (
-                    <Button variant="outline" className="gap-2" asChild>
-                      <Link
-                        to={`/contracts/${generatedContracts.find((c) => c.type === contract.type)?.id}/edit`}>
-                        Next steps <ChevronRight />
-                      </Link>
-                    </Button>
-                  )}
-                </div>
+                {googleDocLinks[contract.type] && (
+                  <div className="flex justify-end">
+                    <a
+                      href={googleDocLinks[contract.type]}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                      data-testid={`link-open-google-doc-${contract.type.toLowerCase()}`}>
+                      <ExternalLink className="h-4 w-4" />
+                      Open in Google Docs
+                    </a>
+                  </div>
+                )}
+                {googleDocErrors[contract.type] && (
+                  <p
+                    role="alert"
+                    className="text-right text-sm text-destructive"
+                    data-testid={`error-export-google-doc-${contract.type.toLowerCase()}`}>
+                    {googleDocErrors[contract.type]}
+                  </p>
+                )}
               </div>
             ))}
 
