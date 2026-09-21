@@ -288,27 +288,77 @@ export interface ProjectUnit {
   quantity?: number;
 }
 
+/** One phase as `buildPhaseRollups` returns it; the fields A.2 and B.1 render. */
+export interface ExhibitPhase {
+  phaseNumber: number;
+  properties: {
+    propertyCode: string;
+    address: string | null;
+    units: {
+      unitLabel: string | null;
+      sourceName: string | null;
+      squareFootage: number | null;
+      bedrooms: number | null;
+      bathrooms: number | null;
+      quantity: number;
+    }[];
+  }[];
+  dates: {
+    factoryStart: string | null;
+    factoryComplete: string | null;
+    deliveryWindow: string | null;
+    targetCO: string | null;
+  };
+}
+
+/** UTC, matching `formatDateOrTBD` in mapper.ts: a YYYY-MM-DD string is UTC
+ * midnight, and formatting it in the host zone prints the day before. */
+const EXHIBIT_DATE_FORMAT = new Intl.DateTimeFormat('en-US', {
+  year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
+});
+
+function formatExhibitDate(value: string | null): string {
+  if (!value) return 'TBD';
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return Number.isNaN(parsed.getTime()) ? 'TBD' : EXHIBIT_DATE_FORMAT.format(parsed);
+}
+
+function unitSpecs(unit: ExhibitPhase['properties'][number]['units'][number]): string {
+  const specs: string[] = [];
+  if (unit.bedrooms != null) specs.push(`${unit.bedrooms} Bed`);
+  if (unit.bathrooms != null) specs.push(`${unit.bathrooms} Bath`);
+  if (unit.squareFootage != null) specs.push(`${unit.squareFootage.toLocaleString()} sqft`);
+  return specs.length > 0 ? specs.join(' / ') : '-';
+}
+
 export function generateExhibitA2TableHtml(
-  units: ProjectUnit[] | null,
-  siteAddress: string
+  phases: ExhibitPhase[] | null,
+  fallbackAddress: string
 ): string {
-  const modelGroups: Record<string, number> = {};
-  if (units && units.length > 0) {
-    for (const u of units) {
-      const name = u.modelName || 'Unknown';
-      modelGroups[name] = (modelGroups[name] || 0) + (u.quantity || 1);
+  const rows: { cells: string[]; isBold?: boolean; isTotal?: boolean }[] = [];
+
+  for (const phase of phases || []) {
+    for (const property of phase.properties) {
+      const models = property.units
+        .map((u) => `${u.quantity}× ${u.sourceName || 'Unknown'}`)
+        .join(', ');
+      rows.push({
+        cells: [
+          property.propertyCode,
+          property.address || fallbackAddress || 'TBD',
+          `Phase ${phase.phaseNumber}`,
+          models || 'TBD',
+          formatExhibitDate(phase.dates.factoryStart),
+          formatExhibitDate(phase.dates.factoryComplete),
+          formatExhibitDate(phase.dates.deliveryWindow),
+          formatExhibitDate(phase.dates.targetCO),
+        ],
+      });
     }
   }
 
-  const rows: { cells: string[]; isBold?: boolean; isTotal?: boolean }[] = [];
-  if (Object.keys(modelGroups).length > 0) {
-    for (const [model, qty] of Object.entries(modelGroups)) {
-      rows.push({
-        cells: ['P-1', siteAddress, 'Phase 1', model, String(qty), '', '', '', ''],
-      });
-    }
-  } else {
-    rows.push({ cells: ['No units configured', '', '', '', '', '', '', '', ''] });
+  if (rows.length === 0) {
+    rows.push({ cells: ['No properties configured', '', '', '', '', '', '', ''] });
   }
 
   return buildStyledTable({
@@ -317,7 +367,6 @@ export function generateExhibitA2TableHtml(
       { header: 'Site Address', align: 'left' },
       { header: 'Phase', align: 'left' },
       { header: 'Home/Model', align: 'left' },
-      { header: 'Qty', align: 'center' },
       { header: 'Est. Factory Start', align: 'left' },
       { header: 'Est. Factory Complete', align: 'left' },
       { header: 'Est. Delivery Window', align: 'left' },
@@ -436,55 +485,37 @@ export function generateExhibitA5TableHtml(
   });
 }
 
-export function generateExhibitB1TableHtml(
-  units: UnitDetail[] | null
-): string {
-  if (!units || units.length === 0) {
+export function generateExhibitB1TableHtml(phases: ExhibitPhase[] | null): string {
+  const rows: { cells: string[]; isBold?: boolean; isTotal?: boolean }[] = [];
+  let totalUnits = 0;
+
+  for (const phase of phases || []) {
+    for (const property of phase.properties) {
+      for (const unit of property.units) {
+        totalUnits += unit.quantity;
+        rows.push({
+          cells: [
+            property.propertyCode,
+            String(phase.phaseNumber),
+            unit.unitLabel || '-',
+            unit.sourceName || '-',
+            String(unit.quantity),
+            unitSpecs(unit),
+            '',
+            '',
+            '',
+          ],
+        });
+      }
+    }
+  }
+
+  if (rows.length === 0) {
     return '<p style="font-style: italic; color: #666;">No units configured.</p>';
   }
 
-  const rows: { cells: string[]; isBold?: boolean; isTotal?: boolean }[] = units.map((unit, index) => {
-    const specs: string[] = [];
-    if (unit.bedrooms !== undefined && unit.bedrooms !== null) {
-      specs.push(`${unit.bedrooms} Bed`);
-    }
-    if (unit.bathrooms !== undefined && unit.bathrooms !== null) {
-      specs.push(`${unit.bathrooms} Bath`);
-    }
-    if (unit.squareFootage !== undefined && unit.squareFootage !== null) {
-      specs.push(`${unit.squareFootage.toLocaleString()} sqft`);
-    }
-    const specsStr = specs.length > 0 ? specs.join(' / ') : '-';
-
-    return {
-      cells: [
-        `P-${index + 1}`,
-        '1',
-        unit.unitLabel || `Unit ${index + 1}`,
-        unit.modelName || '-',
-        String(unit.quantity || 1),
-        specsStr,
-        '',
-        '',
-        '',
-      ],
-    };
-  });
-
-  const totalUnitsB1 = units.reduce((sum, u) => sum + (u.quantity || 1), 0);
-
   rows.push({
-    cells: [
-      '',
-      '',
-      '',
-      'Total',
-      String(totalUnitsB1),
-      '',
-      '',
-      '',
-      '',
-    ],
+    cells: ['', '', '', 'Total', String(totalUnits), '', '', '', ''],
     isBold: true,
     isTotal: true,
   });
