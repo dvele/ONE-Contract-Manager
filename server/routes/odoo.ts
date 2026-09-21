@@ -5,11 +5,12 @@ import { requireAuth } from "../middleware/auth";
 const router = Router();
 router.use(requireAuth);
 
-interface OdooProject {
+// TODO: rename route path and file from /odoo/projects to /projects (upstream is Onedot, not Odoo)
+interface OnedotProject {
   id: number;
-  name: string;
-  company_id: boolean | number;
-  tag_ids: number[];
+  project_number: string;
+  project_name: string;
+  google_drive_folder: string | null;
 }
 
 interface OdooProjectShaped {
@@ -17,20 +18,7 @@ interface OdooProjectShaped {
   projectNumber: string;
   projectName: string;
   displayName: string;
-}
-
-function parseOdooProjectName(name: string): {
-  projectNumber: string;
-  projectName: string;
-} {
-  const separatorIndex = name.indexOf(" - ");
-  if (separatorIndex === -1) {
-    return { projectNumber: name, projectName: "" };
-  }
-  return {
-    projectNumber: name.slice(0, separatorIndex),
-    projectName: name.slice(separatorIndex + 3),
-  };
+  googleDriveFolder: string | null;
 }
 
 router.get("/odoo/projects", async (_req, res) => {
@@ -41,7 +29,7 @@ router.get("/odoo/projects", async (_req, res) => {
   }
 
   try {
-    const response = await fetch("https://one-api.dvele.com/odoo/projects", {
+    const response = await fetch("https://one-api.dvele.com/projects", {
       headers: { Authorization: `Api-Key ${apiKey}` },
     });
 
@@ -52,11 +40,14 @@ router.get("/odoo/projects", async (_req, res) => {
         .json({ error: "Failed to fetch projects from Odoo" });
     }
 
-    const raw: OdooProject[] = await response.json();
-    const projects: OdooProjectShaped[] = raw.map((p) => {
-      const { projectNumber, projectName } = parseOdooProjectName(p.name);
-      return { id: p.id, projectNumber, projectName, displayName: p.name };
-    });
+    const raw: OnedotProject[] = await response.json();
+    const projects: OdooProjectShaped[] = raw.map((p) => ({
+      id: p.id,
+      projectNumber: p.project_number,
+      projectName: p.project_name,
+      displayName: `${p.project_number} - ${p.project_name}`,
+      googleDriveFolder: p.google_drive_folder || null,
+    }));
 
     res.json(projects);
   } catch (err) {
