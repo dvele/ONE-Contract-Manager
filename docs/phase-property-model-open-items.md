@@ -328,3 +328,67 @@ Unrelated to this work, but they cost a day and will cost the next person the sa
 - `.agents/skills/web-design-guidelines/` and `skills-lock.json` are untracked. Plans C
   and D both need that skill for their wizard surfaces, and a fresh checkout will not
   have it.
+
+---
+
+## 9. Left open by Plan E (2026-09-21)
+
+Plan E rewired the MASTER_EF exhibit bodies onto the dynamic generators and fixed
+eleven of the twelve documented defects. These were found during it and deliberately
+not fixed. Each is recorded with the reasoning, because the reasoning is the expensive
+part.
+
+### Decisions that are yours, not the implementation's
+
+- **C.2 lost its `Notes / Acceptance Standard` column and its `Factory fabrication —
+  Dvele` row.** The column drop is sanctioned by the design spec ("the Notes /
+  Acceptance Standard column is dropped to match the wizard"). The row loss follows as
+  an unstated consequence: `responsibilityDefaults.ts` has no factory-fabrication item,
+  the wizard UI cannot add one, and `ResponsibilityMatrixItem` has no notes field — so
+  **every** contract loses both, not just a test fixture. Restoring either means
+  reverting a spec decision or extending the wizard's data model, and there is a real
+  argument that an offsite row does not belong in Exhibit C's *on-site* matrix at all.
+  C.2 can no longer render empty (a server-side default now backs it), but it renders
+  the wizard's five categories and nothing else.
+
+- **A.4 and A.5 now state different totals for a partially-attached project** — units on
+  properties with no phase. A.4 prints the contract price; A.5 prints only the phased
+  subtotal. Both figures are honest and `reconcilePhases` deliberately permits
+  generation in this shape. Previously the inconsistency was hidden *inside* A.5, which
+  asserted a total its own rows did not support; it is now visible *between* two
+  exhibits. Whether such a project should generate a MASTER_EF at all is a decision
+  about what the document may say.
+
+### A real defect, contained, worth its own task
+
+- **The printed Amount column does not sum to the printed Total** for roughly three
+  quarters of whole-dollar inputs, by $1–$3, on both A.5 paths. `formatCurrency` rounds
+  each row to whole dollars independently while the Total is derived from exact cents.
+  **Pre-existing** — the old code printed the identical string, and
+  `generatePaymentScheduleHtml` has the same structure — so Plan E did not worsen it.
+  But `exhibit-a5.test.ts` now asserts this exact invariant and passes only because its
+  fixture splits cleanly, so the suite carries a claim that does not hold in general.
+  The fix is at the display layer: round each row, then derive the Total from the
+  rounded figures.
+
+### Smaller items
+
+- `--write-seed` iterates every exhibit in `seed-data.json` unscoped, while the database
+  query is correctly scoped to MASTER_EF. Latent: no seed exhibit matches a rewiring.
+- `repriceAgainst` divides by the sum of the stored percentages rather than by 100, so a
+  stored set not totalling 100 misstates its own denominator. House behaviour — it
+  mirrors `generatePaymentScheduleHtml`.
+- A **fourth** `toLocaleDateString` without `timeZone` at `tableBuilders.ts:87`. It
+  formats "now", so it is arguably correct, but it is the same copy-count problem.
+- A **third** `generateLLCName` at `server/services/llc-service.ts:77`, using a different
+  naming convention entirely and imported by nothing. Dead code, and exactly the
+  divergence that left the doubled-suffix defect half-fixed until the final review.
+- `PROJECT_START_DATE` substitutes `new Date()` for a missing execution date — a
+  fabricated default for a missing input, which the rest of this branch spent four plans
+  removing.
+- `{{DESIGN_FEE}}` (a bare number, not currency) appears three times in `seed-data.json`'s
+  **clauses** array, none supplying its own `$`. Out of scope for an exhibits-only
+  script; needs its own task.
+- `POST /contracts/draft-preview` ignores `req.body.templateId` and never calls
+  `resolveTemplateId`, so a first preview renders with zero exhibits — the hazard
+  `AGENTS.md` warns about.
