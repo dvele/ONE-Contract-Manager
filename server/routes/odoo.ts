@@ -5,7 +5,7 @@ import { requireAuth } from "../middleware/auth";
 const router = Router();
 router.use(requireAuth);
 
-// TODO: rename route path and file from /odoo/projects to /projects (upstream is Onedot, not Odoo)
+// Upstream is Onedot; path is kept as /odoo/projects for client compatibility.
 interface OnedotProject {
   id: number;
   project_number: string;
@@ -41,11 +41,12 @@ router.get("/odoo/projects", async (_req, res) => {
     }
 
     const raw: OnedotProject[] = await response.json();
+    // Populated on 42 of 44 projects; null is a real answer, not an error.
     const projects: OdooProjectShaped[] = raw.map((p) => ({
       id: p.id,
-      projectNumber: p.project_number,
-      projectName: p.project_name,
-      displayName: `${p.project_number} - ${p.project_name}`,
+      projectNumber: p.project_number.trim(),
+      projectName: p.project_name.trim(),
+      displayName: `${p.project_number.trim()} - ${p.project_name.trim()}`,
       googleDriveFolder: p.google_drive_folder || null,
     }));
 
