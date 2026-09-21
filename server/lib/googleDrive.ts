@@ -61,7 +61,10 @@ export async function exportHtmlToGoogleDoc(options: {
         mimeType: GOOGLE_DOC, // the TARGET — this is the conversion
         parents: [options.folderId],
       },
-      media: { mimeType: "text/html", body: Readable.from(options.html) },
+      // The bytes are UTF-8, and the historical default for text/* is
+      // ISO-8859-1. The clause library is not ASCII — §, en-dashes and curly
+      // quotes — so an undeclared charset mojibakes the legal text.
+      media: { mimeType: "text/html; charset=utf-8", body: Readable.from(options.html) },
       fields: "id, webViewLink",
       // Required for a shared drive. Without it the call fails or lands in the
       // wrong place, and the service account has no My Drive to fall back on.
