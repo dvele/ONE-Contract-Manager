@@ -73,10 +73,12 @@ export function generatePricingTableHtml(
   
   let filteredContractTotal = contractValue;
   if (contractType === 'MANUFACTURING') {
-    filteredContractTotal = breakdown.totalDesignFee + breakdown.totalOffsite;
+    // Customizations are rendered as a row below, so they belong in this total.
+    filteredContractTotal = breakdown.totalDesignFee + breakdown.totalOffsite +
+      (breakdown.totalCustomizations || 0);
   } else if (contractType === 'ONSITE') {
-    filteredContractTotal = breakdown.totalOnsite + 
-      (breakdown.totalShipping || 0) + 
+    filteredContractTotal = breakdown.totalOnsite +
+      (breakdown.totalShipping || 0) +
       (breakdown.totalInstallation || 0);
   }
 
@@ -95,15 +97,19 @@ export function generatePricingTableHtml(
     rows.push({ cells: ['Customizations', formatCurrency(breakdown.totalCustomizations)] });
   }
   
-  if ((contractType === 'ONE' && isCMOS && breakdown.totalOnsite > 0) || 
+  if ((contractType === 'ONE' && isCMOS && breakdown.totalOnsite > 0) ||
       contractType === 'ONSITE') {
     rows.push({ cells: ['Onsite Services', formatCurrency(breakdown.totalOnsite)] });
   }
-  
+
+  // contractValue carries shipping under every model, so a table without this
+  // row is one line item short of the total printed beneath it.
+  if ((contractType === 'ONE' || contractType === 'ONSITE') &&
+      breakdown.totalShipping && breakdown.totalShipping > 0) {
+    rows.push({ cells: ['Shipping', formatCurrency(breakdown.totalShipping)] });
+  }
+
   if (contractType === 'ONSITE') {
-    if (breakdown.totalShipping && breakdown.totalShipping > 0) {
-      rows.push({ cells: ['Shipping', formatCurrency(breakdown.totalShipping)] });
-    }
     if (breakdown.totalInstallation && breakdown.totalInstallation > 0) {
       rows.push({ cells: ['Installation', formatCurrency(breakdown.totalInstallation)] });
     }
@@ -333,21 +339,25 @@ export function generateExhibitA4TableHtml(
   const productionPrice = formatCurrency(breakdown.totalOffsite);
   const logisticsPrice = breakdown.totalShipping ? formatCurrency(breakdown.totalShipping) : '$0';
   const onsitePrice = formatCurrency(breakdown.totalOnsite);
-  const totalProjectPrice = formatCurrency(
-    breakdown.totalDesignFee + breakdown.totalOffsite + (breakdown.totalShipping || 0) +
-    (isCMOS ? breakdown.totalOnsite : 0)
-  );
+  // The engine's own figure, not a recomputation of it. Re-deriving the total
+  // here is what let A.4's line items disagree with A.4's stated total by
+  // $2,087,400 in the issued September 2026 agreement.
+  const totalProjectPrice = formatCurrency(pricingSummary.contractValue);
 
   const rows: { cells: string[]; isBold?: boolean; isTotal?: boolean }[] = [
     { cells: ['Design / Pre-Production Fee', designFee, '', 'Due at signing'] },
     { cells: ['Offsite Services (Factory)', productionPrice, '', 'Per Phase'] },
     { cells: ['Offsite Services (Delivery/Assembly)', logisticsPrice, '', 'Delivery/transport'] },
   ];
-  
+
+  if (breakdown.totalCustomizations && breakdown.totalCustomizations > 0) {
+    rows.push({ cells: ['Customizations', formatCurrency(breakdown.totalCustomizations), '', 'Per unit'] });
+  }
+
   if (isCMOS) {
     rows.push({ cells: ['On-site Services (CMOS)', onsitePrice, '', 'CMOS only'] });
   }
-  
+
   rows.push({ cells: ['Reimbursables (if any)', '', '', 'At cost plus admin fee'] });
   rows.push({
     cells: ['Total Project Price', totalProjectPrice, '', 'Subject to Change Orders'],
