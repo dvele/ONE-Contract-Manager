@@ -47,6 +47,13 @@ describe("generateExhibitA4TableHtml", () => {
     const none = { ...SUMMARY, breakdown: { ...SUMMARY.breakdown, totalCustomizations: 0 } };
     expect(generateExhibitA4TableHtml(none, "CRC")).not.toContain("Customizations");
   });
+
+  it("makes the CMOS line items sum to the printed Total Project Price", () => {
+    const html = generateExhibitA4TableHtml({ ...SUMMARY, contractValue: 14_200_000_00 }, "CMOS");
+    const figures = amounts(html).map((f) => Number(f.replace(/[$,]/g, "")));
+    const total = figures.pop();
+    expect(figures.reduce((sum, f) => sum + f, 0)).toBe(total);
+  });
 });
 
 describe("generatePricingTableHtml", () => {
@@ -67,6 +74,23 @@ describe("generatePricingTableHtml", () => {
   it("makes the ONE line items sum to the stated contract total", () => {
     const figures = amounts(generatePricingTableHtml(SUMMARY, "ONE"))
       .map((f) => Number(f.replace(/[$,]/g, "")));
+    const total = figures.pop();
+    expect(figures.reduce((sum, f) => sum + f, 0)).toBe(total);
+  });
+
+  it("makes the MANUFACTURING line items sum to the printed total", () => {
+    const figures = amounts(generatePricingTableHtml(SUMMARY, "MANUFACTURING"))
+      .map((f) => Number(f.replace(/[$,]/g, "")));
+    const total = figures.pop();
+    expect(figures.reduce((sum, f) => sum + f, 0)).toBe(total);
+  });
+
+  it("makes the ONSITE line items sum to the printed total, with Shipping appearing once", () => {
+    const html = generatePricingTableHtml(SUMMARY, "ONSITE");
+    const shippingMentions = html.match(/Shipping/g) ?? [];
+    expect(shippingMentions.length).toBe(1);
+
+    const figures = amounts(html).map((f) => Number(f.replace(/[$,]/g, "")));
     const total = figures.pop();
     expect(figures.reduce((sum, f) => sum + f, 0)).toBe(total);
   });
