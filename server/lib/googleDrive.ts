@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import { readFileSync } from "node:fs";
 import { Readable } from "node:stream";
 
 /**
@@ -17,21 +18,51 @@ export class NotConfigured extends Error {}
 /** Google refused or the upload failed — the caller should surface it. */
 export class ExportFailed extends Error {}
 
-function credentials(): { client_email: string; private_key: string } | null {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-  if (!raw) return null;
+type ServiceAccountKey = { client_email: string; private_key: string };
+
+function parseKey(raw: string, source: string): ServiceAccountKey | null {
   try {
     const parsed = JSON.parse(raw);
     if (typeof parsed?.client_email !== "string" || typeof parsed?.private_key !== "string") {
       return null;
     }
-    return parsed;
+    return { client_email: parsed.client_email, private_key: parsed.private_key };
   } catch {
     // A malformed key is indistinguishable from an unset one to the caller:
-    // both mean the feature cannot run. The difference is logged, not thrown.
-    console.error("[googleDrive] GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON");
+    // both mean the feature cannot run. The difference is logged, not thrown —
+    // and never with the contents, which are a private key either way.
+    console.error(`[googleDrive] ${source} is not valid JSON`);
     return null;
   }
+}
+
+/**
+ * The service account key, from the inline JSON or from a file.
+ *
+ * Inline wins when both are set: it is the only shape a deployed container has,
+ * so a stray local path must not be able to displace it.
+ */
+function credentials(): ServiceAccountKey | null {
+  const inline = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (inline) return parseKey(inline, "GOOGLE_SERVICE_ACCOUNT_JSON");
+
+  const keyFilePath = process.env.GOOGLE_SERVICE_ACCOUNT_KEY_FILE;
+  if (!keyFilePath) return null;
+
+  let contents: string;
+  try {
+    contents = readFileSync(keyFilePath, "utf8");
+  } catch (error) {
+    // The likeliest local misconfiguration, so name the path — it is not a
+    // secret, and a wrong one is otherwise silent.
+    console.error(
+      `[googleDrive] could not read GOOGLE_SERVICE_ACCOUNT_KEY_FILE at ${keyFilePath}:`,
+      error instanceof Error ? error.message : String(error),
+    );
+    return null;
+  }
+
+  return parseKey(contents, `GOOGLE_SERVICE_ACCOUNT_KEY_FILE (${keyFilePath})`);
 }
 
 export function isConfigured(): boolean {

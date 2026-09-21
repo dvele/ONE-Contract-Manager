@@ -12,7 +12,7 @@ so the next session does not have to re-derive it.
 
 ## 1. The export has never run against Google
 
-`GOOGLE_SERVICE_ACCOUNT_JSON` is absent from `.env`, so the success path of
+Neither `GOOGLE_SERVICE_ACCOUNT_JSON` nor `GOOGLE_SERVICE_ACCOUNT_KEY_FILE` is set, so the success path of
 `POST /api/contracts/export-google-doc` has **never executed**. What has been proven, by driving the
 route handler directly:
 
@@ -38,7 +38,23 @@ most importantly — **what Google's HTML importer does to a generated contract*
    Files are owned by the drive, not by a person, which is the whole point of using a service account
    rather than the OAuth credentials already in `.env` — those would make contracts the property of
    one individual's account.
-3. Put the key in `.env` as `GOOGLE_SERVICE_ACCOUNT_JSON` (whole JSON, one line).
+3. Point the app at the key, either way:
+
+   | Variable | Value | Use |
+   |---|---|---|
+   | `GOOGLE_SERVICE_ACCOUNT_JSON` | the whole key JSON, one line | deployed containers, which only have env vars |
+   | `GOOGLE_SERVICE_ACCOUNT_KEY_FILE` | a path to the key file, e.g. `creds/servicecreds.json` | local development |
+
+   **Inline wins when both are set**, so a stray local path cannot displace a deployed key. A malformed
+   inline value does **not** fall back to the file — that would hide a broken deploy behind a local
+   file that only exists on one machine.
+
+   Deliberately **not** `GOOGLE_APPLICATION_CREDENTIALS`, which is Google's own convention for a key
+   path: `.env` already sets that name to a 40-character hex string from a different integration, so
+   reading it would try to open a file by that name and report the feature unconfigured.
+
+   **If you keep the key in the repo, make sure its directory is git-ignored.** A service-account
+   private key in git history is effectively permanent.
 
 `GOOGLE_DRIVE_ID` is present in `.env` but **this design does not use it** — `files.create` with
 `parents: [folderId]` and `supportsAllDrives: true` writes into a known folder without the drive id.
