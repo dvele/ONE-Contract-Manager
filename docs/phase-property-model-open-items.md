@@ -315,13 +315,14 @@ Unrelated to this work, but they cost a day and will cost the next person the sa
   database module. That is what makes the document code testable, and it is why the
   twelve document defects could be locked down by tests rather than eyeballed in a PDF.
   Keep it true.
-- **Nothing on this branch has been exercised through a browser or over HTTP.** Every
-  `/api` route sits behind Cognito JWT validation. Verification was `tsc`, the vitest
-  suite, throwaway scripts driving the route handlers directly, and — for the generated
-  document — one end-to-end regeneration diffed against the issued Zaca Preserve PDF.
-  **Four plans' worth of wizard UI has never been clicked**: Step 4's property and phase
-  entry, Step 6's timeline, Step 7's payment editor and offsite inputs. This is the
-  largest unretired risk on the branch.
+- **Almost nothing on this branch has been exercised through a browser.** Every `/api`
+  route sits behind Cognito JWT validation, so verification was `tsc`, the vitest suite,
+  throwaway scripts driving the route handlers directly, and — for the generated document
+  — one end-to-end regeneration diffed against the issued Zaca Preserve PDF.
+  **One browser run has now happened**: Step 4's property, phase and unit-attachment path,
+  on project 42, with the pricing identity confirmed to the cent (§7 item 2). Everything
+  else is still unclicked — Step 6's timeline, Step 7's payment editor and offsite inputs,
+  and generation from the wizard. That remains the largest unretired risk on the branch.
 
 ---
 
@@ -400,13 +401,73 @@ Unrelated to this work, but they cost a day and will cost the next person the sa
    `POST /contracts/draft-preview` ignores `req.body.templateId` and never calls
    `resolveTemplateId` — it reads `template_id` only off the newest saved `contracts`
    row, so the first preview of a project renders with no exhibits.
-2. Step 4 end to end: properties, phases, unit attachment, a New Configuration, phase
-   rename and delete.
-3. Step 4 with the legacy quantity-based list and the new editor both populated. This
-   is the default state the spec predicted and it has never been seen.
+2. **Step 4 — partly done (2026-09-21), the first browser exercise on this branch.**
+   Project 42 `25-002 Maia/Mariposa`, CRC, created by hand through the wizard. The rows
+   it wrote were inspected and the pricing engine run over them:
+
+   | Figure | Value | Check |
+   |---|---|---|
+   | 2× Lumina offsite | $1,291,600.00 | 645,800 × 2 |
+   | shipping | $90,000.00 | 45,000 × 2 |
+   | onsite | $240,000.00 | correctly excluded from `contractValue` under CRC |
+   | `contractValue` | $1,386,600.00 | fee + offsite + shipping |
+   | **Σ `phaseValue`** | **$1,381,600.00** | **= `contractValue` − `designFee`, exactly** |
+   | Phase 1's six milestones | 276,320×4 + 207,240 + 69,080 | **= $1,381,600.00, to the cent** |
+
+   `reconciliation` came back `{reconciles: true, shortfall: 0, unexplained: 0}`. This is
+   the first empirical confirmation of the identity Plans B through D were built around —
+   everything before it was `tsc`, vitest and handler-driving scripts.
+
+   Four things this established that nothing had:
+
+   - **The null discipline survives a real wizard save.** `prelim_onsite`,
+     `additional_offsite` and `additional_delivery` are all `NULL`, not `0`. Three
+     separate defects on this branch came from that distinction collapsing.
+   - **Plan C's duration fallback works.** Neither phase has `manufacturing_days` or
+     `onsite_days`, yet all four dates derived from the project's 60/120/90, and Phase 2
+     starts where Phase 1's factory completes.
+   - **An empty phase behaves.** Phase 2 has no properties: $0 value, zero milestones, no
+     fabricated rows.
+   - **One home plus one ADU on a single property** is accepted, per the rule in
+     `server/lib/unit-attachment.ts`.
+
+   Exercised: property create (3) and **delete** (property 18 was created and removed —
+   the id gap is the evidence), phase create (2), unit attachment.
+   **Still not exercised:** a **New Configuration** (`unit_configurations` has no rows and
+   its sequence never advanced), **phase delete** (`phases_id_seq` is 46 and both 45 and 46
+   survive), and **phase rename** (Phase 1 is named "Phase 1", Phase 2 is unnamed, so a
+   rename cannot be distinguished from the default).
+
+   Also still unexercised on this project: Step 7's payment editor (no stored milestones,
+   so Phase 1 renders the default template), both Offsite Services inputs (still `NULL`),
+   and generation (no `contracts` row).
+
+   **A correction worth recording, because it is an easy mistake to repeat:** attaching a
+   unit to an unphased property does **not** trip Plan D's reconciliation gate. Such a
+   unit is *explained* — `reconcilePhases` returns `reconciles: true` with
+   `explainedByUnphased: true`, and Plan D has a test asserting exactly that. For a
+   unit-priced project the identity holds by construction, because both sides derive from
+   the same unit rows, so the gate is close to unreachable from the browser. It guards
+   against future drift, not user error. The reachable divergence is the
+   financials-fallback path (phases but no units, with `prelim_offsite` set).
+
+   What a browser run *can* usefully show instead: attach a unit to the already-unphased
+   P-3 and generate. A.4 prints the full contract price while A.5 prints only the phased
+   subtotal — the parked decision in §9, made visible on a page.
+
+   Cosmetic, noticed in passing: Phase 1's `deliveryWindow` and `factoryComplete` are the
+   same date, because `deliveryLagDays` defaults to 0, so Exhibit A.2 prints one date in
+   two adjacent columns.
+
+3. Step 4 with the legacy quantity-based list and the new editor both populated. **Still
+   never seen** — project 42's units are both property-attached, so this remains the state
+   the spec predicted and nobody has looked at.
 4. First `dev` deploy: `drizzle-kit push` runs on container start and will create
    `phases`, `properties`, `unit_configurations` and new columns on `project_units`.
-   Watch the entrypoint log — a push failure means the API does not boot.
+   Watch the entrypoint log — a push failure means the API does not boot. Remember that
+   nothing in the deploy path seeds `home_models` or `template_exhibits` (§5), and that
+   the deployed `exhibits` rows keep their hardcoded tables until
+   `scripts/rewire_master_ef_exhibits.ts` is run there (§3).
 
 ---
 
