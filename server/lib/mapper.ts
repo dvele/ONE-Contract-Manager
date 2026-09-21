@@ -1105,8 +1105,13 @@ export function mapProjectToVariables(
     PRODUCTION_PRICE: pricingSummary
       ? formatCurrency(pricingSummary.breakdown.totalOffsite / 100)
       : formatCentsAsCurrency(financials?.prelimOffsite),
+    // `prelimOffsite` is PRODUCTION_PRICE's fallback: sharing it made both
+    // variables print the same figure, double-counting offsite in any table
+    // carrying the two. `additionalDelivery` is the delivery-side column.
     LOGISTICS_PRICE: formatCentsAsCurrency(
-      pricingSummary?.breakdown.totalShipping ?? financials?.prelimOffsite ?? null
+      pricingSummary?.breakdown.totalShipping ??
+        financials?.additionalDelivery ??
+        null
     ),
     ONSITE_PRICE: pricingSummary
       ? formatCurrency(pricingSummary.breakdown.totalOnsite / 100)
@@ -1199,7 +1204,8 @@ export function mapProjectToVariables(
     ),
     EXHIBIT_A4_TABLE: generateExhibitA4TableHtml(
       pricingSummary || null,
-      pricingSummary?.serviceModel || project.onSiteSelection || "CRC"
+      pricingSummary?.serviceModel || project.onSiteSelection || "CRC",
+      project.adminFeePercent
     ),
     EXHIBIT_A5_TABLE: generateExhibitA5TableHtml(
       pricingSummary?.phases || null,

@@ -374,7 +374,8 @@ export function generateExhibitA2TableHtml(
 
 export function generateExhibitA4TableHtml(
   pricingSummary: PricingSummary | null,
-  serviceModel: string
+  serviceModel: string,
+  adminFeePercent?: number | null
 ): string {
   if (!pricingSummary) return 'No pricing data available.';
   const { breakdown } = pricingSummary;
@@ -403,7 +404,14 @@ export function generateExhibitA4TableHtml(
     rows.push({ cells: ['On-site Services (CMOS)', onsitePrice, '', 'CMOS only'] });
   }
 
-  rows.push({ cells: ['Reimbursables (if any)', '', '', 'At cost plus admin fee'] });
+  // A markup with no stated rate is an uncapped one. Where the project has no
+  // percentage the clause is omitted rather than printed as "of 0%", which
+  // would state a rate the project never agreed.
+  const adminFee =
+    adminFeePercent != null && adminFeePercent > 0
+      ? `At cost plus admin fee of ${adminFeePercent}%`
+      : 'At cost plus admin fee';
+  rows.push({ cells: ['Reimbursables (if any)', '', '', adminFee] });
   rows.push({
     cells: ['Total Project Price', totalProjectPrice, '', 'Subject to Change Orders'],
     isBold: true,

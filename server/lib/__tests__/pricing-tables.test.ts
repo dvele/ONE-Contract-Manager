@@ -48,6 +48,22 @@ describe("generateExhibitA4TableHtml", () => {
     expect(generateExhibitA4TableHtml(none, "CRC")).not.toContain("Customizations");
   });
 
+  it("states the rate of the admin fee it charges on reimbursables", () => {
+    // "At cost plus admin fee" with no rate is an uncapped markup; the issued
+    // agreement read "of 10%".
+    expect(generateExhibitA4TableHtml(SUMMARY, "CRC", 10)).toContain(
+      "At cost plus admin fee of 10%"
+    );
+  });
+
+  it("omits the rate clause rather than stating one the project never agreed", () => {
+    for (const noRate of [undefined, null, 0]) {
+      const html = generateExhibitA4TableHtml(SUMMARY, "CRC", noRate);
+      expect(html).toContain("At cost plus admin fee");
+      expect(html).not.toContain("admin fee of");
+    }
+  });
+
   it("makes the CMOS line items sum to the printed Total Project Price", () => {
     const html = generateExhibitA4TableHtml({ ...SUMMARY, contractValue: 14_200_000_00 }, "CMOS");
     const figures = amounts(html).map((f) => Number(f.replace(/[$,]/g, "")));
