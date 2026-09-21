@@ -22,7 +22,9 @@ function credentials(): { client_email: string; private_key: string } | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    if (!parsed?.client_email || !parsed?.private_key) return null;
+    if (typeof parsed?.client_email !== "string" || typeof parsed?.private_key !== "string") {
+      return null;
+    }
     return parsed;
   } catch {
     // A malformed key is indistinguishable from an unset one to the caller:
@@ -74,12 +76,14 @@ export async function exportHtmlToGoogleDoc(options: {
     return { docId, webViewLink };
   } catch (error: any) {
     if (error instanceof ExportFailed) throw error;
-    // Never log the parsed credentials; client_email is safe and is what
+    // A googleapis failure is typically a GaxiosError, which carries
+    // response.config — including the Authorization header, a live bearer
+    // token. Never pass the raw error to console.error: `error?.message ??
+    // error` only guards null/undefined, so a non-Error rejection would print
+    // the live object. Stringify first; client_email is safe and is what
     // identifies which service account needs access to the folder.
-    console.error(
-      `[googleDrive] export failed as ${creds.client_email}:`,
-      error?.message ?? error,
-    );
-    throw new ExportFailed(error?.message ?? "Google Drive rejected the export");
+    const detail = error instanceof Error ? error.message : String(error);
+    console.error(`[googleDrive] export failed as ${creds.client_email}:`, detail);
+    throw new ExportFailed(detail);
   }
 }

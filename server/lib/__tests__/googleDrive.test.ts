@@ -51,4 +51,12 @@ describe("isConfigured", () => {
     });
     expect(isConfigured()).toBe(true);
   });
+
+  it("is false when client_email is present but not a string", () => {
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({
+      client_email: 12345,
+      private_key: "-----BEGIN PRIVATE KEY-----\nx\n-----END PRIVATE KEY-----\n",
+    });
+    expect(isConfigured()).toBe(false);
+  });
 });
