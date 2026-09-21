@@ -8,6 +8,7 @@ import {
   contractors,
   warrantyTerms,
 } from "../../shared/schema";
+import { generateLLCName } from "../../shared/llcName";
 import { eq, ne, and, sql, desc } from "drizzle-orm";
 import { z } from "zod";
 import {
@@ -303,12 +304,14 @@ router.post("/projects", async (req, res) => {
     if (!llcId) {
       // Get site address from project details or project name
       const siteAddress = projectData.siteAddress || projectData.name || "New Project";
-      
-      // Generate LLC name: "DP [Street Name] LLC"
-      const streetMatch = siteAddress.match(/^\d+\s+(.+?)(?:,|\s+(?:St|Street|Ave|Avenue|Rd|Road|Dr|Drive|Blvd|Boulevard|Ln|Lane|Way|Ct|Court|Pl|Place))?/i);
-      const streetName = streetMatch ? streetMatch[1].trim() : siteAddress.split(',')[0].trim();
-      const llcName = `DP ${streetName} LLC`;
-      
+
+      // `llcs.name` is NOT NULL and unique, so a project with neither a site
+      // address nor a usable name keeps the placeholder this route has always
+      // inserted rather than writing an empty name.
+      const llcName =
+        generateLLCName(projectData.siteAddress || "", projectData.name) ||
+        "DP New Project LLC";
+
       console.log(`🏢 Auto-generating LLC: ${llcName} for project: ${projectData.name}`);
       
       const llcResult = await pool.query(
