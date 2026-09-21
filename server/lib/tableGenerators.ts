@@ -27,6 +27,7 @@ interface PricingSummary {
   projectBudget: number;
   contractValue: number;
   serviceModel?: string;
+  paymentSchedule?: PaymentMilestone[];
 }
 
 interface PaymentMilestone {
@@ -427,6 +428,26 @@ export interface A5Phase {
   milestones: { name: string; trigger: string; percentage: number; amount: number }[];
 }
 
+/**
+ * Re-prices a project-level payment schedule against `base`, which is the
+ * contract value less the design fee — the design fee is billed once on A.5's
+ * own Execution row, so leaving it inside the milestone base would bill it
+ * twice. The remainder from rounding lands on the last milestone, so the
+ * re-priced amounts sum to `base` exactly and the table's Total holds.
+ */
+function repriceAgainst(schedule: PaymentMilestone[], base: number): PaymentMilestone[] {
+  const totalPercentage = schedule.reduce((sum, m) => sum + m.percentage, 0);
+  if (totalPercentage <= 0) return schedule;
+
+  const repriced = schedule.map((m) => ({
+    ...m,
+    amount: Math.round((base * m.percentage) / totalPercentage),
+  }));
+  const remainder = base - repriced.reduce((sum, m) => sum + m.amount, 0);
+  repriced[repriced.length - 1].amount += remainder;
+  return repriced;
+}
+
 export function generateExhibitA5TableHtml(
   phases: A5Phase[] | null,
   pricingSummary: PricingSummary | null,
@@ -443,15 +464,44 @@ export function generateExhibitA5TableHtml(
     { cells: ['', '', 'Design Fee', 'Execution', '-', formatCurrency(breakdown.totalDesignFee), 'Immediate'] },
   ];
 
-  for (const phase of phases || []) {
-    const propertyCode = phase.properties.map((p) => p.propertyCode).join(', ');
-    for (const milestone of phase.milestones) {
+  let milestoneTotal = 0;
+  const isPhased = (phases?.length ?? 0) > 0;
+
+  if (isPhased) {
+    for (const phase of phases!) {
+      const propertyCode = phase.properties.map((p) => p.propertyCode).join(', ');
+      for (const milestone of phase.milestones) {
+        milestoneTotal += milestone.amount;
+        rows.push({
+          cells: [
+            propertyCode,
+            String(phase.phaseNumber),
+            milestone.name,
+            milestone.trigger,
+            `${milestone.percentage}%`,
+            formatCurrency(milestone.amount),
+            '',
+          ],
+        });
+      }
+    }
+  } else {
+    // A project with no phases — every project predating the phase model —
+    // has no per-phase milestones, and A.5 is the only place its payment terms
+    // appear now that the trailing {{PAYMENT_SCHEDULE_TABLE}} is gone. Without
+    // this the agreement states a price and no terms for paying it.
+    const schedule = repriceAgainst(
+      pricingSummary.paymentSchedule ?? [],
+      pricingSummary.contractValue - breakdown.totalDesignFee
+    );
+    for (const milestone of schedule) {
+      milestoneTotal += milestone.amount;
       rows.push({
         cells: [
-          propertyCode,
-          String(phase.phaseNumber),
+          '',
+          milestone.phase || '',
           milestone.name,
-          milestone.trigger,
+          '',
           `${milestone.percentage}%`,
           formatCurrency(milestone.amount),
           '',
@@ -460,8 +510,12 @@ export function generateExhibitA5TableHtml(
     }
   }
 
+  // Derived from the rows actually rendered, never from contractValue: a
+  // phase-less project and a partially-phased one both render line items that
+  // do not add up to it, and a Total the table contradicts is the defect this
+  // exhibit was rewired to fix.
   rows.push({
-    cells: ['', '', 'Total', '', '100%', formatCurrency(pricingSummary.contractValue), ''],
+    cells: ['', '', 'Total', '', '—', formatCurrency(breakdown.totalDesignFee + milestoneTotal), ''],
     isBold: true,
     isTotal: true,
   });
@@ -472,7 +526,9 @@ export function generateExhibitA5TableHtml(
       { header: 'Phase', align: 'left' },
       { header: 'Payment', align: 'left' },
       { header: 'Trigger', align: 'left' },
-      { header: '%', align: 'center' },
+      // Each phased percentage is of its own phase's value, not of the Total;
+      // the fallback's are of the contract value less the design fee.
+      { header: isPhased ? '% of Phase' : '% of Balance', align: 'center' },
       { header: 'Amount', align: 'right' },
       { header: 'Due', align: 'left' },
     ],
