@@ -510,7 +510,7 @@ Catch `NotConfigured` → 503 and `ExportFailed` → 502 (`{ error }`), so a Goo
 Every `/api` route is Cognito-gated, so drive the handler directly as the other plans in this repo did: import the router, walk `router.stack` for the path, call it with a fake `req`/`res`. Assert:
 
 - unset `GOOGLE_SERVICE_ACCOUNT_JSON` → 503, and **no Drive call is attempted**
-- a project whose number is not in Onedot and no fallback set → 409 naming the project number
+- a project whose number is not in Onedot → 409 naming the project number
 - an unreconciled project → 409 from the reconciliation gate, before any Drive call
 - a good project → 200 with a `webViewLink`, and the `contracts` row carries both new columns
 
@@ -561,7 +561,7 @@ Do not disable the button while the pricing query is loading; disable it only wh
 
 - [ ] **Step 3: Verify**
 
-Gates, then a browser pass: sign in, reach Step 9, export, and confirm the Doc appears **in that project's Onedot folder** — not in a fallback. Open it and check the contract renders as a document rather than as one long HTML blob.
+Gates, then a browser pass: sign in, reach Step 9, export, and confirm the Doc appears **in that project's Onedot folder**. Open it and check the contract renders as a document rather than as one long HTML blob.
 
 ```bash
 npm run check 2>&1 | grep -c "error TS"
