@@ -106,6 +106,23 @@ const LITERAL_REWIRINGS: { from: string; to: string; note: string }[] = [
 ];
 
 /**
+ * Holds after a row is processed, in every environment: A.5's generated table
+ * carries every phase's milestones, so a body keeping the project-level
+ * schedule as well bills the same money twice. The literal rewirings match
+ * exactly, and a production body differing by one newline would no-op that
+ * removal silently while A.5 was rewired around it.
+ */
+function assertScheduleBilledOnce(id: number, title: string, content: string): void {
+  if (content.includes("{{EXHIBIT_A5_TABLE}}") && content.includes("{{PAYMENT_SCHEDULE_TABLE}}")) {
+    throw new Error(
+      `exhibit ${id} (${title}) carries {{EXHIBIT_A5_TABLE}} and {{PAYMENT_SCHEDULE_TABLE}}: ` +
+        `the trailing project-level schedule did not match and was left in place. ` +
+        `Its surrounding whitespace differs from LITERAL_REWIRINGS — inspect the body by hand.`
+    );
+  }
+}
+
+/**
  * Replaces Exhibit A's hardcoded signature table with the resolved block.
  *
  * Deviates from the task brief's sketch, which replaced only the first <td>
@@ -196,56 +213,114 @@ function rewire(content: string, { heading, placeholder }: Rewiring): { content:
   };
 }
 
+/**
+ * Whether this body is one the script knows — it carries a heading, a row or
+ * the signature marker some rewiring targets, whether or not that rewiring has
+ * already been applied. Distinguishes "nothing here to do" (the Limited
+ * Warranty and State-Specific Provisions exhibits have no such section) from
+ * "this environment's bodies no longer look like the ones this script matches".
+ */
+function recognises(content: string): boolean {
+  return (
+    REWIRINGS.some((r) => content.includes(r.heading)) ||
+    CELL_REWIRINGS.some((c) => content.includes(`<td>${c.rowLabel}</td>`)) ||
+    content.includes("<p><strong>Accepted and agreed:</strong></p>") ||
+    content.includes("{{EXHIBIT_A_SIGNATURE_TABLE}}")
+  );
+}
+
+/** Every rewiring applied to one body, in the order the rules run. */
+function rewireBody(content: string): { content: string; applied: string[]; recognised: boolean } {
+  const recognised = recognises(content);
+  const applied: string[] = [];
+
+  for (const rewiring of REWIRINGS) {
+    const result = rewire(content, rewiring);
+    if (result.found && result.changed) applied.push(rewiring.heading);
+    content = result.content;
+  }
+
+  const rowRules = applyRowRules(content);
+  applied.push(...rowRules.applied);
+
+  return { content: rowRules.content, applied, recognised };
+}
+
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
   const writeSeed = process.argv.includes("--write-seed");
 
-  const { rows } = await pool.query(`SELECT id, title, content FROM exhibits ORDER BY id`);
+  // Scoped to MASTER_EF: these headings and literals are this agreement's, and
+  // an unscoped UPDATE could rewrite a similarly-worded body belonging to
+  // another contract type in an environment whose library has diverged.
+  const { rows } = await pool.query(
+    `SELECT id, title, content FROM exhibits
+      WHERE contract_types @> '["MASTER_EF"]'::jsonb
+      ORDER BY id`
+  );
   let changedRows = 0;
+  let recognisedRows = 0;
 
-  for (const row of rows) {
-    let content: string = row.content || "";
-    const applied: string[] = [];
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
 
-    for (const rewiring of REWIRINGS) {
-      const result = rewire(content, rewiring);
-      if (result.found && result.changed) applied.push(rewiring.heading);
-      if (!result.found) {
-        console.log(`  exhibit ${row.id} (${row.title}): heading not found: "${rewiring.heading}"`);
+    for (const row of rows) {
+      const { content, applied, recognised } = rewireBody(row.content || "");
+      assertScheduleBilledOnce(row.id, row.title, content);
+      if (recognised) recognisedRows++;
+
+      // One line per exhibit, listing what applied — the old per-heading "not
+      // found" logging printed ~60 lines per dry run, under which a genuine
+      // miss was invisible.
+      const summary = applied.length > 0 ? applied.join("; ") : recognised ? "already rewired" : "nothing to rewire";
+      console.log(`${dryRun ? "[dry-run] " : ""}exhibit ${row.id} (${row.title}): ${summary}`);
+
+      if (applied.length === 0) continue;
+      changedRows++;
+
+      if (!dryRun) {
+        await client.query(`UPDATE exhibits SET content = $1 WHERE id = $2`, [content, row.id]);
       }
-      content = result.content;
     }
 
-    const rowRules = applyRowRules(content);
-    content = rowRules.content;
-    applied.push(...rowRules.applied);
-
-    if (applied.length === 0) continue;
-    changedRows++;
-    console.log(`${dryRun ? "[dry-run] " : ""}exhibit ${row.id} (${row.title}): ${applied.length} section(s)`);
-    for (const heading of applied) console.log(`    ${heading}`);
-
-    if (!dryRun) {
-      await pool.query(`UPDATE exhibits SET content = $1 WHERE id = $2`, [content, row.id]);
-    }
+    await client.query(dryRun ? "ROLLBACK" : "COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
   }
 
-  console.log(`${changedRows} row(s) ${dryRun ? "would change" : "changed"}`);
+  console.log(`${rows.length} MASTER_EF exhibit(s) read, ${changedRows} ${dryRun ? "would change" : "changed"}`);
 
   if (writeSeed && !dryRun) {
     const path = "server/seed-data.json";
     const seed = JSON.parse(readFileSync(path, "utf8"));
     for (const exhibit of seed.exhibits) {
-      let content: string = exhibit.content || "";
-      for (const rewiring of REWIRINGS) content = rewire(content, rewiring).content;
-      content = applyRowRules(content).content;
+      const { content } = rewireBody(exhibit.content || "");
+      assertScheduleBilledOnce(exhibit.id ?? -1, exhibit.title ?? path, content);
       exhibit.content = content;
     }
     writeFileSync(path, `${JSON.stringify(seed, null, 2)}\n`);
     console.log(`${path} refreshed`);
   }
 
-  await pool.end();
+  // Deliberately not per-exhibit: the Limited Warranty and State-Specific
+  // Provisions exhibits carry no section any rewiring targets and never will,
+  // so failing on those would make the exit code permanently non-zero. What is
+  // an error is recognising nothing at all — the environment's bodies no
+  // longer look like the ones this script matches, and every UPDATE above was
+  // a silent no-op.
+  if (recognisedRows === 0) {
+    console.error(`No MASTER_EF exhibit carried any section this script rewires — bodies have diverged.`);
+    process.exitCode = 1;
+  }
 }
 
-main();
+main()
+  .catch((err) => {
+    console.error("Rewiring failed:", err);
+    process.exitCode = 1;
+  })
+  .finally(() => pool.end());
