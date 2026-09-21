@@ -640,6 +640,8 @@ export const contracts = pgTable("contracts", {
   filePath: text("file_path"),
   fileName: text("file_name"),
   fileHash: text("file_hash"), // For integrity verification
+  googleDocId: text("google_doc_id"),
+  googleDocUrl: text("google_doc_url"),
   
   // Variable Snapshot
   variablesSnapshot: text("variables_snapshot"), // JSON of all variables at generation time
