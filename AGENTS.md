@@ -38,11 +38,28 @@ Enterprise contract management platform for modular home construction (Dvele). A
 npm install
 cp .env.example .env        # set DATABASE_URL (required)
 npm run db:push             # push schema to DB
-npx tsx scripts/seed_mvp.ts
+npm run seed:dev            # org 1, base data, home models, template→exhibit junction
 npx tsx scripts/seed_variables.ts
 npx tsx scripts/seed-components.ts
 npm run dev                 # starts on port 5000
 ```
+
+`npm run seed:dev` (`scripts/seed_dev_fixtures.ts`) is what makes the wizard reachable.
+It calls `seedProductionData` — which skips any table that already has rows — and then
+adds the two things that function does **not** cover:
+
+- **`home_models`**, without which Step 1 has nothing to select, so no project can be
+  priced and Steps 4, 6 and 7 cannot be reached.
+- **`template_exhibits`**, the junction `fetchExhibitsForContract` keys off. Without it a
+  generated contract silently contains **no exhibits at all**.
+
+It is idempotent and never overwrites an existing home model, so re-running it is safe
+and a locally edited price survives. It exits non-zero if a template resolves no
+exhibits, because that state generates an exhibit-less contract without erroring.
+
+**Do not use `scripts/seed_mvp.ts`.** It reads `process.env.DATABASE_URL` without
+importing dotenv and references a `users` table that no longer exists in
+`shared/schema.ts`.
 
 Key env vars: `DATABASE_URL`, `NODE_ENV`, `PORT` (default 5000), `AWS_S3_BUCKET`, `AWS_REGION`, `ENABLE_SCHEDULED_JOBS`, `PUPPETEER_EXECUTABLE_PATH`
 

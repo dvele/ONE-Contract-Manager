@@ -265,11 +265,23 @@ than fixed because fixing them unverified buys nothing.
 
 Unrelated to this work, but they cost a day and will cost the next person the same.
 
-- **The documented dev setup fails on a clean machine.** `AGENTS.md` says to run
-  `npx tsx scripts/seed_mvp.ts`. That script reads `process.env.DATABASE_URL` without
-  importing dotenv, so `pg` falls back to a database named after the OS user; and it
-  references a `users` table that no longer exists in `shared/schema.ts`. Work around
-  it by exporting `DATABASE_URL` and inserting the `organizations` row by hand.
+- **The documented dev setup failed on a clean machine — fixed 2026-09-21.**
+  `scripts/seed_mvp.ts` reads `process.env.DATABASE_URL` without importing dotenv, so
+  `pg` falls back to a database named after the OS user, and it references a `users`
+  table that no longer exists in `shared/schema.ts`. `npm run seed:dev`
+  (`scripts/seed_dev_fixtures.ts`) replaces it and `AGENTS.md` now points there.
+
+  The deeper gap it closes: `seedProductionData` covers clauses, exhibits, templates and
+  template clauses but **not `home_models` and not `template_exhibits`**. With no home
+  models Step 1 has nothing to select, so no project can be priced and Steps 4, 6 and 7
+  are unreachable; with no junction rows `fetchExhibitsForContract` returns nothing and a
+  generated contract silently carries **no exhibits at all**. Both failures look like app
+  bugs rather than missing fixtures, which is what made them expensive. The new script
+  resolves the junction from `exhibits.contract_types` and `exhibits.sort_order` rather
+  than by id, so it seeds any environment; it is idempotent; and it exits non-zero when a
+  template resolves no exhibits.
+
+  `scripts/seed_mvp.ts` is left in place but should not be used.
 - Homebrew Postgres names its superuser after the OS user, not `postgres`, which the
   committed `.env` expects. `createuser -s postgres` fixes it.
 
@@ -379,12 +391,12 @@ Unrelated to this work, but they cost a day and will cost the next person the sa
    `paymentSchedule` against `contractValue − designFee` so the design fee stays billed
    once. See §9 for what remains open after that.
 
-   Two prerequisites the comparison had to supply, both absent from the seeder and
-   **both still absent** — check them before trusting any deployed generation:
-   `template_exhibits` is empty, so `fetchExhibitsForContract` returns nothing and a
-   generated contract carries **no exhibits at all** until the junction is populated
-   (MASTER_EF template 26 → exhibits 78–83; ONE template 24 → 71–77); and `home_models`
-   is empty, so no project can be priced. Separately,
+   Two prerequisites the comparison had to supply, both absent from `seedProductionData`:
+   `template_exhibits`, without which `fetchExhibitsForContract` returns nothing and a
+   generated contract carries **no exhibits at all**; and `home_models`, without which no
+   project can be priced. **Both are now seeded by `npm run seed:dev`** (§5) — but that
+   only fixes environments where it has been run. **Check both in staging before trusting
+   any deployed generation**, because nothing in the deploy path runs it. Separately,
    `POST /contracts/draft-preview` ignores `req.body.templateId` and never calls
    `resolveTemplateId` — it reads `template_id` only off the newest saved `contracts`
    row, so the first preview of a project renders with no exhibits.
