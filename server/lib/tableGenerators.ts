@@ -376,59 +376,48 @@ export function generateExhibitA4TableHtml(
   });
 }
 
+/** One phase as `buildPhaseRollups` returns it; only the fields A.5 renders. */
+export interface A5Phase {
+  phaseNumber: number;
+  properties: { propertyCode: string }[];
+  milestones: { name: string; trigger: string; percentage: number; amount: number }[];
+}
+
 export function generateExhibitA5TableHtml(
-  paymentSchedule: PaymentMilestone[] | null,
+  phases: A5Phase[] | null,
   pricingSummary: PricingSummary | null,
   serviceModel: string
 ): string {
-  const isCMOS = serviceModel === 'CMOS';
-
   if (!pricingSummary) return 'No pricing data available.';
 
   const { breakdown } = pricingSummary;
-  const totalBase = breakdown.totalDesignFee + breakdown.totalOffsite +
-    (breakdown.totalShipping || 0) + (isCMOS ? breakdown.totalOnsite : 0);
 
-  const milestones = [
-    { payment: 'Design Fee', trigger: 'Execution', pct: '-', amount: formatCurrency(breakdown.totalDesignFee), due: 'Immediate' },
-    ...(paymentSchedule || [])
-      .filter(m => m.name.toLowerCase() !== 'design fee' && m.name.toLowerCase() !== 'deposit')
-      .map(m => ({
-        payment: m.name,
-        trigger: getMilestoneTrigger(m.name),
-        pct: m.percentage + '%',
-        amount: formatCurrencyWhole(m.amount / 100),
-        due: ''
-      }))
+  // The design fee is billed once, on its own Execution row. Every phase's
+  // milestones divide that phase's value, which excludes it by construction —
+  // so this row and those rows cannot overlap.
+  const rows: { cells: string[]; isBold?: boolean; isTotal?: boolean }[] = [
+    { cells: ['', '', 'Design Fee', 'Execution', '-', formatCurrency(breakdown.totalDesignFee), 'Immediate'] },
   ];
 
-  if (!paymentSchedule || paymentSchedule.length === 0) {
-    const remainingAfterDesign = totalBase - breakdown.totalDesignFee;
-    const defaultMilestones = [
-      { name: 'Green Light Deposit', pct: 20, trigger: 'Green Light Notice' },
-      { name: 'Factory Start', pct: 20, trigger: 'First module fabrication' },
-      { name: 'Factory Completion', pct: 20, trigger: 'Dvele certification' },
-      { name: 'Delivery / Set', pct: 15, trigger: 'Delivery/set complete' },
-      { name: 'Retainage', pct: 5, trigger: 'CO/Equivalent' },
-    ];
-    for (const ms of defaultMilestones) {
-      milestones.push({
-        payment: ms.name,
-        trigger: ms.trigger,
-        pct: ms.pct + '%',
-        amount: formatCurrency(Math.round(remainingAfterDesign * ms.pct / 100 * 100)),
-        due: ''
+  for (const phase of phases || []) {
+    const propertyCode = phase.properties.map((p) => p.propertyCode).join(', ');
+    for (const milestone of phase.milestones) {
+      rows.push({
+        cells: [
+          propertyCode,
+          String(phase.phaseNumber),
+          milestone.name,
+          milestone.trigger,
+          `${milestone.percentage}%`,
+          formatCurrency(milestone.amount),
+          '',
+        ],
       });
     }
   }
 
-  const rows: { cells: string[]; isBold?: boolean; isTotal?: boolean }[] = milestones.map(m => ({
-    cells: ['P-1', '1', m.payment, m.trigger, m.pct, m.amount, m.due],
-  }));
-
-  const totalAmount = formatCurrency(totalBase);
   rows.push({
-    cells: ['', '', 'Total', '', '100%', totalAmount, ''],
+    cells: ['', '', 'Total', '', '100%', formatCurrency(pricingSummary.contractValue), ''],
     isBold: true,
     isTotal: true,
   });
@@ -445,17 +434,6 @@ export function generateExhibitA5TableHtml(
     ],
     rows,
   });
-}
-
-function getMilestoneTrigger(name: string): string {
-  const n = name.toLowerCase();
-  if (n.includes('green light') || n.includes('deposit')) return 'Green Light Notice';
-  if (n.includes('factory start') || n.includes('production')) return 'First module fabrication';
-  if (n.includes('factory comp') || n.includes('certification')) return 'Dvele certification';
-  if (n.includes('delivery') || n.includes('set')) return 'Delivery/set complete';
-  if (n.includes('retainage') || n.includes('co/')) return 'CO/Equivalent';
-  if (n.includes('completion')) return 'Issuance';
-  return '';
 }
 
 export function generateExhibitB1TableHtml(
