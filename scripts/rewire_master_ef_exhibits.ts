@@ -103,6 +103,15 @@ const LITERAL_REWIRINGS: { from: string; to: string; note: string }[] = [
     to: "",
     note: "A.5 manual-entry note, obsolete once the table is generated",
   },
+  {
+    // SITE_ADDRESS already resolves to a complete address through
+    // buildFullAddress, so A.1's Site(s) row printed the city, state and zip
+    // twice. The duplication is the template's, not the variable's — other
+    // callers depend on SITE_ADDRESS resolving exactly as it does.
+    from: "<td>{{SITE_ADDRESS}}, {{SITE_CITY}}, {{SITE_STATE}} {{SITE_ZIP}}</td>",
+    to: "<td>{{SITE_ADDRESS}}</td>",
+    note: "A.1 site address printed twice",
+  },
 ];
 
 /**
