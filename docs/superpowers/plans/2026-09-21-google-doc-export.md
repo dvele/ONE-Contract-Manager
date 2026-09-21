@@ -39,12 +39,13 @@ Settled 2026-09-21. Each of these was a real fork.
 
 ## Configuration
 
-One new secret and one optional fallback:
+One new secret:
 
 ```
 GOOGLE_SERVICE_ACCOUNT_JSON=   # the whole key JSON, one line
-GOOGLE_DRIVE_FALLBACK_FOLDER_ID=   # optional: used when a project has no Onedot folder
 ```
+
+> **`GOOGLE_DRIVE_FALLBACK_FOLDER_ID` was removed by ruling during the fix wave.** It was a substituted default for the one input that decides where a legal agreement is filed, which this plan's own Global Constraints forbid; the export now refuses instead of misfiling.
 
 `GOOGLE_DRIVE_ID` is **not** needed — `files.create` with `parents: [folderId]` and `supportsAllDrives: true` writes into a known folder without the drive id.
 
@@ -487,21 +488,7 @@ Order of operations, each failing with its own message:
 3. `reconciliationRefusal` → 409, unchanged from the other entry points.
 4. Folder resolution:
 
-```ts
-    const onedotProjects = await fetchOnedotProjects();
-    const folderId =
-      findFolderId(onedotProjects, project.projectNumber) ??
-      process.env.GOOGLE_DRIVE_FALLBACK_FOLDER_ID ??
-      null;
-
-    if (!folderId) {
-      return res.status(409).json({
-        error:
-          `No Google Drive folder for project ${project.projectNumber}. ` +
-          `Add one in Onedot, or set GOOGLE_DRIVE_FALLBACK_FOLDER_ID.`,
-      });
-    }
-```
+Superseded by the fix wave — see `server/routes/contracts.ts`. The project number is normalized with `onedotProjectNumber()` first, a number that is only a draft placeholder and a project Onedot has no folder for get distinct 409s, and a failure to reach Onedot returns 502 rather than falling through to the outer 500. There is no fallback folder.
 
 5. Generate the HTML, export, persist, return `{ docId, webViewLink }`.
 
