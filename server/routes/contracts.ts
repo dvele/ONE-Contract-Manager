@@ -749,6 +749,10 @@ router.get("/contracts", async (req, res) => {
         generatedAt: string;
         templateVersion: number | null;
         currentTemplateVersion: number | null;
+        // Carried through so a list view can link straight to the exported
+        // document. The select reads it; without it here the package mapping
+        // silently drops it and every row reports null.
+        googleDocUrl: string | null;
       }>;
     }>();
     
@@ -781,6 +785,7 @@ router.get("/contracts", async (req, res) => {
         generatedAt: c.generatedAt?.toISOString() || '',
         templateVersion: c.templateVersion ?? null,
         currentTemplateVersion: c.currentTemplateVersion ?? null,
+        googleDocUrl: c.googleDocUrl ?? null,
       };
       
       if (existing) {
