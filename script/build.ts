@@ -58,6 +58,31 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  // Maintenance scripts, bundled so they can run in the deployed container.
+  //
+  // `scripts/` is TypeScript and imports from `server/`, neither of which
+  // reaches the runtime image — it copies only `dist`, `shared`,
+  // drizzle.config.ts and the entrypoint, and installs production deps, so tsx
+  // is absent too. Without this there is no way to run a one-off maintenance
+  // task against staging, whose database is private to the VPC.
+  //
+  // Not minified: these are read when something has gone wrong, and a
+  // stack trace that names real functions is worth more than the bytes.
+  console.log("building maintenance scripts...");
+  await esbuild({
+    entryPoints: ["scripts/rewire_master_ef_exhibits.ts"],
+    platform: "node",
+    bundle: true,
+    format: "cjs",
+    outfile: "dist/scripts/rewire-master-ef-exhibits.cjs",
+    define: {
+      "process.env.NODE_ENV": '"production"',
+    },
+    minify: false,
+    external: externals,
+    logLevel: "info",
+  });
 }
 
 buildAll().catch((err) => {
