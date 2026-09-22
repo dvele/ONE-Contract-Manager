@@ -33,7 +33,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { useState, useCallback } from "react";
-import { Eye } from "lucide-react";
+import { Eye, ExternalLink } from "lucide-react";
 
 // HTML escape function for XSS protection
 const escapeHtml = (text: string): string => {
@@ -176,6 +176,9 @@ interface Contract {
   templateVersion: number | null;
   currentTemplateVersion: number | null;
   fileName: string;
+  /** Set once the contract has been exported; the link survives the session. */
+  googleDocId?: string | null;
+  googleDocUrl?: string | null;
   filePath: string;
   notes: string;
   projectName?: string;
@@ -557,6 +560,16 @@ export default function ContractDetail() {
             <Eye className="mr-2 h-4 w-4" />
             {isGenerating ? "Generating..." : "View PDF"}
           </Button>
+          {/* Only once an export has happened: the contract stores the link,
+              so it survives the session that created it. */}
+          {contract?.googleDocUrl && (
+            <Button variant="outline" asChild data-testid="link-view-google-doc">
+              <a href={contract.googleDocUrl} target="_blank" rel="noreferrer">
+                <ExternalLink className="mr-2 h-4 w-4" />
+                View Google Doc
+              </a>
+            </Button>
+          )}
           <Button
             onClick={handleDownload}
             disabled={isGenerating || !contract?.projectId}

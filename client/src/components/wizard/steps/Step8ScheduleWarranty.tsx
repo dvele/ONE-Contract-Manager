@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Shield, Scale, Calendar, Clock, Info } from 'lucide-react';
 import { ResponsibilityMatrix } from '../ResponsibilityMatrix';
+import { addDays, addMonths, formatProjectDate, parseProjectDate } from '@/lib/projectDates';
 
 export const Step8ScheduleWarranty: React.FC = () => {
   const { 
@@ -55,13 +56,7 @@ export const Step8ScheduleWarranty: React.FC = () => {
     }
   }, []);
   
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
-  };
+  const formatDate = formatProjectDate;
   
   const totalDays = (projectData.designPhaseDays || 0) + 
                     (projectData.manufacturingDurationDays || 0) + 
@@ -74,16 +69,11 @@ export const Step8ScheduleWarranty: React.FC = () => {
   const projectDates = useMemo(() => {
     if (!projectData.effectiveDate) return null;
     
-    const startDate = new Date(projectData.effectiveDate);
-    const designComplete = new Date(startDate);
-    designComplete.setDate(designComplete.getDate() + (projectData.designPhaseDays || 0));
-    
-    const mfgComplete = new Date(designComplete);
-    mfgComplete.setDate(mfgComplete.getDate() + (projectData.manufacturingDurationDays || 0));
-    
-    const projectComplete = new Date(mfgComplete);
-    projectComplete.setDate(projectComplete.getDate() + (projectData.onsiteDurationDays || 0));
-    
+    const startDate = parseProjectDate(projectData.effectiveDate);
+    const designComplete = addDays(startDate, projectData.designPhaseDays || 0);
+    const mfgComplete = addDays(designComplete, projectData.manufacturingDurationDays || 0);
+    const projectComplete = addDays(mfgComplete, projectData.onsiteDurationDays || 0);
+
     return { startDate, designComplete, mfgComplete, projectComplete };
   }, [
     projectData.effectiveDate,
@@ -95,15 +85,10 @@ export const Step8ScheduleWarranty: React.FC = () => {
   const warrantyDates = useMemo(() => {
     if (!projectDates) return null;
     
-    const fitFinishExpires = new Date(projectDates.projectComplete);
-    fitFinishExpires.setMonth(fitFinishExpires.getMonth() + (projectData.warrantyFitFinishMonths || 24));
-    
-    const envelopeExpires = new Date(projectDates.projectComplete);
-    envelopeExpires.setMonth(envelopeExpires.getMonth() + (projectData.warrantyBuildingEnvelopeMonths || 60));
-    
-    const structuralExpires = new Date(projectDates.projectComplete);
-    structuralExpires.setMonth(structuralExpires.getMonth() + (projectData.warrantyStructuralMonths || 120));
-    
+    const fitFinishExpires = addMonths(projectDates.projectComplete, projectData.warrantyFitFinishMonths || 24);
+    const envelopeExpires = addMonths(projectDates.projectComplete, projectData.warrantyBuildingEnvelopeMonths || 60);
+    const structuralExpires = addMonths(projectDates.projectComplete, projectData.warrantyStructuralMonths || 120);
+
     return { fitFinishExpires, envelopeExpires, structuralExpires };
   }, [
     projectDates,

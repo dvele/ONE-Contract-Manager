@@ -7,3 +7,9 @@ vite.config.ts.*
 .env
 generated_contracts/
 *.db
+.claude/worktrees/
+
+# Service-account keys. Deployed containers read GOOGLE_SERVICE_ACCOUNT_JSON
+# from the task definition, so nothing here is ever needed to build or run —
+# the file option exists only for local dev.
+creds/

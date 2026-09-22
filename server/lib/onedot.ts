@@ -47,6 +47,41 @@ export function findFolderId(
   return match?.google_drive_folder?.trim() || null;
 }
 
+/** The folder for the Onedot record with this id, or null. */
+export function findFolderByOnedotId(
+  projects: OnedotProject[],
+  odooProjectId: number | null | undefined,
+): string | null {
+  if (odooProjectId == null) return null;
+  const match = projects.find((p) => p.id === odooProjectId);
+  return match?.google_drive_folder?.trim() || null;
+}
+
+/**
+ * The project's Drive folder, by the strongest key available.
+ *
+ * `projects.odooProjectId` is written when the user picks a project from the
+ * Onedot combobox, so it names the record they actually chose. The project
+ * number is the fallback, and a weak one: the wizard suffixes it with
+ * `-DRAFT-…`, it collides under a UNIQUE constraint so only the first package
+ * keeps the clean value, and a generated number (`2026-001`, four-digit year)
+ * matches no Onedot row at all — Onedot's own numbers are `25-002`.
+ *
+ * The fallback still runs when the id is absent (every project created before
+ * the id was persisted), stale, or points at one of the projects Onedot has no
+ * folder for.
+ */
+export function resolveFolderId(
+  projects: OnedotProject[],
+  odooProjectId: number | null | undefined,
+  projectNumber: string | null | undefined,
+): string | null {
+  return (
+    findFolderByOnedotId(projects, odooProjectId) ??
+    findFolderId(projects, onedotProjectNumber(projectNumber))
+  );
+}
+
 export async function fetchOnedotProjects(): Promise<OnedotProject[]> {
   const apiKey = process.env.ONEDOT_API_KEY;
   if (!apiKey) throw new Error("ONEDOT_API_KEY is not set");

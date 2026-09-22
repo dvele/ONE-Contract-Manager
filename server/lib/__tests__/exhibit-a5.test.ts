@@ -145,6 +145,52 @@ describe("generateExhibitA5TableHtml", () => {
     });
   });
 
+  describe("the Total states the sum of the rows for amounts that do not divide evenly", () => {
+    /**
+     * Every fixture above splits into whole dollars, so the Total agreed with
+     * its rows whether it was derived from them or from exact cents. A phase
+     * value with cents does not: each row is rounded to whole dollars on its
+     * own, and a Total taken from the unrounded cents lands a dollar or three
+     * away from the column printed above it.
+     *
+     * 13,197,400.00 over three phases is the Zaca Preserve shape — two phases
+     * of 2/7 and one of 3/7, none of which is a whole number of dollars.
+     */
+    function unevenPhase(phaseNumber: number, propertyCode: string, phaseValue: number) {
+      const pct = (p: number) => ({
+        name: `Milestone ${p}`,
+        trigger: "Trigger",
+        percentage: p,
+        amount: Math.round((phaseValue * p) / 100),
+      });
+      return {
+        ...phase(phaseNumber, propertyCode, phaseValue),
+        milestones: [pct(20), pct(20), pct(20), pct(20), pct(15), pct(5)],
+      };
+    }
+
+    const UNEVEN = [
+      unevenPhase(1, "P-1, P-2", 377_068_571),
+      unevenPhase(2, "P-3, P-4", 377_068_571),
+      unevenPhase(3, "P-5, P-6, P-7", 565_602_857),
+    ];
+
+    it("for phase values that carry cents", () => {
+      const { rows, total } = rowsAndTotal(generateExhibitA5TableHtml(UNEVEN, SUMMARY, "CMOS"));
+      expect(rows.reduce((sum, f) => sum + f, 0)).toBe(total);
+    });
+
+    it("still states the rounded value of the money it represents", () => {
+      // Making the Total the sum of independently rounded rows fixes A.5's
+      // internal contradiction but moves it outward: A.4 prints the contract
+      // value rounded once, so the two exhibits then disagree by a dollar.
+      // 200,000.00 + 3,770,685.71 + 3,770,685.71 + 5,656,028.57 = 13,397,399.99.
+      const exactCents = 200_000_00 + 377_068_571 + 377_068_571 + 565_602_857;
+      const { total } = rowsAndTotal(generateExhibitA5TableHtml(UNEVEN, SUMMARY, "CMOS"));
+      expect(total).toBe(Math.round(exactCents / 100));
+    });
+  });
+
   describe("the percentage column", () => {
     it("names the denominator each phased percentage is taken against", () => {
       const html = generateExhibitA5TableHtml(PHASES, SUMMARY, "CRC");

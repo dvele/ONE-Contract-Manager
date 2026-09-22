@@ -132,8 +132,8 @@ export const Step1ProjectInfo: React.FC = () => {
               <OdooProjectCombobox
                 projects={odooProjects}
                 isLoading={odooLoading}
-                onSelect={(projectNumber, projectName) => {
-                  updateProjectData({ projectNumber, projectName });
+                onSelect={(projectNumber, projectName, odooProjectId) => {
+                  updateProjectData({ projectNumber, projectName, odooProjectId });
                 }}
                 onManualEntry={() => setMode('manual')}
               />

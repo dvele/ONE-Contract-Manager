@@ -443,6 +443,39 @@ export interface A5Phase {
  * twice. The remainder from rounding lands on the last milestone, so the
  * re-priced amounts sum to `base` exactly and the table's Total holds.
  */
+/** The Amount column's index in A.5, and its placeholder until amounts are allocated. */
+const A5_AMOUNT_CELL = 5;
+const AMOUNT_PENDING = '';
+
+/**
+ * Splits an exact cents figure across rows as whole dollars.
+ *
+ * Rounding each row on its own leaves the column short of, or over, its own
+ * Total by a dollar or three — the printed figures then contradict the printed
+ * sum. Rounding the exact total once instead keeps A.4 and A.5 agreeing but
+ * makes A.5 contradict itself. Largest remainder does both: every row is its
+ * own value to the nearest dollar, the column sums to the Total, and the Total
+ * is the exact money rounded once.
+ *
+ * The residual goes to the rows with the largest fractional parts, so the rows
+ * moved are the ones already closest to rounding up.
+ */
+function allocateWholeDollars(amountsInCents: number[]): number[] {
+  const exact = amountsInCents.map((cents) => cents / 100);
+  const allocated = exact.map((dollars) => Math.floor(dollars));
+  const target = Math.round(amountsInCents.reduce((sum, cents) => sum + cents, 0) / 100);
+
+  let residual = target - allocated.reduce((sum, dollars) => sum + dollars, 0);
+  const byFraction = exact
+    .map((dollars, index) => ({ index, fraction: dollars - Math.floor(dollars) }))
+    .sort((a, b) => b.fraction - a.fraction);
+
+  for (let i = 0; i < byFraction.length && residual > 0; i++, residual--) {
+    allocated[byFraction[i].index] += 1;
+  }
+  return allocated;
+}
+
 function repriceAgainst(schedule: PaymentMilestone[], base: number): PaymentMilestone[] {
   const totalPercentage = schedule.reduce((sum, m) => sum + m.percentage, 0);
   if (totalPercentage <= 0) return schedule;
@@ -469,17 +502,20 @@ export function generateExhibitA5TableHtml(
   // milestones divide that phase's value, which excludes it by construction —
   // so this row and those rows cannot overlap.
   const rows: { cells: string[]; isBold?: boolean; isTotal?: boolean }[] = [
-    { cells: ['', '', 'Design Fee', 'Execution', '-', formatCurrency(breakdown.totalDesignFee), 'Immediate'] },
+    { cells: ['', '', 'Design Fee', 'Execution', '-', AMOUNT_PENDING, 'Immediate'] },
   ];
 
-  let milestoneTotal = 0;
+  // Amounts are collected in cents and converted together, below: rounding each
+  // row on its own makes the column disagree with its own Total, and rounding
+  // their sum once makes the Total disagree with A.4.
+  const amountsInCents: number[] = [breakdown.totalDesignFee];
   const isPhased = (phases?.length ?? 0) > 0;
 
   if (isPhased) {
     for (const phase of phases!) {
       const propertyCode = phase.properties.map((p) => p.propertyCode).join(', ');
       for (const milestone of phase.milestones) {
-        milestoneTotal += milestone.amount;
+        amountsInCents.push(milestone.amount);
         rows.push({
           cells: [
             propertyCode,
@@ -487,7 +523,7 @@ export function generateExhibitA5TableHtml(
             milestone.name,
             milestone.trigger,
             `${milestone.percentage}%`,
-            formatCurrency(milestone.amount),
+            AMOUNT_PENDING,
             '',
           ],
         });
@@ -503,7 +539,7 @@ export function generateExhibitA5TableHtml(
       pricingSummary.contractValue - breakdown.totalDesignFee
     );
     for (const milestone of schedule) {
-      milestoneTotal += milestone.amount;
+      amountsInCents.push(milestone.amount);
       rows.push({
         cells: [
           '',
@@ -511,19 +547,24 @@ export function generateExhibitA5TableHtml(
           milestone.name,
           '',
           `${milestone.percentage}%`,
-          formatCurrency(milestone.amount),
+          AMOUNT_PENDING,
           '',
         ],
       });
     }
   }
 
+  const wholeDollars = allocateWholeDollars(amountsInCents);
+  wholeDollars.forEach((dollars, index) => {
+    rows[index].cells[A5_AMOUNT_CELL] = formatCurrencyWhole(dollars);
+  });
+
   // Derived from the rows actually rendered, never from contractValue: a
   // phase-less project and a partially-phased one both render line items that
   // do not add up to it, and a Total the table contradicts is the defect this
   // exhibit was rewired to fix.
   rows.push({
-    cells: ['', '', 'Total', '', '—', formatCurrency(breakdown.totalDesignFee + milestoneTotal), ''],
+    cells: ['', '', 'Total', '', '—', formatCurrencyWhole(wholeDollars.reduce((sum, d) => sum + d, 0)), ''],
     isBold: true,
     isTotal: true,
   });
@@ -610,13 +651,19 @@ export function generateResponsibilityMatrixHtml(
     return '<p style="font-style: italic; color: #666;">Responsibility matrix not configured.</p>';
   }
 
-  // Inline SVG check mark — does not depend on a font having the U+2713 glyph,
-  // which the slim PDF-rendering container lacks (renders as tofu boxes otherwise).
+  // A character, not an SVG: Drive's HTML-to-Docs conversion drops `<svg>`
+  // outright, so the exported Google Doc showed a matrix that allocated
+  // nothing — under a C.5 saying responsibilities are allocated "exclusively
+  // as set forth in this Exhibit C". A probe through a real conversion found
+  // every text marker survives and both `<svg>` and CSS-drawn boxes do not.
+  //
+  // The glyph is why this was an SVG before: fonts-liberation has no U+2713 and
+  // the PDF printed tofu. The container now installs fonts-dejavu-core, named
+  // first here so the PDF resolves the glyph; Docs has its own coverage and
+  // ignores the stack.
   const checkMark =
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" ' +
-    'xmlns="http://www.w3.org/2000/svg" style="display:inline-block;vertical-align:middle;">' +
-    '<path d="M5 13l4 4L19 7" stroke="#1a73e8" stroke-width="3" ' +
-    'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    '<span style="font-family: \'DejaVu Sans\', Arial, sans-serif; color: #1a73e8;">' +
+    '✓</span>';
   const categories = new Map<string, ResponsibilityMatrixItem[]>();
   for (const item of matrixItems) {
     const cat = item.category || 'General';

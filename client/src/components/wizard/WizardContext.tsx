@@ -124,6 +124,14 @@ export interface ResponsibilityItem {
 // Project data interface
 export interface ProjectData {
   projectNumber: string;
+  /**
+   * The Onedot record id, set when the user picks a project from the combobox
+   * in Step 1. It is what resolves the project's Google Drive folder at export
+   * time; the project number is only a fallback, and the wizard's draft
+   * suffixing and number regeneration both break it. Null for a project
+   * entered by hand, which has no Onedot record to link to.
+   */
+  odooProjectId: number | null;
   projectName: string;
   projectType: string;
   totalUnits: number;
@@ -360,6 +368,7 @@ export interface WizardContextType {
 // Initial project data
 export const initialProjectData: ProjectData = {
   projectNumber: '',
+  odooProjectId: null,
   projectName: '',
   projectType: 'Single Family Residence',
   totalUnits: 1,
@@ -484,6 +493,7 @@ export const initialProjectData: ProjectData = {
 // Test draft data pre-filled through Step 8 for faster testing
 export const testDraftData: Partial<ProjectData> = {
   projectNumber: 'TEST-2026-001',
+  odooProjectId: null,
   projectName: 'Sample Test Project',
   projectType: 'Single Family',
   totalUnits: 1,
@@ -640,6 +650,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         const loadedData: Partial<ProjectData> = {
           projectName: project?.name || '',
           projectNumber: project?.projectNumber || '',
+          odooProjectId: project?.odooProjectId ?? null,
           serviceModel: project?.onSiteSelection || 'CRC',
           contractType: project?.contractType === 'MASTER_EF' ? 'MASTER_EF' : 'MASTER_EF',
           buyerType: project?.buyerType || 'end_customer',
@@ -1078,6 +1089,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
       // Project basics
       projectName: pd.projectName,
       projectNumber: pd.projectNumber,
+      odooProjectId: pd.odooProjectId,
       serviceModel: pd.serviceModel,
       contractType: pd.contractType,
       buyerType: pd.buyerType,
@@ -1178,6 +1190,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         
         const projectPayload = {
           projectNumber: draftProjectNumber,
+          odooProjectId: pd.odooProjectId ?? null,
           name: pd.projectName,
           status: 'Draft',
           state: pd.siteState || null,
@@ -1768,6 +1781,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
       // Create project record
       const projectPayload = {
         projectNumber: draftProjectNumber,
+        odooProjectId: pd.odooProjectId ?? null,
         name: pd.projectName,
         status: 'Draft',
         state: pd.siteState || null,
@@ -1983,6 +1997,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         // Use existing draft project - just update it
         const projectPayload = {
           projectNumber: pd.projectNumber,
+          odooProjectId: pd.odooProjectId ?? null,
           name: pd.projectName,
           status: 'Draft',
           state: pd.siteState,
@@ -2003,6 +2018,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         // Create new project
         const projectPayload = {
           projectNumber: pd.projectNumber,
+          odooProjectId: pd.odooProjectId ?? null,
           name: pd.projectName,
           status: 'Draft',
           state: pd.siteState,

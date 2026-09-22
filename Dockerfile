@@ -27,10 +27,16 @@ ENV NODE_ENV=production \
 
 # Chromium for Puppeteer PDF generation. apt resolves the bulk of Chromium's
 # shared-lib dependencies automatically; fonts-liberation avoids blank glyphs.
+#
+# fonts-dejavu-core carries U+2713, which fonts-liberation does not. Exhibit
+# C.2's allocation marks are that character: without this package the PDF
+# prints tofu boxes, which is what drove them to an inline SVG that Drive's
+# HTML-to-Docs conversion then dropped, emptying C.2 in every exported Doc.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         chromium \
         fonts-liberation \
+        fonts-dejavu-core \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 

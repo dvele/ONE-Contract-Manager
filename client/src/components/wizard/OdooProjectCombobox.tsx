@@ -16,7 +16,12 @@ export interface OdooProject {
 interface Props {
   projects: OdooProject[];
   isLoading: boolean;
-  onSelect: (projectNumber: string, projectName: string) => void;
+  /**
+   * `odooProjectId` is the Onedot record id. It is persisted on the project and
+   * is what resolves the Google Drive folder at export time — the project
+   * number is a fallback that draft suffixes and regeneration can break.
+   */
+  onSelect: (projectNumber: string, projectName: string, odooProjectId: number) => void;
   onManualEntry: () => void;
 }
 
@@ -59,7 +64,7 @@ export function OdooProjectCombobox({ projects, isLoading, onSelect, onManualEnt
                     onSelect={() => {
                       setSelectedId(project.id);
                       setOpen(false);
-                      onSelect(project.projectNumber, project.projectName);
+                      onSelect(project.projectNumber, project.projectName, project.id);
                     }}
                   >
                     <Check

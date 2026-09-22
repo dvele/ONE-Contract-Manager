@@ -686,6 +686,8 @@ router.get("/contracts", async (req, res) => {
         generatedBy: contracts.generatedBy,
         templateVersion: contracts.templateVersion,
         fileName: contracts.fileName,
+        googleDocId: contracts.googleDocId,
+        googleDocUrl: contracts.googleDocUrl,
         notes: contracts.notes,
         projectName: projects.name,
         projectNumber: projects.projectNumber,
@@ -985,6 +987,8 @@ router.get("/contracts/:id", async (req, res) => {
         templateId: contracts.templateId,
         templateVersion: contracts.templateVersion,
         fileName: contracts.fileName,
+        googleDocId: contracts.googleDocId,
+        googleDocUrl: contracts.googleDocUrl,
         filePath: contracts.filePath,
         notes: contracts.notes,
         projectName: projects.name,
@@ -1590,22 +1594,36 @@ router.post("/contracts/export-google-doc", async (req, res) => {
     const exportRefusal = await reconciliationRefusal(pricingSummary);
     if (exportRefusal) return res.status(409).json(exportRefusal);
 
-    const { fetchOnedotProjects, findFolderId, onedotProjectNumber } = await import('../lib/onedot');
+    const { exportFolderOverride } = await import('../lib/contractFolder');
+    const overrideFolderId = exportFolderOverride();
+    if (overrideFolderId) {
+      console.warn(
+        `⚠️  GOOGLE_DRIVE_EXPORT_FOLDER_OVERRIDE is set — exporting to ${overrideFolderId} ` +
+        `instead of the project's Drive folder. Local testing only; ignored in production.`,
+      );
+    }
 
+    const { fetchOnedotProjects, resolveFolderId, onedotProjectNumber } = await import('../lib/onedot');
+
+    // The id is written when the user picks the project from the Onedot
+    // combobox; the number is the fallback for projects saved before that, and
+    // is the only key a hand-entered project has.
+    const odooProjectId = fullProject.project.odooProjectId ?? null;
     const storedNumber = fullProject.project.projectNumber;
     const projectNumber = onedotProjectNumber(storedNumber);
-    if (!projectNumber) {
+    if (!overrideFolderId && odooProjectId === null && !projectNumber) {
       return res.status(409).json({
         error:
-          `Project ${projectId} has no usable project number — it is stored as ` +
-          `"${storedNumber ?? ""}", which is a wizard draft placeholder. ` +
-          `Give the project its real number, then export again.`,
+          `Project ${projectId} is not linked to Onedot and has no usable project ` +
+          `number — it is stored as "${storedNumber ?? ""}", which is a wizard ` +
+          `draft placeholder. Pick the project from the Onedot list in Step 1, or ` +
+          `give it its real number, then export again.`,
       });
     }
 
-    let onedotProjects;
+    let onedotProjects: Awaited<ReturnType<typeof fetchOnedotProjects>> = [];
     try {
-      onedotProjects = await fetchOnedotProjects();
+      if (!overrideFolderId) onedotProjects = await fetchOnedotProjects();
     } catch (onedotError) {
       const detail = onedotError instanceof Error ? onedotError.message : String(onedotError);
       console.error("[export-google-doc] Onedot project list unavailable:", detail);
@@ -1614,13 +1632,36 @@ router.post("/contracts/export-google-doc", async (req, res) => {
       });
     }
 
-    const folderId = findFolderId(onedotProjects, projectNumber);
-    if (!folderId) {
-      return res.status(409).json({
-        error:
-          `Onedot has no Google Drive folder for project ${projectNumber}. ` +
-          `Add the folder to that project in Onedot, then export again.`,
-      });
+    const projectFolderId = overrideFolderId ?? resolveFolderId(onedotProjects, odooProjectId, storedNumber);
+
+    // Onedot names the project root. Contracts belong in its sales subfolder —
+    // writing to the root is a misfile, so an unresolvable layout refuses here
+    // rather than dropping the document a level too high.
+    const { resolveProjectContractFolder, resolveUnfiledFolder } =
+      await import('../lib/googleDrive');
+    const { chooseExportDestination } = await import('../lib/contractFolder');
+
+    const contractFolder = overrideFolderId
+      ? { folderId: overrideFolderId, path: ['(override)'] }
+      : projectFolderId
+        ? await resolveProjectContractFolder(projectFolderId)
+        : null;
+
+    const destination = chooseExportDestination(projectFolderId, contractFolder);
+
+    // A project with nowhere to file still exports. It goes to the service
+    // account's own Drive and is shared with whoever asked for it, because a
+    // document there is invisible to everyone else.
+    let folderId: string;
+    if (destination.kind === "project") {
+      folderId = destination.folderId;
+      console.log(`📁 Contract folder: ${destination.path.join(" / ")} (${folderId})`);
+    } else {
+      folderId = await resolveUnfiledFolder();
+      console.log(
+        `📁 Unfiled: ${destination.reason}. Writing to the service account's Drive ` +
+        `(${folderId}), shared with the company.`,
+      );
     }
 
     // Contract type filtering: ONE shows all, MANUFACTURING shows offsite only, ONSITE shows onsite only

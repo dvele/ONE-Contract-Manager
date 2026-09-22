@@ -21,7 +21,7 @@ import {
   generateResponsibilityMatrixHtml,
   type ResponsibilityMatrixItem,
 } from "./tableGenerators";
-import { buildSignatureBlock as buildStyledSignatureBlock } from "./tableStyles";
+import { buildSignatureBlock as buildStyledSignatureBlock, signatureLine } from "./tableStyles";
 import {
   deriveDesignMilestones,
   earliestDate,
@@ -567,12 +567,18 @@ function buildMapperSignatureBlock(
   });
 }
 
-function buildExhibitASignatureBlock(
+/**
+ * Exhibit A's two approval columns. Exported for its tests; the contract reads
+ * it through `EXHIBIT_A_SIGNATURE_TABLE`.
+ *
+ * The lines come from the shared `signatureLine` — this block carried its own
+ * copy of that markup, so the fix that restored the main signature block in
+ * exported Google Docs left these two columns blank.
+ */
+export function buildExhibitASignatureBlock(
   companyName: string,
   clientName: string
 ): string {
-  const lineStyle =
-    "border-bottom: 1px solid #000; margin-bottom: 4pt; height: 20pt;";
   const labelStyle = "font-size: 9pt; color: #666; margin-bottom: 2pt;";
 
   function sigColumn(title: string): string {
@@ -580,22 +586,22 @@ function buildExhibitASignatureBlock(
       <td style="width: 47%; border: none; vertical-align: top; padding: 8pt;">
         <div style="font-weight: bold; color: #1a73e8; margin-bottom: 8pt;">${title}</div>
         <div style="font-weight: bold; margin-bottom: 16pt;">${companyName}</div>
-        <div style="${lineStyle}"></div>
+        ${signatureLine()}
         <div style="${labelStyle}">Signature</div>
-        <div style="margin-top: 12pt; ${lineStyle}"></div>
+        ${signatureLine('margin-top: 12pt; ')}
         <div style="${labelStyle}">Name (Print)</div>
-        <div style="margin-top: 12pt; ${lineStyle}"></div>
+        ${signatureLine('margin-top: 12pt; ')}
         <div style="${labelStyle}">Title</div>
-        <div style="margin-top: 12pt; ${lineStyle}"></div>
+        ${signatureLine('margin-top: 12pt; ')}
         <div style="${labelStyle}">Date</div>
         <div style="margin-top: 20pt; font-weight: bold; margin-bottom: 16pt;">${clientName}</div>
-        <div style="${lineStyle}"></div>
+        ${signatureLine()}
         <div style="${labelStyle}">Signature</div>
-        <div style="margin-top: 12pt; ${lineStyle}"></div>
+        ${signatureLine('margin-top: 12pt; ')}
         <div style="${labelStyle}">Name (Print)</div>
-        <div style="margin-top: 12pt; ${lineStyle}"></div>
+        ${signatureLine('margin-top: 12pt; ')}
         <div style="${labelStyle}">Title</div>
-        <div style="margin-top: 12pt; ${lineStyle}"></div>
+        ${signatureLine('margin-top: 12pt; ')}
         <div style="${labelStyle}">Date</div>
       </td>`;
   }
