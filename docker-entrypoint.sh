@@ -1,42 +1,46 @@
 #!/bin/sh
 set -e
 
-# drizzle-kit asks before adding a constraint to a table that already holds
-# rows. With no TTY it draws the menu, reads no answer, and exits **0 without
-# applying anything** — which on 2026-09-22 booted a server whose code expected
-# columns the database did not have (`financials.additional_offsite`), leaving
-# /api/contracts and /api/dashboard/stats returning 500.
+# drizzle-kit push asks before adding a constraint to a table that already holds
+# rows, and there is no flag to answer it non-interactively: `--force` means
+# "auto-approve all data loss statements", which is the *truncating* answer, and
+# `--strict` only asks more often.
 #
-# `yes ""` accepts whichever option the prompt has highlighted, which is always
-# the non-destructive one ("add the constraint without truncating the table").
+# stdin is /dev/null so the prompt cannot block. Without it the container hangs
+# at the question, never starts the server, fails its health checks and is
+# killed — which is what revision 13 did on 2026-09-22. Piping `yes ""` does not
+# help: the prompt reads raw TTY keypresses, not piped newlines.
 #
-# Never `--force`: in drizzle-kit that flag means "accept data-loss statements",
-# i.e. the truncating answer to this very prompt.
+# The trade-off is that a push needing an answer applies nothing and still exits
+# 0, so the schema silently stays behind. The check below is what makes that
+# visible; the permanent fix is to apply the awkward change to the database once
+# by hand, after which push has nothing to ask about and runs clean.
 echo "Applying database schema (drizzle-kit push)..."
-yes "" | node /app/node_modules/drizzle-kit/bin.cjs push --config /app/drizzle.config.ts
+node /app/node_modules/drizzle-kit/bin.cjs push --config /app/drizzle.config.ts < /dev/null
 
-# The push above exits 0 whether or not it applied anything, so `set -e` cannot
-# be trusted to catch a bail. Re-running is the schema-agnostic check: once a
-# push has succeeded there is nothing left to do, so anything other than "no
-# changes" means the schema did not land.
+# Re-running is a schema-agnostic check: after a successful push there is
+# nothing left to do, so anything other than "no changes" means it did not land.
+# This is how a bail becomes loud instead of silent — on 2026-09-22 a stale
+# schema booted a server whose code expected columns the database did not have
+# (financials.additional_offsite), and nothing in the logs said so.
 #
-# Deliberately a warning, not a failure. A server with a stale schema still
-# serves most of the app, whereas exiting here would turn a partial outage into
-# a boot loop and take the whole service down.
+# A warning, not a failure: a stale schema still serves most of the app, while
+# exiting here would turn a partial outage into a boot loop.
 echo "Verifying the schema actually applied..."
-RECHECK="$(yes "" | node /app/node_modules/drizzle-kit/bin.cjs push --config /app/drizzle.config.ts 2>&1 || true)"
+RECHECK="$(node /app/node_modules/drizzle-kit/bin.cjs push --config /app/drizzle.config.ts < /dev/null 2>&1 || true)"
 if printf '%s' "$RECHECK" | grep -qi "no changes detected"; then
   echo "Schema verified: no pending changes."
 else
   echo "=============================================================="
-  echo "WARNING: schema push did not fully apply. The server is"
-  echo "starting anyway, but endpoints touching new columns will fail."
-  echo "Re-run output follows:"
+  echo "WARNING: the schema push did not fully apply."
+  echo "The server is starting anyway, but any endpoint touching a new"
+  echo "column will fail. If the output below shows a question, apply"
+  echo "that change to the database by hand — push cannot answer it."
   printf '%s\n' "$RECHECK"
   echo "=============================================================="
 fi
 
-echo "Schema applied. Starting server..."
+echo "Starting server..."
 
 # Execute the command passed as arguments to this script (CMD from Dockerfile)
 exec "$@"
