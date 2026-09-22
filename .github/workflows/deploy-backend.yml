@@ -11,6 +11,12 @@ on:
       - "shared/**"
       - "script/build.ts"
       - "Dockerfile"
+      # Both are copied into the image and run the schema migration on every
+      # boot, so a change to either alters what deploys — but neither used to
+      # trigger this workflow. A fix to the entrypoint's drizzle-kit push sat
+      # on dev undeployed while staging served 500s because of it.
+      - "docker-entrypoint.sh"
+      - "drizzle.config.ts"
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/deploy-backend.yml"
