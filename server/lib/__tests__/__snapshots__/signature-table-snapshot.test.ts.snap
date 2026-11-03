@@ -1,0 +1,36 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`SIGNATURE_BLOCK_TABLE > is unchanged for a fixture project 1`] = `
+"
+    <div class="signature-section" style="margin-top: 48pt; page-break-inside: avoid;">
+      <table style="width: 100%; border: none; margin-top: 24pt;">
+        <tr>
+          <td style="width: 47%; border: none; vertical-align: top; padding: 8pt;">
+            <div style="font-weight: bold; color: #1a73e8; margin-bottom: 8pt;">COMPANY:</div>
+            <div style="font-weight: bold; margin-bottom: 24pt;">Dvele AZ, LLC</div>
+            <div style="border-bottom: 1px solid #000; margin-bottom: 4pt; height: 20pt;">&nbsp;</div>
+            <div style="font-size: 9pt; color: #666; margin-bottom: 2pt;">Signature</div>
+            <div style="margin-top: 16pt; border-bottom: 1px solid #000; margin-bottom: 4pt; height: 20pt;">&nbsp;</div>
+            <div style="font-size: 9pt; color: #666; margin-bottom: 2pt;">Name (Print)</div>
+            <div style="margin-top: 16pt; border-bottom: 1px solid #000; margin-bottom: 4pt; height: 20pt;">&nbsp;</div>
+            <div style="font-size: 9pt; color: #666; margin-bottom: 2pt;">Title</div>
+            <div style="margin-top: 16pt; border-bottom: 1px solid #000; margin-bottom: 4pt; height: 20pt;">&nbsp;</div>
+            <div style="font-size: 9pt; color: #666; margin-bottom: 2pt;">Date</div>
+          </td>
+          <td style="width: 6%; border: none;"></td>
+          <td style="width: 47%; border: none; vertical-align: top; padding: 8pt;">
+            <div style="font-weight: bold; color: #1a73e8; margin-bottom: 8pt;">CLIENT:</div>
+            <div style="font-weight: bold; margin-bottom: 24pt;">Example Holdings, LLC</div>
+            <div style="border-bottom: 1px solid #000; margin-bottom: 4pt; height: 20pt;">&nbsp;</div>
+            <div style="font-size: 9pt; color: #666; margin-bottom: 2pt;">Signature</div>
+            <div style="margin-top: 16pt; border-bottom: 1px solid #000; margin-bottom: 4pt; height: 20pt;">&nbsp;</div>
+            <div style="font-size: 9pt; color: #666; margin-bottom: 2pt;">Name (Print)</div>
+            <div style="margin-top: 16pt; border-bottom: 1px solid #000; margin-bottom: 4pt; height: 20pt;">&nbsp;</div>
+            <div style="font-size: 9pt; color: #666; margin-bottom: 2pt;">Title</div>
+            <div style="margin-top: 16pt; border-bottom: 1px solid #000; margin-bottom: 4pt; height: 20pt;">&nbsp;</div>
+            <div style="font-size: 9pt; color: #666; margin-bottom: 2pt;">Date</div>
+          </td>
+        </tr>
+      </table>
+    </div>"
+`;

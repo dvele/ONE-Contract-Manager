@@ -12,7 +12,12 @@ import {
   getDefaultMatrix,
   isC2Matrix,
 } from "../../shared/responsibilityMatrix";
-import { toDeliveryModel } from "../../shared/deliveryModel";
+import {
+  toDeliveryModel,
+  DELIVERY_MODEL_LABELS,
+  type DeliveryModel,
+} from "../../shared/deliveryModel";
+import { stateName } from "../../shared/usStates";
 import {
   generatePricingTableHtml,
   generatePaymentScheduleHtml,
@@ -28,7 +33,6 @@ import {
   type ResponsibilityMatrixItem,
 } from "./tableGenerators";
 import { buildSignatureBlock as buildStyledSignatureBlock, signatureLine } from "./tableStyles";
-import type { DeliveryModel } from "../../shared/deliveryModel";
 import {
   deriveDesignMilestones,
   earliestDate,
@@ -113,6 +117,9 @@ export const VARIABLE_CATEGORIES = {
     "PROJECT_COUNTY",
     "PROJECT_FEDERAL_DISTRICT",
     "ON_SITE_SELECTION", // CRC or CMOS - critical for conditional sections
+    "PROJECT_STATE_NAME",
+    "DELIVERY_MODEL_ELECTION",
+    "BUYER_TYPE_ELECTION",
   ],
   client: [
     "CLIENT_LEGAL_NAME",
@@ -142,6 +149,8 @@ export const VARIABLE_CATEGORIES = {
     "CHILD_LLC_ADDRESS",
     "CHILD_LLC_FULL_ADDRESS",
     "CHILD_LLC_INSURANCE_STATUS",
+    "SELLER_LEGAL_NAME",
+    "SELLER_ENTITY_CLAUSE",
   ],
   site: [
     "DELIVERY_ADDRESS",
@@ -162,6 +171,7 @@ export const VARIABLE_CATEGORIES = {
     "HOME_STORIES",
     "HOME_GARAGE",
     "TOTAL_UNITS",
+    "TOTAL_UNITS_WRITTEN",
     "MODULE_COUNT",
   ],
   specifications: [
@@ -205,6 +215,7 @@ export const VARIABLE_CATEGORIES = {
     "INFLATION_TRIGGER_DATE",
     "INFLATION_ADJUSTMENT_PERCENT",
     "MATERIAL_INCREASE_THRESHOLD",
+    "STORAGE_TERMS",
   ],
   milestones: [
     // Client milestones
@@ -287,6 +298,7 @@ export const VARIABLE_CATEGORIES = {
     "ONSITE_CONTRACTOR_CONTACT_PHONE",
     "ONSITE_CONTRACTOR_BOND_AMOUNT",
     "ONSITE_CONTRACTOR_INSURANCE_AMOUNT",
+    "GC_INFORMATION_LINE",
   ],
   liquidatedDamages: [
     "LIQUIDATED_DAMAGES_PER_DAY",
@@ -329,6 +341,8 @@ export const VARIABLE_CATEGORIES = {
   ],
   legal: [
     "GOVERNING_LAW_STATE",
+    "AGREEMENT_GOVERNING_LAW_STATE",
+    "WARRANTY_STATUTE_PREFIX",
     "ARBITRATION_LOCATION",
     "ARBITRATION_PROVIDER",
     "STATE_OF_FORMATION",
@@ -346,6 +360,7 @@ export const VARIABLE_CATEGORIES = {
     "MILESTONE_SCHEDULE_TABLE",
     "SIGNATURE_BLOCK_TABLE",
     "EXHIBIT_A_SIGNATURE_TABLE",
+    "MASTER_EF_SIGNATURE_TABLE",
   ],
   conditional: [
     "IS_CRC",
@@ -354,6 +369,8 @@ export const VARIABLE_CATEGORIES = {
     "HAS_TRUST",
     "HAS_MULTIPLE_CLIENTS",
     "PRICE_IS_LOCKED",
+    "DELIVERY_MODEL",
+    "IS_FOB",
   ],
 };
 
@@ -626,6 +643,76 @@ export function buildExhibitASignatureBlock(
     </div>`;
 }
 
+/** 1-99 as lowercase words ("twenty-one"); 0 and anything above 99 as digits. */
+export function numberToWords(n: number): string {
+  if (!Number.isInteger(n) || n < 1 || n > 99) return String(n);
+  const ones = [
+    "", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+    "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
+    "seventeen", "eighteen", "nineteen",
+  ];
+  const tens = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+  if (n < 20) return ones[n];
+  const t = tens[Math.floor(n / 10)];
+  return n % 10 ? `${t}-${ones[n % 10]}` : t;
+}
+
+/**
+ * The Master EF 2026 agreement's signature columns: seller, buyer, and — only
+ * under Dvele GC — the GC Affiliate. Serves the main agreement and Exhibit A.
+ * Exported for its tests; the contract reads it through
+ * `MASTER_EF_SIGNATURE_TABLE`.
+ */
+export function buildMasterEf2026SignatureBlock(
+  sellerName: string,
+  buyerName: string,
+  gcAffiliateName: string | null
+): string {
+  const labelStyle = "font-size: 9pt; color: #666; margin-bottom: 2pt;";
+  const hasGc = gcAffiliateName !== null;
+  const width = hasGc ? "31%" : "47%";
+  const gap = hasGc ? "3.5%" : "6%";
+
+  function sigColumn(title: string, subtitle: string | null): string {
+    return `
+      <td style="width: ${width}; border: none; vertical-align: top; padding: 8pt;">
+        <div style="font-weight: bold; margin-bottom: ${subtitle ? "2pt" : "16pt"};">${title}</div>
+        ${subtitle ? `<div style="${labelStyle} margin-bottom: 14pt;">${subtitle}</div>` : ""}
+        ${signatureLine()}
+        <div style="${labelStyle}">Signed</div>
+        ${signatureLine("margin-top: 12pt; ")}
+        <div style="${labelStyle}">Name</div>
+        ${signatureLine("margin-top: 12pt; ")}
+        <div style="${labelStyle}">Title</div>
+        ${signatureLine("margin-top: 12pt; ")}
+        <div style="${labelStyle}">Date</div>
+      </td>`;
+  }
+
+  const columns = [
+    sigColumn((sellerName || "[SELLER]").toUpperCase(), null),
+    sigColumn(buyerName || "[BUYER]", null),
+  ];
+  if (hasGc) {
+    columns.push(
+      sigColumn(
+        (gcAffiliateName || "[GC AFFILIATE]").toUpperCase(),
+        "GC Affiliate, solely as to on-site work"
+      )
+    );
+  }
+  const spacer = `<td style="width: ${gap}; border: none;"></td>`;
+
+  return `
+    <div style="margin-top: 20pt; page-break-inside: avoid;">
+      <table style="width: 100%; border-collapse: collapse; border: none; font-size: 10pt; font-family: Arial, sans-serif;">
+        <tr>
+          ${columns.join(spacer)}
+        </tr>
+      </table>
+    </div>`;
+}
+
 // =============================================================================
 // MILESTONE HELPERS
 // =============================================================================
@@ -835,6 +922,32 @@ export function mapProjectToVariables(
   const rolledDeliverySet = latestDate(phaseDates.map((d) => d.deliveryWindow));
   const rolledTargetCO = latestDate(phaseDates.map((d) => d.targetCO));
 
+  // Master EF 2026 agreement values
+  const deliveryModel = toDeliveryModel(
+    pricingSummary?.serviceModel || project.onSiteSelection
+  );
+  const unitCount = Number(
+    pricingSummary?.unitCount || projectDetails?.totalUnits || 1
+  );
+  const BLANK = "____________________";
+  const gcName = onsiteContractor?.legalName || BLANK;
+  const gcLicenseNo = onsiteContractor?.licenseNumber || BLANK;
+  const gcLicenseState = onsiteContractor?.licenseState || BLANK;
+  const sellerState = stateName(childLlc?.formationState);
+  const sellerEntityClause = sellerState
+    ? `${/^[AEIOU]/i.test(sellerState) ? "an" : "a"} ${sellerState} limited liability company`
+    : "a limited liability company";
+  const deliveryModelElection = (["FOB", "CRC", "CMOS"] as DeliveryModel[])
+    .map((m) => {
+      const box = m === deliveryModel ? "☒" : "☐";
+      const gcDetail =
+        m === "CMOS"
+          ? `; GC Affiliate: ${gcName}; License No. / State: ${gcLicenseNo} / ${gcLicenseState}`
+          : "";
+      return `${box} ${DELIVERY_MODEL_LABELS[m]}${gcDetail}`;
+    })
+    .join("<br>");
+
   // Build the variables object
   const variables: ContractVariables = {
     // ===================
@@ -849,6 +962,12 @@ export function mapProjectToVariables(
     PROJECT_FEDERAL_DISTRICT: getFederalDistrict(project.state || ""),
     LIEN_LAW_STATE: project.state || "",
     ON_SITE_SELECTION: project.onSiteSelection || "CRC",
+    PROJECT_STATE_NAME: stateName(project.state),
+    DELIVERY_MODEL_ELECTION: deliveryModelElection,
+    BUYER_TYPE_ELECTION:
+      project.buyerType === "developer"
+        ? "☐ End Customer (owner-occupant) ☒ Developer (for resale or lease)"
+        : "☒ End Customer (owner-occupant) ☐ Developer (for resale or lease)",
 
     // ===================
     // CLIENT
@@ -897,6 +1016,8 @@ export function mapProjectToVariables(
       childLlc?.zip
     ),
     CHILD_LLC_INSURANCE_STATUS: childLlc?.insuranceStatus || "Pending",
+    SELLER_LEGAL_NAME: childLlc?.legalName || "[SELLER]",
+    SELLER_ENTITY_CLAUSE: sellerEntityClause,
     CHILD_LLC_INSURANCE_EXPIRATION: childLlc?.insuranceExpiration || "",
     CHILD_LLC_ANNUAL_REPORT_DUE: childLlc?.annualReportDue || "",
 
@@ -959,6 +1080,7 @@ export function mapProjectToVariables(
     HOME_STORIES: projectDetails?.homeStories || "",
     HOME_GARAGE: projectDetails?.homeGarage || "",
     TOTAL_UNITS: pricingSummary?.unitCount || projectDetails?.totalUnits || 1,
+    TOTAL_UNITS_WRITTEN: `${numberToWords(unitCount)} (${unitCount})`,
     MODULE_COUNT: projectDetails?.moduleCount || "",
 
     // ===================
@@ -1144,6 +1266,10 @@ export function mapProjectToVariables(
     AD_FEE: project.adminFeePercent ? `${project.adminFeePercent}%` : "none",
     STORAGE_FEE_PER_DAY: formatCurrency((project.storageFeePerDay || 0) / 100),
     STORAGE_FREE_DAYS: String(project.storageFreedays || 14),
+    STORAGE_TERMS:
+      (project.storageFeePerDay || 0) > 0
+        ? `${formatCurrency((project.storageFeePerDay || 0) / 100)}/day per Home after ${project.storageFreedays || 14} days free`
+        : "$250/day per Home after ten (10) business days",
 
     // Contact information
     CLIENT_PRIMARY_CONTACT:
@@ -1282,6 +1408,12 @@ export function mapProjectToVariables(
       ""
     ),
 
+    MASTER_EF_SIGNATURE_TABLE: buildMasterEf2026SignatureBlock(
+      childLlc?.legalName || "",
+      client?.legalName || "",
+      deliveryModel === "CMOS" ? (onsiteContractor?.legalName ?? "") : null
+    ),
+
     EXHIBIT_A_SIGNATURE_TABLE: buildExhibitASignatureBlock(
       childLlc?.legalName || "Dvele, Inc.",
       client
@@ -1386,6 +1518,11 @@ export function mapProjectToVariables(
     ONSITE_CONTRACTOR_CONTACT_NAME: onsiteContractor?.contactName || "",
     ONSITE_CONTRACTOR_CONTACT_EMAIL: onsiteContractor?.contactEmail || "",
     ONSITE_CONTRACTOR_CONTACT_PHONE: onsiteContractor?.contactPhone || "",
+    GC_INFORMATION_LINE: `${
+      deliveryModel === "CMOS"
+        ? "Not applicable; Dvele GC elected. GC Affiliate name / license no. / contact:"
+        : "Buyer GC name / license no. / contact:"
+    } ${gcName} / ${gcLicenseNo} / ${onsiteContractor?.contactName || BLANK}`,
     ONSITE_CONTRACTOR_BOND_AMOUNT: formatCentsAsCurrency(
       onsiteContractor?.bondAmount
     ),
@@ -1428,6 +1565,12 @@ export function mapProjectToVariables(
     // ===================
     GOVERNING_LAW_STATE:
       projectDetails?.governingLawState || project.state || "California",
+    AGREEMENT_GOVERNING_LAW_STATE:
+      stateName(projectDetails?.governingLawState) || "Arizona",
+    WARRANTY_STATUTE_PREFIX:
+      (project.state || "").trim().toUpperCase() === "CA"
+        ? "PURSUANT TO CAL. COM. CODE § 1201(b)(10), "
+        : "",
     ARBITRATION_LOCATION: projectDetails?.arbitrationLocation || "",
     ARBITRATION_PROVIDER: "JAMS",
     STATE_OF_FORMATION:
@@ -1571,6 +1714,8 @@ export function mapProjectToVariables(
     // ===================
     IS_CRC: project.onSiteSelection === "CRC",
     IS_CMOS: project.onSiteSelection === "CMOS",
+    DELIVERY_MODEL: DELIVERY_MODEL_LABELS[deliveryModel],
+    IS_FOB: deliveryModel === "FOB",
     HAS_CHILD_LLC: !!childLlc?.legalName,
     HAS_TRUST: !!client?.trustDate || client?.entityType === "Trust",
     HAS_MULTIPLE_CLIENTS: !!client?.client2LegalName,

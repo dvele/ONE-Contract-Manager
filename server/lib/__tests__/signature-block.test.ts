@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildSignatureBlock } from "../tableStyles";
-import { buildExhibitASignatureBlock } from "../mapper";
+import { buildExhibitASignatureBlock, buildMasterEf2026SignatureBlock } from "../mapper";
 
 /**
  * Drive's HTML-to-Docs conversion turns block elements into paragraphs, and an
@@ -88,5 +88,35 @@ describe("buildExhibitASignatureBlock", () => {
     const html = buildExhibitASignatureBlock("DP Example LLC", "Example Client");
     expect(html.match(/DP Example LLC/g)).toHaveLength(2);
     expect(html.match(/Example Client/g)).toHaveLength(2);
+  });
+});
+
+describe("buildMasterEf2026SignatureBlock", () => {
+  const columns = (html: string) => (html.match(/vertical-align: top/g) ?? []).length;
+
+  it("titles column 1 with the seller upper-cased", () => {
+    expect(buildMasterEf2026SignatureBlock("Dvele AZ, LLC", "Buyer Co", null)).toContain("DVELE AZ, LLC");
+  });
+
+  it("draws two columns without a GC affiliate, with four lines each", () => {
+    const html = buildMasterEf2026SignatureBlock("Dvele AZ, LLC", "Buyer Co", null);
+    expect(columns(html)).toBe(2);
+    expect(lineElements(html)).toHaveLength(8);
+  });
+
+  it("falls back to [BUYER] for an empty buyer name", () => {
+    expect(buildMasterEf2026SignatureBlock("Dvele AZ, LLC", "", null)).toContain("[BUYER]");
+  });
+
+  it("adds a third column for the GC affiliate with its subtitle", () => {
+    const html = buildMasterEf2026SignatureBlock("Dvele AZ, LLC", "Buyer Co", "Acme Builders");
+    expect(columns(html)).toBe(3);
+    expect(lineElements(html)).toHaveLength(12);
+    expect(html).toContain("ACME BUILDERS");
+    expect(html).toContain("GC Affiliate, solely as to on-site work");
+  });
+
+  it("uses [GC AFFILIATE] when the affiliate name is empty", () => {
+    expect(buildMasterEf2026SignatureBlock("Dvele AZ, LLC", "Buyer Co", "")).toContain("[GC AFFILIATE]");
   });
 });
