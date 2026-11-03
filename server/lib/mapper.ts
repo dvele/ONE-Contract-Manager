@@ -745,7 +745,7 @@ export function buildMasterEf2026SignatureBlock(
   const spacer = `<td style="width: ${gap}; border: none;"></td>`;
 
   return `
-    <div style="margin-top: 20pt; page-break-inside: avoid;">
+    <div class="signature-section" style="margin-top: 20pt; page-break-inside: avoid;">
       <table style="width: 100%; border-collapse: collapse; border: none; font-size: 10pt; font-family: Arial, sans-serif;">
         <tr>
           ${columns.join(spacer)}

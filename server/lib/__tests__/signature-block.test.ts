@@ -92,6 +92,12 @@ describe("buildExhibitASignatureBlock", () => {
 });
 
 describe("buildMasterEf2026SignatureBlock", () => {
+  it("carries the signature-section class so the generator does not append the legacy block", () => {
+    const html = buildMasterEf2026SignatureBlock("Dvele AZ, LLC", "Buyer Co", null);
+    expect(html).toContain('class="signature-section"');
+    expect(buildMasterEf2026SignatureBlock("Dvele AZ, LLC", "Buyer Co", "Acme Builders")).toContain('class="signature-section"');
+  });
+
   const columns = (html: string) => (html.match(/vertical-align: top/g) ?? []).length;
 
   it("titles column 1 with the seller upper-cased", () => {
