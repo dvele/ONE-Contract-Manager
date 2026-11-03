@@ -7,11 +7,14 @@
  * empty table.
  */
 
+import type { DeliveryModel } from './deliveryModel';
+
 export interface ResponsibilityItem {
   id: string;
   category: string;
   label: string;
   assignedTo: 'company' | 'client_gc';
+  note?: string;
 }
 
 export interface ResponsibilityCategory {
@@ -82,4 +85,58 @@ export function getDefaultMatrix(serviceModel: 'CRC' | 'CMOS'): ResponsibilityIt
     }
   }
   return items;
+}
+
+export type C2Assignee = 'company' | 'client_gc';
+
+export interface C2WorkCategory {
+  id: string;
+  label: string;
+  note: string;
+  defaults: Record<DeliveryModel, C2Assignee>;
+}
+
+/**
+ * The Work Categories of the Master EF 2026 agreement's C.2, verbatim. The
+ * defaults follow its preamble: under FOB Dvele fabricates only; under
+ * Delivered to Site it adds transport and the crane/set; under Dvele GC it does
+ * everything. Kept apart from RESPONSIBILITY_CATEGORIES, which older exhibits
+ * still render.
+ */
+export const C2_WORK_CATEGORIES: readonly C2WorkCategory[] = [
+  { id: 'factory_fabrication', label: 'Factory fabrication', note: 'Per Exhibit B', defaults: { FOB: 'company', CRC: 'company', CMOS: 'company' } },
+  { id: 'transport_coordination', label: 'Transport coordination', note: 'Per Exhibit A', defaults: { FOB: 'client_gc', CRC: 'company', CMOS: 'company' } },
+  { id: 'transport_cost', label: 'Transport cost', note: 'Per Exhibit A', defaults: { FOB: 'client_gc', CRC: 'company', CMOS: 'company' } },
+  { id: 'route_surveys', label: 'Route surveys / escorts', note: 'As required', defaults: { FOB: 'client_gc', CRC: 'company', CMOS: 'company' } },
+  { id: 'crane_rigging', label: 'Crane / rigging', note: 'Define in Exhibit A', defaults: { FOB: 'client_gc', CRC: 'company', CMOS: 'company' } },
+  { id: 'site_access', label: 'Site access & staging', note: 'Must meet delivery specs', defaults: { FOB: 'client_gc', CRC: 'client_gc', CMOS: 'company' } },
+  { id: 'clearing_grading', label: 'Clearing / grading', note: '', defaults: { FOB: 'client_gc', CRC: 'client_gc', CMOS: 'company' } },
+  { id: 'foundation', label: 'Foundation / footings / slab', note: 'Must meet Dvele tolerances', defaults: { FOB: 'client_gc', CRC: 'client_gc', CMOS: 'company' } },
+  { id: 'utility_stubs', label: 'Utility stubs (water/sewer/power/gas)', note: 'Stub locations per drawings', defaults: { FOB: 'client_gc', CRC: 'client_gc', CMOS: 'company' } },
+  { id: 'set_placement', label: 'Set / placement on foundation', note: 'If Dvele model, Dvele manages via sub', defaults: { FOB: 'client_gc', CRC: 'company', CMOS: 'company' } },
+  { id: 'stitching_sealing', label: 'Stitching / sealing / weatherproofing', note: 'Allocate clearly', defaults: { FOB: 'client_gc', CRC: 'client_gc', CMOS: 'company' } },
+  { id: 'mep_reconnections', label: 'MEP reconnections', note: 'Allocate clearly', defaults: { FOB: 'client_gc', CRC: 'client_gc', CMOS: 'company' } },
+  { id: 'interior_finish', label: 'Interior finish out (site)', note: 'Allocate clearly', defaults: { FOB: 'client_gc', CRC: 'client_gc', CMOS: 'company' } },
+  { id: 'exterior_tieins', label: 'Exterior tie-ins / decks / stairs', note: 'Allocate clearly', defaults: { FOB: 'client_gc', CRC: 'client_gc', CMOS: 'company' } },
+  { id: 'inspections_scheduling', label: 'Inspections scheduling', note: '', defaults: { FOB: 'client_gc', CRC: 'client_gc', CMOS: 'company' } },
+  { id: 'co_equivalent', label: 'CO/Equivalent responsibility', note: 'Election in Exhibit A', defaults: { FOB: 'client_gc', CRC: 'client_gc', CMOS: 'company' } },
+  { id: 'site_safety', label: 'Site safety and security', note: '', defaults: { FOB: 'client_gc', CRC: 'client_gc', CMOS: 'company' } },
+  { id: 'debris_cleanup', label: 'Debris removal / cleanup', note: '', defaults: { FOB: 'client_gc', CRC: 'client_gc', CMOS: 'company' } },
+  { id: 'damage_remediation', label: 'Damage remediation from delivery activities', note: 'Allocate', defaults: { FOB: 'client_gc', CRC: 'client_gc', CMOS: 'company' } },
+];
+
+export function getC2DefaultMatrix(model: DeliveryModel): ResponsibilityItem[] {
+  return C2_WORK_CATEGORIES.map((c) => ({
+    id: c.id,
+    category: 'C.2',
+    label: c.label,
+    assignedTo: c.defaults[model],
+    note: c.note,
+  }));
+}
+
+/** A stored matrix saved against the old list must not be mixed with this one. */
+export function isC2Matrix(items: ResponsibilityItem[]): boolean {
+  const ids = new Set(C2_WORK_CATEGORIES.map((c) => c.id));
+  return items.every((i) => ids.has(i.id));
 }

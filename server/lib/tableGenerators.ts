@@ -641,6 +641,7 @@ export interface ResponsibilityMatrixItem {
   category: string;
   label: string;
   assignedTo: 'company' | 'client_gc';
+  note?: string;
 }
 
 export function generateResponsibilityMatrixHtml(
@@ -696,5 +697,34 @@ export function generateResponsibilityMatrixHtml(
     ],
     rows,
     caption: 'Exhibit C.2 — On-Site Responsibility Matrix',
+  });
+}
+
+/**
+ * The agreement's C.2: one row per Work Category with the responsible party
+ * marked. Text glyphs, not SVG, for the reason `generateResponsibilityMatrixHtml`
+ * gives; the span names DejaVu first so the PDF resolves U+2714 and U+2610.
+ */
+export function generateExhibitC2TableHtml(items: ResponsibilityMatrixItem[]): string {
+  const glyph = (mark: string) =>
+    `<span style="font-family: 'DejaVu Sans', Arial, sans-serif;">${mark}</span>`;
+  const yes = glyph('✔');
+  const no = glyph('☐');
+
+  return buildStyledTable({
+    columns: [
+      { header: 'Work Category', width: '34%', align: 'left' },
+      { header: 'Dvele', width: '10%', align: 'center' },
+      { header: 'Buyer/GC', width: '10%', align: 'center' },
+      { header: 'Notes / Acceptance Standard', width: '46%', align: 'left' },
+    ],
+    rows: items.map((item) => ({
+      cells: [
+        item.label,
+        item.assignedTo === 'company' ? yes : no,
+        item.assignedTo === 'client_gc' ? yes : no,
+        item.note ?? '',
+      ],
+    })),
   });
 }

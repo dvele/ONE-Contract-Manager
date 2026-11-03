@@ -7,7 +7,12 @@ import type {
   WarrantyTerm,
   Contractor,
 } from "../../shared/schema";
-import { getDefaultMatrix } from "../../shared/responsibilityMatrix";
+import {
+  getC2DefaultMatrix,
+  getDefaultMatrix,
+  isC2Matrix,
+} from "../../shared/responsibilityMatrix";
+import { toDeliveryModel } from "../../shared/deliveryModel";
 import {
   generatePricingTableHtml,
   generatePaymentScheduleHtml,
@@ -19,6 +24,7 @@ import {
   generateExhibitA5TableHtml,
   generateExhibitB1TableHtml,
   generateResponsibilityMatrixHtml,
+  generateExhibitC2TableHtml,
   type ResponsibilityMatrixItem,
 } from "./tableGenerators";
 import { buildSignatureBlock as buildStyledSignatureBlock, signatureLine } from "./tableStyles";
@@ -335,6 +341,7 @@ export const VARIABLE_CATEGORIES = {
     "PAYMENT_SCHEDULE_TABLE",
     "UNIT_DETAILS_TABLE",
     "RESPONSIBILITY_MATRIX_TABLE",
+    "EXHIBIT_C2_TABLE",
     "WHAT_HAPPENS_NEXT_TABLE",
     "MILESTONE_SCHEDULE_TABLE",
     "SIGNATURE_BLOCK_TABLE",
@@ -1215,6 +1222,25 @@ export function mapProjectToVariables(
       return generateResponsibilityMatrixHtml(
         stored ?? getDefaultMatrix(serviceModel),
         serviceModel
+      );
+    })(),
+    // The agreement's C.2. A stored matrix saved against the old item list is
+    // ignored rather than mixed with this one.
+    EXHIBIT_C2_TABLE: (() => {
+      let stored: ResponsibilityMatrixItem[] | null = null;
+      try {
+        const raw = projectDetails?.responsibilityMatrix;
+        const parsed = raw ? (JSON.parse(raw) as ResponsibilityMatrixItem[]) : null;
+        if (Array.isArray(parsed) && parsed.length > 0) stored = parsed;
+      } catch {
+        stored = null;
+      }
+      return generateExhibitC2TableHtml(
+        stored && isC2Matrix(stored)
+          ? stored
+          : getC2DefaultMatrix(
+              toDeliveryModel(pricingSummary?.serviceModel || project.onSiteSelection)
+            )
       );
     })(),
     MILESTONE_SCHEDULE_TABLE: "",
