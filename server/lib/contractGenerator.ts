@@ -554,6 +554,25 @@ function applyDynamicNumbering(
   }
 }
 
+type MasterEfSlugRole = 'preamble' | 'recitals' | 'recital' | 'therefore';
+
+// The old Master EF rows use the MASTER_EF_ prefix and the 2026 agreement uses
+// MEF26_; both sets stay in the table because slugs are unique.
+function masterEfSlugRole(slug: string): MasterEfSlugRole | null {
+  for (const prefix of ['MASTER_EF', 'MEF26']) {
+    if (slug === `${prefix}_PREAMBLE`) return 'preamble';
+    if (slug === `${prefix}_RECITALS`) return 'recitals';
+    if (slug === `${prefix}_RECITAL_THEREFORE`) return 'therefore';
+    if (slug.startsWith(`${prefix}_RECITAL_`)) return 'recital';
+  }
+  return null;
+}
+
+/** True for the Master EF preamble and recital slugs, which take no section number. */
+export function isUnnumberedMasterEfSlug(slug: string): boolean {
+  return masterEfSlugRole(slug) !== null;
+}
+
 function applyMasterEFNumbering(nodes: BlockNode[]): void {
   let sectionCounter = 0;
   
@@ -562,10 +581,7 @@ function applyMasterEFNumbering(nodes: BlockNode[]): void {
     
     const clauseCode = node.clause.clause_code || '';
     
-    const isPreamble = clauseCode === 'MASTER_EF_PREAMBLE';
-    const isRecitals = clauseCode === 'MASTER_EF_RECITALS';
-    
-    if (isPreamble || isRecitals) {
+    if (isUnnumberedMasterEfSlug(clauseCode)) {
       node.dynamicNumber = '';
       if (node.children.length > 0) {
         assignMasterEFNoNumbers(node.children);
@@ -1307,10 +1323,11 @@ function renderBlockNode(node: BlockNode): string {
   else if (currentContractType === 'MASTER_EF') {
     const isConspicuous = blockType === 'conspicuous';
     const conspicuousClass = isConspicuous ? ' conspicuous' : '';
-    const isPreamble = clauseCode === 'MASTER_EF_PREAMBLE';
-    const isRecitals = clauseCode === 'MASTER_EF_RECITALS';
-    const isRecitalChild = clauseCode.startsWith('MASTER_EF_RECITAL_') && clauseCode !== 'MASTER_EF_RECITAL_THEREFORE';
-    const isNowTherefore = clauseCode === 'MASTER_EF_RECITAL_THEREFORE';
+    const slugRole = masterEfSlugRole(clauseCode);
+    const isPreamble = slugRole === 'preamble';
+    const isRecitals = slugRole === 'recitals';
+    const isRecitalChild = slugRole === 'recital';
+    const isNowTherefore = slugRole === 'therefore';
     
     if (isPreamble) {
       if (content) html += `<div class="mef-preamble${conspicuousClass}">${content}</div>`;
