@@ -98,6 +98,9 @@ describe("seller", () => {
     ["AZ", "an Arizona limited liability company"],
     ["Arizona", "an Arizona limited liability company"],
     ["DE", "a Delaware limited liability company"],
+    ["UT", "a Utah limited liability company"],
+    ["OH", "an Ohio limited liability company"],
+    ["IA", "an Iowa limited liability company"],
     [null, "a limited liability company"],
   ])("entity clause for %s", (state, expected) => {
     const llc = { legalName: "X, LLC", formationState: state, entityType: "LLC" };
@@ -170,7 +173,9 @@ describe("TOTAL_UNITS_WRITTEN", () => {
   it("writes the unit count", () => {
     expect(build({ unitCount: 2 }).TOTAL_UNITS_WRITTEN).toBe("two (2)");
     expect(build().TOTAL_UNITS_WRITTEN).toBe("one (1)");
-    expect(build({ unitCount: 120 }).TOTAL_UNITS_WRITTEN).toBe("120 (120)");
+    expect(build({ unitCount: 120 }).TOTAL_UNITS_WRITTEN).toBe("120");
+    expect(build({ unitCount: 2.5 }).TOTAL_UNITS_WRITTEN).toBe("2.5");
+    expect(build({ projectDetails: { totalUnits: "abc" } }).TOTAL_UNITS_WRITTEN).toBe("abc");
   });
 });
 

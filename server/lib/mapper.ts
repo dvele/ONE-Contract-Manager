@@ -926,16 +926,16 @@ export function mapProjectToVariables(
   const deliveryModel = toDeliveryModel(
     pricingSummary?.serviceModel || project.onSiteSelection
   );
-  const unitCount = Number(
-    pricingSummary?.unitCount || projectDetails?.totalUnits || 1
-  );
+  const totalUnits = pricingSummary?.unitCount || projectDetails?.totalUnits || 1;
+  const unitCount = Number(totalUnits);
+  const unitWords = Number.isFinite(unitCount) ? numberToWords(unitCount) : "";
   const BLANK = "____________________";
   const gcName = onsiteContractor?.legalName || BLANK;
   const gcLicenseNo = onsiteContractor?.licenseNumber || BLANK;
   const gcLicenseState = onsiteContractor?.licenseState || BLANK;
   const sellerState = stateName(childLlc?.formationState);
   const sellerEntityClause = sellerState
-    ? `${/^[AEIOU]/i.test(sellerState) ? "an" : "a"} ${sellerState} limited liability company`
+    ? `${/^[AEIOU]/i.test(sellerState) && sellerState !== "Utah" ? "an" : "a"} ${sellerState} limited liability company`
     : "a limited liability company";
   const deliveryModelElection = (["FOB", "CRC", "CMOS"] as DeliveryModel[])
     .map((m) => {
@@ -1079,8 +1079,12 @@ export function mapProjectToVariables(
     HOME_BATHROOMS: projectDetails?.homeBathrooms || "",
     HOME_STORIES: projectDetails?.homeStories || "",
     HOME_GARAGE: projectDetails?.homeGarage || "",
-    TOTAL_UNITS: pricingSummary?.unitCount || projectDetails?.totalUnits || 1,
-    TOTAL_UNITS_WRITTEN: `${numberToWords(unitCount)} (${unitCount})`,
+    TOTAL_UNITS: totalUnits,
+    // Digits alone when there is no word form (0, above 99, negative, fractional).
+    TOTAL_UNITS_WRITTEN:
+      !unitWords || unitWords === String(unitCount)
+        ? String(totalUnits)
+        : `${unitWords} (${unitCount})`,
     MODULE_COUNT: projectDetails?.moduleCount || "",
 
     // ===================
