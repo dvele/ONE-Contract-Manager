@@ -54,7 +54,7 @@ const gc = {
 
 const NEW_VARS: Record<string, string[]> = {
   childLlc: ["SELLER_LEGAL_NAME", "SELLER_ENTITY_CLAUSE"],
-  legal: ["AGREEMENT_GOVERNING_LAW_STATE", "WARRANTY_STATUTE_PREFIX"],
+  legal: ["AGREEMENT_GOVERNING_LAW_STATE", "WARRANTY_STATUTE_PREFIX", "AGREEMENT_DISPUTE_LOCATION"],
   project: ["PROJECT_STATE_NAME", "DELIVERY_MODEL_ELECTION", "BUYER_TYPE_ELECTION"],
   conditional: ["DELIVERY_MODEL", "IS_FOB"],
   home: ["TOTAL_UNITS_WRITTEN"],
@@ -122,6 +122,13 @@ describe("governing law and state", () => {
   });
   it("names the project state", () => {
     expect(build({ project: { state: "CO" } }).PROJECT_STATE_NAME).toBe("Colorado");
+  });
+  it("blanks the dispute location when none is set, leaving ARBITRATION_LOCATION alone", () => {
+    expect(build().AGREEMENT_DISPUTE_LOCATION).toBe(BLANK);
+    expect(build().ARBITRATION_LOCATION).toBe("");
+    const v = build({ projectDetails: { arbitrationLocation: "Maricopa County, Arizona" } });
+    expect(v.AGREEMENT_DISPUTE_LOCATION).toBe("Maricopa County, Arizona");
+    expect(v.ARBITRATION_LOCATION).toBe("Maricopa County, Arizona");
   });
   it("prefixes the warranty notice for CA only", () => {
     expect(build({ project: { state: "CA" } }).WARRANTY_STATUTE_PREFIX).toBe(

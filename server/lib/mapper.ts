@@ -348,6 +348,7 @@ export const VARIABLE_CATEGORIES = {
     "AGREEMENT_GOVERNING_LAW_STATE",
     "WARRANTY_STATUTE_PREFIX",
     "ARBITRATION_LOCATION",
+    "AGREEMENT_DISPUTE_LOCATION",
     "ARBITRATION_PROVIDER",
     "STATE_OF_FORMATION",
     "COUNTY",
@@ -1632,6 +1633,10 @@ export function mapProjectToVariables(
         ? "PURSUANT TO CAL. COM. CODE § 1201(b)(10), "
         : "",
     ARBITRATION_LOCATION: projectDetails?.arbitrationLocation || "",
+    // The 2026 agreement's mediation and arbitration seat (§12(a), §12(b)): a
+    // fill-in blank rather than an empty gap when none is set.
+    AGREEMENT_DISPUTE_LOCATION:
+      projectDetails?.arbitrationLocation || "____________________",
     ARBITRATION_PROVIDER: "JAMS",
     STATE_OF_FORMATION:
       projectDetails?.governingLawState || project.state || "California",

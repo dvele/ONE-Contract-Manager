@@ -690,7 +690,7 @@
   {
     "slug": "MEF26_12_A_ESCALATION_MEDIATION",
     "headerText": "Escalation and Mediation",
-    "bodyHtml": "<p>The Parties will first attempt good-faith executive negotiation. If unresolved, the Parties will pursue non-binding mediation in {{ARBITRATION_LOCATION}} unless otherwise agreed.</p>",
+    "bodyHtml": "<p>The Parties will first attempt good-faith executive negotiation. If unresolved, the Parties will pursue non-binding mediation in {{AGREEMENT_DISPUTE_LOCATION}} unless otherwise agreed.</p>",
     "level": 2,
     "parentSlug": "MEF26_12_DISPUTE_RESOLUTION",
     "order": 87
@@ -698,7 +698,7 @@
   {
     "slug": "MEF26_12_B_ARBITRATION",
     "headerText": "Arbitration",
-    "bodyHtml": "<p>Any dispute not resolved by mediation shall be finally resolved by binding arbitration administered by JAMS in {{ARBITRATION_LOCATION}}, under its Comprehensive Arbitration Rules; if Buyer elects the End Customer Buyer Type in Exhibit A, the arbitration shall comply with the JAMS Consumer Arbitration Minimum Standards, and Dvele shall pay JAMS fees in excess of the consumer filing fee. Judgment may be entered in any court of competent jurisdiction. Either Party may seek temporary or preliminary injunctive relief in court to protect its intellectual property or confidential information, and Dvele and any GC Affiliate may commence an action in any court of competent jurisdiction to record, perfect, preserve, or enforce any mechanics lien, stop payment notice, or payment bond claim, or to enforce Dvele’s title and security interest in any Home, without waiving this arbitration agreement; any such action may be stayed pending arbitration of the underlying dispute once the lien, notice, or bond right has been preserved.</p>",
+    "bodyHtml": "<p>Any dispute not resolved by mediation shall be finally resolved by binding arbitration administered by JAMS in {{AGREEMENT_DISPUTE_LOCATION}}, under its Comprehensive Arbitration Rules; if Buyer elects the End Customer Buyer Type in Exhibit A, the arbitration shall comply with the JAMS Consumer Arbitration Minimum Standards, and Dvele shall pay JAMS fees in excess of the consumer filing fee. Judgment may be entered in any court of competent jurisdiction. Either Party may seek temporary or preliminary injunctive relief in court to protect its intellectual property or confidential information, and Dvele and any GC Affiliate may commence an action in any court of competent jurisdiction to record, perfect, preserve, or enforce any mechanics lien, stop payment notice, or payment bond claim, or to enforce Dvele’s title and security interest in any Home, without waiving this arbitration agreement; any such action may be stayed pending arbitration of the underlying dispute once the lien, notice, or bond right has been preserved.</p>",
     "level": 2,
     "parentSlug": "MEF26_12_DISPUTE_RESOLUTION",
     "order": 88

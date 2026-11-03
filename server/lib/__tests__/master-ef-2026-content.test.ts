@@ -72,70 +72,248 @@ function normalize(text: string): string {
     .trim();
 }
 
-/**
- * The authored rendering of the main agreement: each clause's header joined to
- * its body by ". ", as the generator renders level 2 and 3 clauses.
- */
-function authoredPlainText(): string {
-  const clauseText = readClauses()
-    .map((c) => (c.headerText ? `${c.headerText}. ${c.bodyHtml}` : c.bodyHtml))
-    .join("\n");
-  const joined = [clauseText, ...LETTERS.map(readExhibit)].join("\n");
-  return normalize(
-    joined
-      .replace(/\{\{[A-Z0-9_]+\}\}/g, " ")
-      .replace(/\[STATE_DISCLOSURE:[A-Z0-9_]+\]/g, " ")
-  );
-}
+// ---------------------------------------------------------------------------
+// Word-sequence comparison of the docx against the authored content
+// ---------------------------------------------------------------------------
 
-// Literal phrases the substitution table replaces (Ruling 3). Each is removed
-// from the source like a blank before the comparison.
-const SUBSTITUTED_PHRASES = [
-  "Dvele AZ, LLC, an Arizona limited liability company",
-  "_______(__)", // the unit count, whose "(__)" is too short to read as a blank
-  "[IF REQUIRED BY SITE-STATE LAW: PURSUANT TO [STATE STATUTE CITATION],]",
-  "$______/day per Home after ______ days free (if left blank, $250/day per Home after ten (10) business days)",
+/**
+ * The tables the content replaces whole with a generated table. Each becomes
+ * one marker word on both sides, so their contents are excluded by section
+ * boundary rather than compared.
+ */
+const TABLE_MARKERS: { marker: string; variable: string; matches: (text: string) => boolean }[] = [
+  { marker: "⟦SIGNATURE-TABLE⟧", variable: "MASTER_EF_SIGNATURE_TABLE", matches: (t) => /Signed:/.test(t) },
+  { marker: "⟦A2-TABLE⟧", variable: "EXHIBIT_A2_TABLE", matches: (t) => /Home ID/.test(t) && /Site Address/.test(t) },
+  // The A.4 footnote paragraph belongs to this section too (Task 6 renders it).
+  { marker: "⟦A4-TABLE⟧", variable: "EXHIBIT_A4_COST_TABLE", matches: (t) => /Purchase Price\*/.test(t) },
+  { marker: "⟦A5-TABLE⟧", variable: "EXHIBIT_A5_PAYMENT_TABLE", matches: (t) => /Payment Schedule/.test(t) },
+  { marker: "⟦B1-TABLE⟧", variable: "EXHIBIT_B1_TABLE", matches: (t) => /Plan Set Version/.test(t) },
+  { marker: "⟦C2-TABLE⟧", variable: "EXHIBIT_C2_TABLE", matches: (t) => /Work Category/.test(t) },
 ];
 
-/** Source paragraphs, with the replaced tables, election cells and A.4 footnote removed. */
-async function sourceParagraphs(): Promise<string[]> {
-  const { value } = await mammoth.convertToHtml({
-    path: path.join(DIR, "source.docx"),
-  });
+function words(html: string): string[] {
+  return normalize(html.replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n))))
+    .split(" ")
+    .filter(Boolean);
+}
+
+/** The docx as words, in document order, with the replaced tables as markers. */
+async function sourceWords(): Promise<string[]> {
+  const { value } = await mammoth.convertToHtml({ path: path.join(DIR, "source.docx") });
   const $ = cheerio.load(value);
   $("table").each((_, table) => {
-    const text = $(table).text();
-    const replaced =
-      /Signed:/.test(text) || // both signature tables
-      (/Home ID/.test(text) && /Site Address/.test(text)) || // A.2
-      /Purchase Price\*/.test(text) || // A.4
-      /Payment Schedule/.test(text) || // A.5
-      /Plan Set Version/.test(text) || // B.1
-      /Work Category/.test(text); // C.2
-    if (replaced) $(table).remove();
-  });
-  // A.1's Buyer Type and Delivery Model election cells.
-  $("td").each((_, td) => {
-    if (/^\s*☐/.test($(td).text())) $(td).remove();
+    const hit = TABLE_MARKERS.find((m) => m.matches($(table).text()));
+    if (hit) $(table).replaceWith(`<p>${hit.marker}</p>`);
   });
   $("p").each((_, p) => {
     if (/^\*Except as expressly provided/.test($(p).text())) $(p).remove();
   });
-  const html = $("body").html() ?? "";
-  return html
-    .replace(/<\/(p|li|td|h[1-6])>|<br\s*\/?>|<(ol|ul)>/gi, "\n")
-    .split("\n")
-    .map((p) => p.replace(/<[^>]+>/g, ""))
-    .map((p) =>
-      p
-        .replace(/&amp;/g, "&")
-        .replace(/&lt;/g, "<")
-        .replace(/&gt;/g, ">")
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-    )
-    .filter((p) => p.trim().length > 0);
+  return words($("body").html() ?? "");
 }
+
+/**
+ * The authored content as words, in render order: clauses by `order`, then
+ * Exhibits A–F. Headers appear as the generator renders them: level 2 and 3
+ * headers end with the period the renderer adds, and the recital children's
+ * "Recital N" headers are not rendered at all.
+ */
+function authoredWords(): string[] {
+  const parts: string[] = [];
+  for (const c of [...readClauses()].sort((a, b) => a.order - b.order)) {
+    if (c.headerText && !c.slug.startsWith("MEF26_RECITAL_")) {
+      parts.push(c.level === 2 || c.level === 3 ? `${c.headerText}.` : c.headerText);
+    }
+    parts.push(c.bodyHtml);
+  }
+  parts.push(...LETTERS.map(readExhibit));
+  let joined = parts.join("\n");
+  for (const m of TABLE_MARKERS) joined = joined.split(`{{${m.variable}}}`).join(` ${m.marker} `);
+  return words(joined);
+}
+
+type Op = { kind: "equal" | "delete" | "insert"; word: string; at: number };
+
+/** Myers' O(ND) diff over word arrays. `at` indexes `a` for equal/delete and `b` for insert. */
+function diffWords(a: string[], b: string[]): Op[] {
+  const n = a.length;
+  const m = b.length;
+  const max = n + m;
+  const off = max + 1;
+  const v = new Int32Array(2 * max + 3);
+  // trace[d] is V as it stood before step d, kept only over k in [-d-1, d+1].
+  const trace: Int32Array[] = [];
+  let done = false;
+  for (let d = 0; d <= max && !done; d++) {
+    trace.push(v.slice(off - d - 1, off + d + 2));
+    for (let k = -d; k <= d; k += 2) {
+      let x = k === -d || (k !== d && v[off + k - 1] < v[off + k + 1]) ? v[off + k + 1] : v[off + k - 1] + 1;
+      let y = x - k;
+      while (x < n && y < m && a[x] === b[y]) {
+        x++;
+        y++;
+      }
+      v[off + k] = x;
+      if (x >= n && y >= m) {
+        done = true;
+        break;
+      }
+    }
+  }
+  const ops: Op[] = [];
+  let x = n;
+  let y = m;
+  for (let d = trace.length - 1; d >= 0; d--) {
+    const snap = trace[d];
+    const get = (k: number) => snap[k + d + 1];
+    const k = x - y;
+    const prevK = k === -d || (k !== d && get(k - 1) < get(k + 1)) ? k + 1 : k - 1;
+    const prevX = d === 0 ? 0 : get(prevK);
+    const prevY = d === 0 ? 0 : prevX - prevK;
+    while (x > prevX && y > prevY) {
+      ops.push({ kind: "equal", word: a[x - 1], at: x - 1 });
+      x--;
+      y--;
+    }
+    if (d > 0) {
+      if (x === prevX) ops.push({ kind: "insert", word: b[y - 1], at: y - 1 });
+      else ops.push({ kind: "delete", word: a[x - 1], at: x - 1 });
+    }
+    x = prevX;
+    y = prevY;
+  }
+  return ops.reverse();
+}
+
+interface Hunk {
+  src: string;
+  aut: string;
+  context: string;
+}
+
+/** Runs of consecutive non-equal words: what the docx says, and what the content says instead. */
+function hunks(a: string[], b: string[]): Hunk[] {
+  const out: Hunk[] = [];
+  let src: string[] = [];
+  let aut: string[] = [];
+  let lastEqual = -1;
+  const flush = () => {
+    if (src.length || aut.length) {
+      const context = a.slice(Math.max(0, lastEqual - 7), lastEqual + 1).join(" ");
+      out.push({ src: src.join(" "), aut: aut.join(" "), context });
+    }
+    src = [];
+    aut = [];
+  };
+  for (const op of diffWords(a, b)) {
+    if (op.kind === "equal") {
+      flush();
+      lastEqual = op.at;
+    } else if (op.kind === "delete") src.push(op.word);
+    else aut.push(op.word);
+  }
+  flush();
+  return out;
+}
+
+/**
+ * Every sanctioned difference between the docx and the authored content: the
+ * docx words removed (`src`) and the content words put in their place (`aut`).
+ * Each must occur exactly once. Anything else the diff finds fails the test.
+ */
+const SANCTIONED: { src: string; aut: string }[] = [
+  // Preamble: the title, upper-cased as the live preamble row stores it
+  { src: "Dvele Master Factory Built Home Agreement", aut: "DVELE MASTER FACTORY BUILT HOME AGREEMENT" },
+  // Preamble: Effective Date blank
+  { src: "___________, ________", aut: "{{AGREEMENT_EXECUTION_DATE_WRITTEN}}" },
+  // Preamble: the seller is the project's LLC (Decision 3)
+  { src: "Dvele AZ, LLC, an Arizona limited liability company", aut: "{{SELLER_LEGAL_NAME}}, {{SELLER_ENTITY_CLAUSE}}" },
+  // Preamble: the Buyer's name and state of formation / entity type (Ruling 18)
+  { src: "________________, a [State of Formation] [limited liability company / corporation / other entity type],", aut: "{{CLIENT_LEGAL_NAME}}, {{BUYER_ENTITY_CLAUSE}}," },
+  // Preamble: Buyer's principal address blank
+  { src: "_____________________________", aut: "{{CLIENT_FULL_ADDRESS}}" },
+  // Preamble: unit count blank
+  { src: "_______(__)", aut: "{{TOTAL_UNITS_WRITTEN}}" },
+  // Preamble: Site address
+  { src: "[Site Address, City, County, State],", aut: "{{SITE_ADDRESS}}," },
+  // 2(c): the renderer adds a period after a level-2 header the docx leaves bare
+  { src: "Substitutions", aut: "Substitutions." },
+  // 12(a): mediation seat (Ruling 21)
+  { src: "[County], [State]", aut: "{{AGREEMENT_DISPUTE_LOCATION}}" },
+  // 12(b): arbitration seat (Ruling 21)
+  { src: "[County], [State],", aut: "{{AGREEMENT_DISPUTE_LOCATION}}," },
+  // 12(d): governing law state
+  { src: "[Governing Law State],", aut: "{{AGREEMENT_GOVERNING_LAW_STATE}}," },
+  // 14: level-1 headers render without a trailing period
+  { src: "SURVIVAL.", aut: "SURVIVAL" },
+  // 15: level-1 headers render without a trailing period
+  { src: "AUTHORITY.", aut: "AUTHORITY" },
+  // A.1 Buyer Type cell (the A.1 election test checks it reproduces the docx cell)
+  { src: "☐ End Customer (owner-occupant) ☐ Developer (for resale or lease)", aut: "{{BUYER_TYPE_ELECTION}}" },
+  // A.1 Project Name blank cell
+  { src: "", aut: "{{PROJECT_NAME}}" },
+  // A.1 Delivery Model cell (Ruling 17; checked by the A.1 election test)
+  { src: "☐ FOB Factory (Buyer Pickup/Transport) ☐ Delivered to Site (Dvele Transport; Buyer/GC Site Work) ☐ Dvele GC (Turnkey through CO/Equivalent; GC Affiliate: ____________________; License No. / State: ____________ / [State])", aut: "{{DELIVERY_MODEL_ELECTION}}" },
+  // A.1 Jurisdiction blank cell: state name, county, permitting authority, program & approval no. (Ruling 20)
+  { src: "", aut: "{{PROJECT_STATE_NAME}} / ____________ / ____________; ____________" },
+  // A.1 Site(s) blank cell
+  { src: "", aut: "{{SITE_ADDRESS}}" },
+  // A.1 Buyer Notice blank cell
+  { src: "", aut: "{{CLIENT_FULL_ADDRESS}} / {{CLIENT_EMAIL}}" },
+  // A.8 storage fee blanks and their default
+  { src: "$______/day per Home after ______ days free (if left blank, $250/day per Home after ten (10) business days)", aut: "{{STORAGE_TERMS}}" },
+  // C.1: the docx's literal bullet character is a list item in the content
+  { src: "●", aut: "" },
+  // C.1 Buyer GC blank (Ruling 16)
+  { src: "____________________", aut: "{{BUYER_GC_DETAILS}}" },
+  // C.1 GC Affiliate blank (Ruling 16)
+  { src: "____________________).", aut: "{{GC_AFFILIATE_DETAILS}})." },
+  // C.4 foundation deadline blank
+  { src: "[●]", aut: "{{FOUNDATION_READY_DAYS}}" },
+  // C.4 utility stub deadline blank
+  { src: "[●]", aut: "{{UTILITY_STUBBED_DAYS}}" },
+  // C.4 crane deadline blank
+  { src: "[●]", aut: "{{CRANE_ACCESS_READY_DAYS}}" },
+  // D.1/D.2 D-1 Target Date blank cell
+  { src: "", aut: "{{DESIGN_KICKOFF_DATE}}" },
+  // D.1/D.2 D-2 Target Date blank cell
+  { src: "", aut: "{{SCHEMATIC_DESIGN_DATE}}" },
+  // D.1/D.2 D-3 Target Date blank cell
+  { src: "", aut: "{{PERMIT_SUBMITTAL_DATE}}" },
+  // D.1/D.2 D-4 Target Date blank cell
+  { src: "", aut: "{{DESIGN_DEVELOPMENT_DATE}}" },
+  // D.1/D.2 P-1 Target Date blank cell
+  { src: "", aut: "{{PRODUCTION_START_DATE}}" },
+  // D.1/D.2 P-2 Target Date blank cell
+  { src: "", aut: "{{PRODUCTION_COMPLETE_DATE}}" },
+  // D.1/D.2 P-3 Target Date blank cell
+  { src: "", aut: "{{DELIVERY_SET_DATE}}" },
+  // D.1/D.2 P-4 Target Date blank cell
+  { src: "", aut: "{{CO_EQUIVALENT_DATE}}" },
+  // Exhibit E notice: the bracketed statute prefix (Decision 11)
+  { src: "[IF REQUIRED BY SITE-STATE LAW: PURSUANT TO [STATE STATUTE CITATION],] THIS", aut: "{{WARRANTY_STATUTE_PREFIX}}THIS" },
+  // Exhibit E notice: the Site state
+  { src: "[SITE STATE]", aut: "{{PROJECT_STATE_NAME}}" },
+  // Exhibit E heading 1: Word's list number, written into the heading (Decision 12)
+  { src: "", aut: "1." },
+  // Exhibit E heading 2: Word's list number, written into the heading (Decision 12)
+  { src: "", aut: "2." },
+  // Exhibit E heading 3: Word's list number, written into the heading (Decision 12)
+  { src: "", aut: "3." },
+  // Exhibit E heading 4: Word's list number, written into the heading (Decision 12)
+  { src: "", aut: "4." },
+  // Exhibit E heading 5: Word's list number, written into the heading (Decision 12)
+  { src: "", aut: "5." },
+  // Exhibit E heading 6: Word's list number, written into the heading (Decision 12)
+  { src: "", aut: "6." },
+  // Exhibit E heading 7: Word's list number, written into the heading (Decision 12)
+  { src: "", aut: "7." },
+  // Exhibit E heading 8: Word's list number, written into the heading (Decision 12)
+  { src: "", aut: "8." },
+  // Exhibit F title: the Site state
+  { src: "([SITE STATE])", aut: "({{PROJECT_STATE_NAME}})" },
+  // F.2: the per-state notices disclosure (Decision 11)
+  { src: "[For each Site state, insert the statutory disclosures, cancellation rights, warranty notices, arbitration disclosures, contractor-license disclosures, and mechanics lien / preliminary notice requirements that apply to the Buyer Type elected in Exhibit A.]", aut: "[STATE_DISCLOSURE:MASTER_EF_2026_STATE_NOTICES]" },
+];
 
 describe("Master EF 2026 authored content", () => {
   let clauses: ContentClause[];
@@ -167,7 +345,7 @@ describe("Master EF 2026 authored content", () => {
     const allowList = [
       "Delivery window, crane day, and Site access assumptions: ____________________ (if blank, as stated in Exhibit C)",
       "please initial here: __________",
-      "State Factory-Built Housing Program &amp; Approval No.: ____________________",
+      "{{PROJECT_STATE_NAME}} / ____________ / ____________; ____________",
     ];
     let rest = content;
     for (const allowed of allowList) {
@@ -180,23 +358,13 @@ describe("Master EF 2026 authored content", () => {
   });
 
   it("agreement text is preserved", async () => {
-    const authored = authoredPlainText();
-    const missing: string[] = [];
-    for (const paragraph of await sourceParagraphs()) {
-      let text = paragraph;
-      // C.1's bullet is a literal "●" in the docx and a list item in the content.
-      text = text.replace(/^\s*●\s*/, "");
-      for (const phrase of SUBSTITUTED_PHRASES) text = text.split(phrase).join("\u0000");
-      const fragments = text
-        .replace(/_{3,}/g, "\u0000")
-        .replace(/\[[^\]]*\]/g, "\u0000")
-        .split("\u0000")
-        .map(normalize);
-      for (const fragment of fragments) {
-        if (fragment.length >= 25 && !authored.includes(fragment)) missing.push(fragment);
-      }
-    }
-    expect(missing).toEqual([]);
+    const found = hunks(await sourceWords(), authoredWords());
+    const same = (h: { src: string; aut: string }, e: { src: string; aut: string }) =>
+      h.src === e.src && h.aut === e.aut;
+    const unsanctioned = found.filter((h) => !SANCTIONED.some((e) => same(h, e)));
+    const miscounted = SANCTIONED.filter((e) => found.filter((h) => same(h, e)).length !== 1);
+    expect(unsanctioned).toEqual([]);
+    expect(miscounted).toEqual([]);
   });
 
   it("A.1's election variables reproduce the docx cells", async () => {
