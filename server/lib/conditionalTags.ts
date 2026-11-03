@@ -44,11 +44,12 @@ export function processConditionalTags(content: string, model: DeliveryModel): s
     }
   }
 
-  // Keep the matching block's content, drop every other model's block
-  result = result.replace(
-    /\[IF\s+(FOB|CRC|CMOS|CLIENT-RETAINED|COMPANY-MANAGED)\]([\s\S]*?)\[\/IF\]/gi,
-    (_match, tag: string, inner: string) => (TAG_MODELS[tag.toUpperCase()] === model ? inner : '')
-  );
+  // Remove every other model's block first, so a foreign block nested in the elected one goes with it...
+  const foreignTags = Object.keys(TAG_MODELS).filter(tag => TAG_MODELS[tag] !== model).join('|');
+  result = result.replace(new RegExp(`\\[IF\\s+(?:${foreignTags})\\][\\s\\S]*?\\[\\/IF\\]`, 'gi'), '');
+  // ...then unwrap the elected model's blocks (keep content, remove tags)
+  const electedTags = Object.keys(TAG_MODELS).filter(tag => TAG_MODELS[tag] === model).join('|');
+  result = result.replace(new RegExp(`\\[IF\\s+(?:${electedTags})\\]([\\s\\S]*?)\\[\\/IF\\]`, 'gi'), '$1');
 
   // Remove any remaining [IF ...] and [/IF] tags that might have been left over
   result = result.replace(/\[IF\s+[A-Z_-]+\]/gi, '');

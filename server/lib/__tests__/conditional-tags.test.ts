@@ -27,7 +27,7 @@ describe('processConditionalTags', () => {
     expect(processConditionalTags(ALL + VERBOSE_CRC + VERBOSE_CMOS, 'FOB')).not.toContain('[IF');
   });
 
-  it('keeps today\'s verbose handling for CRC and CMOS', () => {
+  it("keeps today's verbose handling for CRC and CMOS", () => {
     expect(processConditionalTags(VERBOSE_CRC + VERBOSE_CMOS, 'CRC')).toBe('x');
     expect(processConditionalTags(VERBOSE_CRC + VERBOSE_CMOS, 'CMOS')).toBe('y');
   });
@@ -37,6 +37,24 @@ describe('processConditionalTags', () => {
     expect(processConditionalTags(s, 'CRC')).toBe('r');
     expect(processConditionalTags(s, 'CMOS')).toBe('g');
     expect(processConditionalTags(s, 'FOB')).toBe('');
+  });
+
+  it('drops a foreign block nested in the elected block', () => {
+    expect(processConditionalTags('[IF CRC]a[IF CMOS]b[/IF]c[/IF]', 'CRC')).toBe('ac');
+    expect(processConditionalTags('[IF CRC]a[IF FOB]b[/IF]c[/IF]', 'CRC')).toBe('ac');
+    expect(processConditionalTags('[IF CMOS]a[IF CRC]b[/IF]c[/IF]', 'CMOS')).toBe('ac');
+    expect(processConditionalTags('[IF CMOS]a[IF FOB]b[/IF]c[/IF]', 'CMOS')).toBe('ac');
+    expect(processConditionalTags('[IF FOB]a[IF CRC]b[/IF]c[/IF]', 'FOB')).toBe('ac');
+    expect(processConditionalTags('[IF FOB]a[IF CMOS]b[/IF]c[/IF]', 'FOB')).toBe('ac');
+  });
+
+  it('keeps adjacent blocks of the same model', () => {
+    expect(processConditionalTags('[IF FOB]x[/IF][IF FOB]y[/IF]', 'FOB')).toBe('xy');
+  });
+
+  it('matches tags case-insensitively', () => {
+    expect(processConditionalTags('[if crc]c[/if]', 'CRC')).toBe('c');
+    expect(processConditionalTags('[if crc]c[/if]', 'FOB')).toBe('');
   });
 
   it('returns an empty string for empty content', () => {
