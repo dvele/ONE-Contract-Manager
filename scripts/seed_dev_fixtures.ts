@@ -22,6 +22,9 @@
 import "dotenv/config";
 import { pool } from "../server/db";
 import { seedProductionData } from "../server/seed";
+import { MASTER_EF_2026_TEMPLATE_NAME } from "../server/lib/masterEf2026Install";
+import { installMasterEf2026 } from "./lib/masterEf2026Installer";
+import { loadMasterEf2026Content } from "./lib/masterEf2026Content";
 
 /**
  * `requireAuth` hardcodes `req.organizationId` to 1, so every fixture must belong to
@@ -157,7 +160,11 @@ async function seedTemplateExhibits(): Promise<{ linked: number; problems: strin
   }
 
   for (const template of templates) {
-    const { rows: inserted } = await pool.query(
+    // The installer links the 2026-10 template to its own six exhibits. The
+    // contract_types match below would also link the superseded MASTER_EF
+    // exhibits to it, so leave it to the installer.
+    const ownsItsExhibits = template.name === MASTER_EF_2026_TEMPLATE_NAME;
+    const { rows: inserted } = ownsItsExhibits ? { rows: [] } : await pool.query(
       `INSERT INTO template_exhibits (template_id, exhibit_id, order_index, organization_id)
        SELECT $1, e.id, COALESCE(e.sort_order, e.id), $2
        FROM exhibits e
@@ -210,6 +217,11 @@ async function main(): Promise<void> {
 
   console.log("\nTemplate → exhibit junction");
   const { linked, problems } = await seedTemplateExhibits();
+
+  // After seedTemplateExhibits, so the superseded MASTER_EF template is linked to
+  // its exhibits before the installer deactivates it.
+  console.log("\nMaster EF 2026-10 agreement");
+  await installMasterEf2026(pool, loadMasterEf2026Content());
 
   console.log(
     `\nDone: ${modelsCreated} model(s) created, ${linked} exhibit link(s) created.`,

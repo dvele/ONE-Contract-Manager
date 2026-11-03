@@ -1,5 +1,6 @@
 import { build as esbuild } from "esbuild";
 import { rm, readFile } from "fs/promises";
+import path from "path";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -79,6 +80,35 @@ async function buildAll() {
     define: {
       "process.env.NODE_ENV": '"production"',
     },
+    minify: false,
+    external: externals,
+    logLevel: "info",
+  });
+
+  // The installer reads the agreement's clauses and exhibits at runtime, and
+  // server/templates is not in the runtime image. Alias the fs loader to its
+  // twin that imports the files, and inline the .html as text, so the .cjs is
+  // self-contained.
+  await esbuild({
+    entryPoints: ["scripts/install_master_ef_2026.ts"],
+    platform: "node",
+    bundle: true,
+    format: "cjs",
+    outfile: "dist/scripts/install-master-ef-2026.cjs",
+    define: {
+      "process.env.NODE_ENV": '"production"',
+    },
+    loader: { ".html": "text" },
+    plugins: [
+      {
+        name: "inline-master-ef-2026-content",
+        setup(b) {
+          b.onResolve({ filter: /\/masterEf2026Content$/ }, (args) => ({
+            path: path.resolve(args.resolveDir, args.path + ".bundled.ts"),
+          }));
+        },
+      },
+    ],
     minify: false,
     external: externals,
     logLevel: "info",
