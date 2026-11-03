@@ -125,6 +125,7 @@ export const VARIABLE_CATEGORIES = {
   ],
   client: [
     "CLIENT_LEGAL_NAME",
+    "BUYER_ENTITY_CLAUSE",
     "CLIENT_ENTITY_TYPE",
     "CLIENT_FORMATION_STATE",
     "CLIENT_ADDRESS",
@@ -300,7 +301,8 @@ export const VARIABLE_CATEGORIES = {
     "ONSITE_CONTRACTOR_CONTACT_PHONE",
     "ONSITE_CONTRACTOR_BOND_AMOUNT",
     "ONSITE_CONTRACTOR_INSURANCE_AMOUNT",
-    "GC_INFORMATION_LINE",
+    "BUYER_GC_DETAILS",
+    "GC_AFFILIATE_DETAILS",
   ],
   liquidatedDamages: [
     "LIQUIDATED_DAMAGES_PER_DAY",
@@ -647,6 +649,40 @@ export function buildExhibitASignatureBlock(
     </div>`;
 }
 
+/**
+ * "a" or "an" for the word that follows, by sound: vowel-initial words take
+ * "an", except "Utah", whose initial vowel is a consonant sound.
+ */
+export function indefiniteArticle(nextWord: string): "a" | "an" {
+  return /^[aeiou]/i.test(nextWord) && !/^utah\b/i.test(nextWord) ? "an" : "a";
+}
+
+/** The entity phrase after the article: "LLC" → "limited liability company". */
+function entityPhrase(entityType: string): string {
+  const t = entityType.trim().toLowerCase();
+  if (t === "llc" || t === "limited liability company") return "limited liability company";
+  if (t === "corporation") return "corporation";
+  if (t === "trust") return "trust";
+  return t;
+}
+
+/**
+ * The 2026 agreement's "a [State of Formation] [entity type]" clause for the
+ * Buyer, e.g. "an Arizona limited liability company"; "an individual" for an
+ * individual or an unrecorded type.
+ */
+export function buyerEntityClause(
+  entityType: string | null | undefined,
+  formationState: string | null | undefined
+): string {
+  if (!entityType?.trim() || entityType.trim().toLowerCase() === "individual") {
+    return "an individual";
+  }
+  const state = stateName(formationState);
+  const phrase = state ? `${state} ${entityPhrase(entityType)}` : entityPhrase(entityType);
+  return `${indefiniteArticle(phrase)} ${phrase}`;
+}
+
 /** 1-99 as lowercase words ("twenty-one"); 0 and anything above 99 as digits. */
 export function numberToWords(n: number): string {
   if (!Number.isInteger(n) || n < 1 || n > 99) return String(n);
@@ -945,19 +981,21 @@ export function mapProjectToVariables(
   const gcLicenseNo = onsiteContractor?.licenseNumber || BLANK;
   const gcLicenseState = onsiteContractor?.licenseState || BLANK;
   const sellerState = stateName(childLlc?.formationState);
-  const sellerEntityClause = sellerState
-    ? `${/^[AEIOU]/i.test(sellerState) && sellerState !== "Utah" ? "an" : "a"} ${sellerState} limited liability company`
-    : "a limited liability company";
+  const sellerPhrase = sellerState
+    ? `${sellerState} limited liability company`
+    : "limited liability company";
+  const sellerEntityClause = `${indefiniteArticle(sellerPhrase)} ${sellerPhrase}`;
+  // Exhibit A.1's Delivery Model options, worded as in the agreement.
+  const deliveryModelOptions: Record<DeliveryModel, string> = {
+    FOB: "FOB Factory (Buyer Pickup/Transport)",
+    CRC: "Delivered to Site (Dvele Transport; Buyer/GC Site Work)",
+    CMOS: `Dvele GC (Turnkey through CO/Equivalent; GC Affiliate: ${gcName}; License No. / State: ${gcLicenseNo} / ${gcLicenseState})`,
+  };
   const deliveryModelElection = (["FOB", "CRC", "CMOS"] as DeliveryModel[])
-    .map((m) => {
-      const box = m === deliveryModel ? "☒" : "☐";
-      const gcDetail =
-        m === "CMOS"
-          ? `; GC Affiliate: ${gcName}; License No. / State: ${gcLicenseNo} / ${gcLicenseState}`
-          : "";
-      return `${box} ${DELIVERY_MODEL_LABELS[m]}${gcDetail}`;
-    })
+    .map((m) => `${m === deliveryModel ? "☒" : "☐"} ${deliveryModelOptions[m]}`)
     .join("<br>");
+  // Exhibit C.1's two blanks: the Buyer's GC, or the GC Affiliate under Dvele GC.
+  const gcDetails = `${gcName} / ${gcLicenseNo} / ${onsiteContractor?.contactName || BLANK}`;
 
   // Build the variables object
   const variables: ContractVariables = {
@@ -984,6 +1022,7 @@ export function mapProjectToVariables(
     // CLIENT
     // ===================
     CLIENT_LEGAL_NAME: client?.legalName || "",
+    BUYER_ENTITY_CLAUSE: buyerEntityClause(client?.entityType, client?.formationState),
     CLIENT_ENTITY_TYPE: client?.entityType || "Individual",
     CLIENT_FORMATION_STATE: client?.formationState || "",
     CLIENT_ADDRESS: client?.address || "",
@@ -1542,11 +1581,8 @@ export function mapProjectToVariables(
     ONSITE_CONTRACTOR_CONTACT_NAME: onsiteContractor?.contactName || "",
     ONSITE_CONTRACTOR_CONTACT_EMAIL: onsiteContractor?.contactEmail || "",
     ONSITE_CONTRACTOR_CONTACT_PHONE: onsiteContractor?.contactPhone || "",
-    GC_INFORMATION_LINE: `${
-      deliveryModel === "CMOS"
-        ? "Not applicable; Dvele GC elected. GC Affiliate name / license no. / contact:"
-        : "Buyer GC name / license no. / contact:"
-    } ${gcName} / ${gcLicenseNo} / ${onsiteContractor?.contactName || BLANK}`,
+    BUYER_GC_DETAILS: deliveryModel === "CMOS" ? BLANK : gcDetails,
+    GC_AFFILIATE_DETAILS: deliveryModel === "CMOS" ? gcDetails : BLANK,
     ONSITE_CONTRACTOR_BOND_AMOUNT: formatCentsAsCurrency(
       onsiteContractor?.bondAmount
     ),

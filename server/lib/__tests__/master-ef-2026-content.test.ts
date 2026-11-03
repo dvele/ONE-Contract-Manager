@@ -95,8 +95,6 @@ const SUBSTITUTED_PHRASES = [
   "_______(__)", // the unit count, whose "(__)" is too short to read as a blank
   "[IF REQUIRED BY SITE-STATE LAW: PURSUANT TO [STATE STATUTE CITATION],]",
   "$______/day per Home after ______ days free (if left blank, $250/day per Home after ten (10) business days)",
-  // C.1's bullet is replaced whole by {{GC_INFORMATION_LINE}}.
-  "Buyer GC name / license no. / contact: ____________________ (not applicable if Dvele GC is elected, in which case all site work allocated to Dvele is performed by the GC Affiliate or its subcontractors; GC Affiliate name / license no. / contact: ____________________).",
 ];
 
 /** Source paragraphs, with the replaced tables, election cells and A.4 footnote removed. */
@@ -186,6 +184,8 @@ describe("Master EF 2026 authored content", () => {
     const missing: string[] = [];
     for (const paragraph of await sourceParagraphs()) {
       let text = paragraph;
+      // C.1's bullet is a literal "●" in the docx and a list item in the content.
+      text = text.replace(/^\s*●\s*/, "");
       for (const phrase of SUBSTITUTED_PHRASES) text = text.split(phrase).join("\u0000");
       const fragments = text
         .replace(/_{3,}/g, "\u0000")
@@ -197,6 +197,26 @@ describe("Master EF 2026 authored content", () => {
       }
     }
     expect(missing).toEqual([]);
+  });
+
+  it("A.1's election variables reproduce the docx cells", async () => {
+    const { value } = await mammoth.convertToHtml({ path: path.join(DIR, "source.docx") });
+    const $ = cheerio.load(value);
+    const a1 = $("table").filter((_, t) => /Buyer Type/.test($(t).text())).first();
+    const cells = a1
+      .find("td")
+      .toArray()
+      .map((td) => $(td).text())
+      .filter((t) => /^\s*☐/.test(t));
+    // Blanks and the bracketed license state compare as one blank; the
+    // elected box compares as an empty one.
+    const shape = (t: string) =>
+      normalize(t.replace(/<br>/g, " ").replace(/☒/g, "☐").replace(/_{3,}|\[State\]/g, "_"));
+    const vars = mapProjectToVariables(MINIMAL_PROJECT);
+    expect(cells.map(shape)).toEqual([
+      shape(String(vars.BUYER_TYPE_ELECTION)),
+      shape(String(vars.DELIVERY_MODEL_ELECTION)),
+    ]);
   });
 
   it("slugs are unique and never mention CRC or CMOS", () => {

@@ -59,7 +59,8 @@ const NEW_VARS: Record<string, string[]> = {
   conditional: ["DELIVERY_MODEL", "IS_FOB"],
   home: ["TOTAL_UNITS_WRITTEN"],
   pricing: ["STORAGE_TERMS"],
-  onsiteContractor: ["GC_INFORMATION_LINE"],
+  onsiteContractor: ["BUYER_GC_DETAILS", "GC_AFFILIATE_DETAILS"],
+  client: ["BUYER_ENTITY_CLAUSE"],
   tables: ["MASTER_EF_SIGNATURE_TABLE"],
 };
 
@@ -142,15 +143,21 @@ describe("delivery model", () => {
     expect(String(v.DELIVERY_MODEL_ELECTION).match(/☒/g)).toHaveLength(1);
     expect(String(v.DELIVERY_MODEL_ELECTION).match(/☐/g)).toHaveLength(2);
   });
-  it("marks the elected option and carries the GC's license under CMOS", () => {
+  it("prints the agreement's three options with their descriptors", () => {
     const el = String(build({ model: "CMOS", contractors: [gc] }).DELIVERY_MODEL_ELECTION);
-    expect(el).toContain("☒ Dvele GC");
-    expect(el).toContain("GC Affiliate: Acme Builders; License No. / State: ROC-123 / AZ");
-    expect(el.split("<br>")).toHaveLength(3);
+    expect(el.split("<br>")).toEqual([
+      "☐ FOB Factory (Buyer Pickup/Transport)",
+      "☐ Delivered to Site (Dvele Transport; Buyer/GC Site Work)",
+      "☒ Dvele GC (Turnkey through CO/Equivalent; GC Affiliate: Acme Builders; License No. / State: ROC-123 / AZ)",
+    ]);
   });
   it("blanks the GC details when none is recorded", () => {
-    const el = String(build({ model: "CMOS" }).DELIVERY_MODEL_ELECTION);
-    expect(el).toContain(`GC Affiliate: ${BLANK}; License No. / State: ${BLANK} / ${BLANK}`);
+    const el = String(build({ model: "CRC" }).DELIVERY_MODEL_ELECTION);
+    expect(el.split("<br>")).toEqual([
+      "☐ FOB Factory (Buyer Pickup/Transport)",
+      "☒ Delivered to Site (Dvele Transport; Buyer/GC Site Work)",
+      `☐ Dvele GC (Turnkey through CO/Equivalent; GC Affiliate: ${BLANK}; License No. / State: ${BLANK} / ${BLANK})`,
+    ]);
   });
   it("orders the options FOB, Delivered to Site, Dvele GC", () => {
     const el = String(build({ model: "FOB" }).DELIVERY_MODEL_ELECTION);
@@ -195,19 +202,36 @@ describe("STORAGE_TERMS", () => {
   });
 });
 
-describe("GC_INFORMATION_LINE", () => {
-  it("reads for Dvele GC", () => {
-    expect(build({ model: "CMOS", contractors: [gc] }).GC_INFORMATION_LINE).toBe(
-      "Not applicable; Dvele GC elected. GC Affiliate name / license no. / contact: Acme Builders / ROC-123 / Pat Doe"
-    );
+describe("C.1 GC details", () => {
+  const DETAILS = "Acme Builders / ROC-123 / Pat Doe";
+  it("fills the GC Affiliate blank under Dvele GC", () => {
+    const v = build({ model: "CMOS", contractors: [gc] });
+    expect(v.GC_AFFILIATE_DETAILS).toBe(DETAILS);
+    expect(v.BUYER_GC_DETAILS).toBe(BLANK);
   });
-  it("reads for the Buyer's GC", () => {
-    expect(build({ model: "CRC", contractors: [gc] }).GC_INFORMATION_LINE).toBe(
-      "Buyer GC name / license no. / contact: Acme Builders / ROC-123 / Pat Doe"
-    );
-    expect(build({ model: "FOB" }).GC_INFORMATION_LINE).toBe(
-      `Buyer GC name / license no. / contact: ${BLANK} / ${BLANK} / ${BLANK}`
-    );
+  it.each(["FOB", "CRC"])("fills the Buyer GC blank under %s", (model) => {
+    const v = build({ model, contractors: [gc] });
+    expect(v.BUYER_GC_DETAILS).toBe(DETAILS);
+    expect(v.GC_AFFILIATE_DETAILS).toBe(BLANK);
+  });
+  it("blanks each missing part", () => {
+    expect(build({ model: "CRC" }).BUYER_GC_DETAILS).toBe(`${BLANK} / ${BLANK} / ${BLANK}`);
+    expect(build({ model: "CMOS" }).GC_AFFILIATE_DETAILS).toBe(`${BLANK} / ${BLANK} / ${BLANK}`);
+  });
+});
+
+describe("BUYER_ENTITY_CLAUSE", () => {
+  it.each([
+    [{ entityType: "Individual" }, "an individual"],
+    [{ entityType: null }, "an individual"],
+    [{ entityType: "LLC", formationState: "AZ" }, "an Arizona limited liability company"],
+    [{ entityType: "Corporation", formationState: "DE" }, "a Delaware corporation"],
+    [{ entityType: "LLC", formationState: null }, "a limited liability company"],
+    [{ entityType: "Trust", formationState: "UT" }, "a Utah trust"],
+    [{ entityType: "Trust" }, "a trust"],
+    [{ entityType: "Partnership", formationState: "OH" }, "an Ohio partnership"],
+  ])("%o", (client, expected) => {
+    expect(build({ client: { legalName: "B", ...client } }).BUYER_ENTITY_CLAUSE).toBe(expected);
   });
 });
 
