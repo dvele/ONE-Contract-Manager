@@ -22,6 +22,7 @@ import {
   type ResponsibilityMatrixItem,
 } from "./tableGenerators";
 import { buildSignatureBlock as buildStyledSignatureBlock, signatureLine } from "./tableStyles";
+import type { DeliveryModel } from "../../shared/deliveryModel";
 import {
   deriveDesignMilestones,
   earliestDate,
@@ -674,7 +675,7 @@ export interface PricingSummaryForMapper {
   grandTotal: number;
   projectBudget: number;
   contractValue: number;
-  serviceModel: "CRC" | "CMOS";
+  serviceModel: DeliveryModel;
   paymentSchedule: {
     name: string;
     percentage: number;

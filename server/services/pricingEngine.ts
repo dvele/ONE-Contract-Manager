@@ -12,6 +12,7 @@ import {
   type ReconciliationResult,
   type StoredMilestone,
 } from "./pricingMath";
+import { billsOnsite, billsShipping, toDeliveryModel, type DeliveryModel } from "../../shared/deliveryModel";
 import { addDays, derivePhaseDates, toDateOnly, asCalendarDate, type PhaseDurations } from "./scheduleMath";
 
 export type { PhaseRollup, RollupProperty, RollupUnit } from "./pricingMath";
@@ -35,8 +36,8 @@ export interface PricingSummary {
   breakdown: PricingBreakdown;
   grandTotal: number;
   projectBudget: number;      // Full cost: design + offsite + customizations + shipping + onsite (always)
-  contractValue: number;      // What Dvele charges: CRC excludes onsite, CMOS includes all
-  serviceModel: 'CRC' | 'CMOS';
+  contractValue: number;      // What Dvele charges: FOB excludes shipping and onsite, CRC excludes onsite, CMOS includes all
+  serviceModel: DeliveryModel;
   paymentSchedule: PaymentScheduleItem[];
   unitCount: number;
   unitModelSummary: string;   // e.g., "1x Trinity, 2x Salt Point"
@@ -74,8 +75,8 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
     throw new Error(`Project with id ${projectId} not found`);
   }
 
-  // Determine service model (CRC or CMOS) from project.onSiteSelection
-  const serviceModel: 'CRC' | 'CMOS' = (project.onSiteSelection === 'CMOS') ? 'CMOS' : 'CRC';
+  // Delivery Model (FOB, CRC or CMOS) from project.onSiteSelection
+  const serviceModel = toDeliveryModel(project.onSiteSelection);
 
   // Always fetch financials to get additional site work / buffer
   const [financial] = await db
@@ -203,14 +204,18 @@ export async function calculateProjectPricing(projectId: number): Promise<Pricin
   const projectBudget = totalDesignFee + totalOffsite + totalCustomizations + totalShipping + totalOnsite;
 
   // contractValue = what Dvele charges the client
+  // FOB: also excludes shipping (client collects at the factory)
   // CRC: excludes onsite (client handles their own GC)
   // CMOS: includes everything (Dvele manages onsite)
   // Customizations are a property of the unit, not of the on-site scope, so they
   // are billed under both models — every unit-table path already adds
   // customization_total to the Unit Price column the client signs against.
-  const contractValue = serviceModel === 'CRC'
-    ? totalDesignFee + totalOffsite + totalCustomizations + totalShipping
-    : totalDesignFee + totalOffsite + totalCustomizations + totalShipping + totalOnsite;
+  const contractValue =
+    totalDesignFee +
+    totalOffsite +
+    totalCustomizations +
+    (billsShipping(serviceModel) ? totalShipping : 0) +
+    (billsOnsite(serviceModel) ? totalOnsite : 0);
   
   // grandTotal kept for backwards compatibility
   const grandTotal = projectBudget;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPhaseRollups, type PropertyRow, type UnitRow } from "../pricingMath";
+import { buildPhaseRollups, sumUnphasedUnitValue, type PropertyRow, type UnitRow } from "../pricingMath";
 
 const PHASES = [
   { id: 1, phaseNumber: 1, name: "Phase 1" },
@@ -413,5 +413,58 @@ describe("buildPhaseRollups", () => {
 
     expect(phase1.breakdown.shipping).toBe(0);
     expect(phase2.breakdown.shipping).toBe(60_000_00);
+  });
+});
+
+describe("FOB Delivery Model", () => {
+  // One unit carrying every price component, so each model's total shows which
+  // components it bills.
+  const full = [
+    unit({
+      id: 200,
+      propertyId: 10,
+      offsiteBasePrice: 100_000_00,
+      shippingSetPrice: 10_000_00,
+      onsiteEstPrice: 50_000_00,
+      customizationTotal: 5_000_00,
+    }),
+  ];
+
+  it("FOB phaseValue excludes shipping and on-site", () => {
+    const value = (m: "FOB" | "CRC" | "CMOS") =>
+      buildPhaseRollups(PHASES, PROPERTIES, full, m, 0, [])[0].phaseValue;
+
+    expect(value("FOB")).toBe(105_000_00);
+    // Regression guards: the existing models are unchanged.
+    expect(value("CRC")).toBe(115_000_00);
+    expect(value("CMOS")).toBe(165_000_00);
+  });
+
+  it("FOB drops the project-level delivery adjustment along with shipping", () => {
+    const [phase1] = buildPhaseRollups(PHASES, PROPERTIES, full, "FOB", 0, [], {
+      additionalDelivery: 20_000_00,
+    });
+    expect(phase1.phaseValue).toBe(105_000_00);
+  });
+
+  it("FOB sumUnphasedUnitValue excludes shipping", () => {
+    const unphased = (m: "FOB" | "CRC" | "CMOS") =>
+      sumUnphasedUnitValue([], [{ ...full[0], propertyId: null }], m);
+
+    expect(unphased("FOB")).toBe(105_000_00);
+    expect(unphased("CRC")).toBe(115_000_00);
+    expect(unphased("CMOS")).toBe(165_000_00);
+  });
+
+  it("milestoneSource reports stored vs default", () => {
+    const storedMilestones = new Map([
+      [1, [{ name: "Deposit", trigger: "Signing", percentage: 100 }]],
+    ]);
+    const [phase1, phase2] = buildPhaseRollups(PHASES, PROPERTIES, UNITS, "CRC", 0, [], {
+      storedMilestones,
+    });
+
+    expect(phase1.milestoneSource).toBe("stored");
+    expect(phase2.milestoneSource).toBe("default");
   });
 });

@@ -1,4 +1,5 @@
 import type { PhaseDates } from "./scheduleMath";
+import { billsOnsite, billsShipping, type DeliveryModel } from "../../shared/deliveryModel";
 
 /**
  * Pure milestone math for per-phase payment schedules.
@@ -121,7 +122,7 @@ export interface ReconciliationResult {
  * The value of units that count into the project totals but into no phase:
  * those on a property carrying no phase, on no property at all, or on a
  * property row that is missing. Mirrors how `buildPhaseRollups` composes
- * `phaseValue`, on-site included only under CMOS, so the two are comparable.
+ * `phaseValue`, shipping omitted under FOB and on-site included only under CMOS, so the two are comparable.
  *
  * Project-level adjustments are excluded deliberately — every one of them is
  * distributed across phases in full, so none of it is ever unphased.
@@ -129,7 +130,7 @@ export interface ReconciliationResult {
 export function sumUnphasedUnitValue(
   propertyRows: PropertyRow[],
   unitRows: UnitRow[],
-  serviceModel: "CRC" | "CMOS"
+  serviceModel: DeliveryModel
 ): number {
   const phasedPropertyIds = new Set(
     propertyRows.filter((p) => p.phaseId !== null).map((p) => p.id)
@@ -142,8 +143,8 @@ export function sumUnphasedUnitValue(
       const perUnit =
         (u.offsiteBasePrice || 0) +
         (u.customizationTotal || 0) +
-        (u.shippingSetPrice || 0) +
-        (serviceModel === "CMOS" ? u.onsiteEstPrice || 0 : 0);
+        (billsShipping(serviceModel) ? u.shippingSetPrice || 0 : 0) +
+        (billsOnsite(serviceModel) ? u.onsiteEstPrice || 0 : 0);
       return sum + perUnit * qty;
     }, 0);
 }
@@ -224,6 +225,8 @@ export interface PhaseRollup {
   };
   phaseValue: number;
   milestones: ScheduledMilestone[];
+  /** Whether `milestones` came from stored rows or the default template. */
+  milestoneSource: "stored" | "default";
   dates: PhaseDates;
 }
 
@@ -303,7 +306,7 @@ export function buildPhaseRollups(
   phaseRows: PhaseRow[],
   propertyRows: PropertyRow[],
   unitRows: UnitRow[],
-  serviceModel: "CRC" | "CMOS",
+  serviceModel: DeliveryModel,
   additionalSiteWork: number,
   phaseDates: PhaseDates[],
   options: PhaseRollupOptions = {}
@@ -363,14 +366,15 @@ export function buildPhaseRollups(
     const phaseValue =
       offsite +
       breakdown.customizations +
-      shipping +
-      (serviceModel === "CMOS" ? onsite : 0);
+      (billsShipping(serviceModel) ? shipping : 0) +
+      (billsOnsite(serviceModel) ? onsite : 0);
 
     const dates =
       phaseDates.find((d) => d.phaseNumber === phase.phaseNumber) ??
       emptyPhaseDates(phase.phaseNumber);
 
     const stored = storedMilestones?.get(phase.id);
+    const useStored = !!stored && stored.length > 0;
 
     return {
       phaseId: phase.id,
@@ -379,10 +383,10 @@ export function buildPhaseRollups(
       properties,
       breakdown: { ...breakdown, offsite, onsite, shipping },
       phaseValue,
-      milestones:
-        stored && stored.length > 0
-          ? priceSchedule(phaseValue, stored)
-          : buildMilestoneSchedule(phaseValue),
+      milestones: useStored
+        ? priceSchedule(phaseValue, stored)
+        : buildMilestoneSchedule(phaseValue),
+      milestoneSource: useStored ? "stored" : "default",
       dates,
     };
   });
