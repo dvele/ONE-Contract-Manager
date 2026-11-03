@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { DELIVERY_MODEL_LABELS, type DeliveryModel } from "@shared/deliveryModel";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -68,6 +69,12 @@ const CATEGORY_ICONS: Record<string, any> = {
   insurance: Shield,
 };
 
+// The compare endpoint only separates the two models the legacy ONE clause tags know,
+// so this page compares those two; FOB has no clause set of its own to compare.
+type ComparedModel = Extract<DeliveryModel, "CRC" | "CMOS">;
+const CRC_LABEL = DELIVERY_MODEL_LABELS.CRC;
+const CMOS_LABEL = DELIVERY_MODEL_LABELS.CMOS;
+
 const SAMPLE_PROJECT_DATA = {
   serviceModel: "CRC",
   projectNumber: "PRJ-2025-001",
@@ -77,7 +84,7 @@ const SAMPLE_PROJECT_DATA = {
 };
 
 export default function ContractPreview() {
-  const [serviceModel, setServiceModel] = useState<"CRC" | "CMOS">("CRC");
+  const [serviceModel, setServiceModel] = useState<ComparedModel>("CRC");
   const [populatedVariables, setPopulatedVariables] = useState<Set<string>>(new Set([
     "PROJECT_NUMBER", "PROJECT_NAME", "CLIENT_LEGAL_NAME", 
     "DELIVERY_ADDRESS", "AGREEMENT_EXECUTION_DATE"
@@ -111,14 +118,14 @@ export default function ContractPreview() {
           <div>
             <h1 className="text-2xl font-semibold" data-testid="text-page-title">Contract Preview</h1>
             <p className="text-muted-foreground">
-              Preview clauses, variables, and CRC/CMOS differences
+              Preview clauses, variables, and {CRC_LABEL} / {CMOS_LABEL} differences
             </p>
           </div>
           <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
-            <Label htmlFor="service-model-toggle" className="text-sm">Service Model:</Label>
+            <Label htmlFor="service-model-toggle" className="text-sm">Delivery Model:</Label>
             <div className="flex items-center gap-2">
               <span className={`text-sm ${serviceModel === "CRC" ? "font-bold text-primary" : "text-muted-foreground"}`}>
-                CRC
+                {CRC_LABEL}
               </span>
               <Switch
                 id="service-model-toggle"
@@ -127,7 +134,7 @@ export default function ContractPreview() {
                 data-testid="switch-service-model"
               />
               <span className={`text-sm ${serviceModel === "CMOS" ? "font-bold text-primary" : "text-muted-foreground"}`}>
-                CMOS
+                {CMOS_LABEL}
               </span>
             </div>
           </div>
@@ -145,7 +152,7 @@ export default function ContractPreview() {
             </TabsTrigger>
             <TabsTrigger value="comparison" data-testid="tab-comparison">
               <ArrowRightLeft className="h-4 w-4 mr-2" />
-              CRC vs CMOS
+              {CRC_LABEL} vs {CMOS_LABEL}
             </TabsTrigger>
           </TabsList>
 
@@ -202,10 +209,10 @@ export default function ContractPreview() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Eye className="h-5 w-5" />
-                  Clauses for {serviceModel} Service Model
+                  Clauses for {DELIVERY_MODEL_LABELS[serviceModel]}
                 </CardTitle>
                 <CardDescription>
-                  These clauses will be included in contracts for {serviceModel === "CRC" ? "Client-Retained Contractor" : "Client-Managed On-Site"} projects
+                  These clauses will be included in contracts for {DELIVERY_MODEL_LABELS[serviceModel]} projects
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -376,7 +383,7 @@ export default function ContractPreview() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <ArrowRightLeft className="h-5 w-5" />
-                  CRC vs CMOS Clause Differences
+                  {CRC_LABEL} vs {CMOS_LABEL} Clause Differences
                 </CardTitle>
                 <CardDescription>
                   Compare which clauses are unique to each service model
@@ -392,7 +399,7 @@ export default function ContractPreview() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <div className="flex items-center gap-2 mb-4">
-                        <Badge className="bg-blue-500">CRC Only</Badge>
+                        <Badge className="bg-blue-500">{CRC_LABEL} Only</Badge>
                         <span className="text-sm text-muted-foreground">
                           {comparisonData?.comparison.crcOnly.length || 0} clauses
                         </span>
@@ -401,7 +408,7 @@ export default function ContractPreview() {
                         <div className="space-y-2">
                           {comparisonData?.comparison.crcOnly.length === 0 ? (
                             <p className="text-sm text-muted-foreground text-center py-4">
-                              No CRC-specific clauses
+                              No {CRC_LABEL}-specific clauses
                             </p>
                           ) : (
                             comparisonData?.comparison.crcOnly.map((clause) => (
@@ -421,7 +428,7 @@ export default function ContractPreview() {
 
                     <div>
                       <div className="flex items-center gap-2 mb-4">
-                        <Badge className="bg-purple-500">CMOS Only</Badge>
+                        <Badge className="bg-purple-500">{CMOS_LABEL} Only</Badge>
                         <span className="text-sm text-muted-foreground">
                           {comparisonData?.comparison.cmosOnly.length || 0} clauses
                         </span>
@@ -430,7 +437,7 @@ export default function ContractPreview() {
                         <div className="space-y-2">
                           {comparisonData?.comparison.cmosOnly.length === 0 ? (
                             <p className="text-sm text-muted-foreground text-center py-4">
-                              No CMOS-specific clauses
+                              No {CMOS_LABEL}-specific clauses
                             </p>
                           ) : (
                             comparisonData?.comparison.cmosOnly.map((clause) => (
@@ -455,7 +462,7 @@ export default function ContractPreview() {
                 <div className="flex items-center justify-center gap-8">
                   <div className="text-center">
                     <p className="text-3xl font-bold text-blue-500">{comparisonData?.comparison.crcTotal || 0}</p>
-                    <p className="text-sm text-muted-foreground">CRC Total</p>
+                    <p className="text-sm text-muted-foreground">{CRC_LABEL} Total</p>
                   </div>
                   <div className="text-center">
                     <p className="text-3xl font-bold text-green-500">{comparisonData?.comparison.shared || 0}</p>
@@ -463,7 +470,7 @@ export default function ContractPreview() {
                   </div>
                   <div className="text-center">
                     <p className="text-3xl font-bold text-purple-500">{comparisonData?.comparison.cmosTotal || 0}</p>
-                    <p className="text-sm text-muted-foreground">CMOS Total</p>
+                    <p className="text-sm text-muted-foreground">{CMOS_LABEL} Total</p>
                   </div>
                 </div>
               </CardContent>

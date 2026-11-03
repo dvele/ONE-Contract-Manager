@@ -54,12 +54,14 @@ import { Plus, Pencil, Trash2, FileUp, Settings2 } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { DELIVERY_MODEL_LABELS } from "@shared/deliveryModel";
 
 const CONTRACT_TYPES = [
   { value: "master_ef", label: "Master Purchase Agreement" },
   { value: "one_agreement", label: "ONE Agreement (Archived)" },
-  { value: "cmos", label: "CMOS" },
-  { value: "crc", label: "CRC" },
+  { value: "fob", label: DELIVERY_MODEL_LABELS.FOB },
+  { value: "cmos", label: DELIVERY_MODEL_LABELS.CMOS },
+  { value: "crc", label: DELIVERY_MODEL_LABELS.CRC },
   { value: "onsite", label: "Onsite" },
 ];
 

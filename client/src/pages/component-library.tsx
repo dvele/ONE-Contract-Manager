@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
+import { DELIVERY_MODEL_LABELS, type DeliveryModel } from "@shared/deliveryModel";
 import { WysiwygEditor } from "@/components/ui/wysiwyg-editor";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -292,11 +293,14 @@ export default function ComponentLibrary() {
     updateMutation.mutate({ id: selectedItem.data.id, data: editCompData });
   };
 
+  const serviceModelLabel = (model: string | null) =>
+    model && model in DELIVERY_MODEL_LABELS ? DELIVERY_MODEL_LABELS[model as DeliveryModel] : model;
+
   const getServiceModelBadge = (items: ComponentRow[]) => {
     const models = items.map(i => i.service_model).filter(Boolean);
     if (models.length === 0) return "ALL";
-    if (models.length === 1) return models[0];
-    return models.join("/");
+    if (models.length === 1) return serviceModelLabel(models[0]);
+    return models.map(serviceModelLabel).join("/");
   };
 
   const isBlockSelected = (tagName: string) => {
@@ -331,7 +335,7 @@ export default function ComponentLibrary() {
           <div className="flex items-center justify-between gap-2 flex-wrap p-4 border-b">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-lg font-semibold" data-testid="detail-tag-name">{comp.tag_name}</h2>
-              {comp.service_model && <Badge variant="secondary" data-testid="detail-service-model">{comp.service_model}</Badge>}
+              {comp.service_model && <Badge variant="secondary" data-testid="detail-service-model">{serviceModelLabel(comp.service_model)}</Badge>}
               {comp.is_system && <Badge variant="outline" data-testid="detail-system-badge">System</Badge>}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -383,13 +387,14 @@ export default function ComponentLibrary() {
                   <Input value={editCompData.tagName} onChange={(e) => setEditCompData({ ...editCompData, tagName: e.target.value })} data-testid="input-tag-name" />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Service Model</Label>
+                  <Label className="text-xs">Delivery Model</Label>
                   <Select value={editCompData.serviceModel || "none"} onValueChange={(v) => setEditCompData({ ...editCompData, serviceModel: v === "none" ? "" : v })}>
                     <SelectTrigger data-testid="select-service-model"><SelectValue placeholder="None (applies to all)" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None (applies to all)</SelectItem>
-                      <SelectItem value="CRC">CRC</SelectItem>
-                      <SelectItem value="CMOS">CMOS</SelectItem>
+                      <SelectItem value="FOB">{DELIVERY_MODEL_LABELS.FOB}</SelectItem>
+                      <SelectItem value="CRC">{DELIVERY_MODEL_LABELS.CRC}</SelectItem>
+                      <SelectItem value="CMOS">{DELIVERY_MODEL_LABELS.CMOS}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -805,7 +810,7 @@ export default function ComponentLibrary() {
                 name="serviceModel"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Service Model</FormLabel>
+                    <FormLabel>Delivery Model</FormLabel>
                     <Select value={field.value || ""} onValueChange={(val) => field.onChange(val === "none" ? "" : val)}>
                       <FormControl>
                         <SelectTrigger data-testid="select-service-model">
@@ -814,8 +819,9 @@ export default function ComponentLibrary() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="none">None (applies to all)</SelectItem>
-                        <SelectItem value="CRC">CRC</SelectItem>
-                        <SelectItem value="CMOS">CMOS</SelectItem>
+                        <SelectItem value="FOB">{DELIVERY_MODEL_LABELS.FOB}</SelectItem>
+                        <SelectItem value="CRC">{DELIVERY_MODEL_LABELS.CRC}</SelectItem>
+                        <SelectItem value="CMOS">{DELIVERY_MODEL_LABELS.CMOS}</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WysiwygEditor } from "@/components/ui/wysiwyg-editor";
 import { ContractTypePicker } from "@/components/ui/contract-type-picker";
+import { DELIVERY_MODEL_LABELS } from "@shared/deliveryModel";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -104,8 +105,9 @@ interface TreeNode {
 
 const CONTRACT_TYPE_OPTIONS = [
   { value: "MASTER_EF", label: "Master Purchase Agreement" },
-  { value: "CMOS", label: "CMOS" },
-  { value: "CRC", label: "CRC" },
+  { value: "FOB", label: DELIVERY_MODEL_LABELS.FOB },
+  { value: "CMOS", label: DELIVERY_MODEL_LABELS.CMOS },
+  { value: "CRC", label: DELIVERY_MODEL_LABELS.CRC },
   { value: "ONSITE", label: "OnSite" },
 ];
 
