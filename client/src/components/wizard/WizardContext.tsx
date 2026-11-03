@@ -5,6 +5,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { generateLLCName } from '@/lib/llcUtils';
 import { getC2DefaultMatrix, isC2Matrix } from './data/responsibilityDefaults';
 import { matrixFromStored, matrixToStored } from './data/storedMatrix';
+import { activeTemplateId } from './data/templateLookup';
 import { toDeliveryModel, billsOnsite, billsShipping, type DeliveryModel } from '@shared/deliveryModel';
 
 // Default on-site duration (days) per Delivery Model. FOB is 0: on-site work is the Buyer's.
@@ -2239,34 +2240,23 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
       
       const contractTypes: string[] = ['master_ef'];
       
-      // Fetch available templates and map to contract types
-      const templateMap: Record<string, number> = {};
+      // Active templates (GET /api/contract-templates returns active rows only).
+      // With none for the contract type, activeTemplateId throws and generation
+      // aborts through the error toast below.
+      let templates: Array<{ id?: number; contract_type?: string }> = [];
       try {
         const templatesResponse = await apiRequest('GET', '/api/contract-templates');
-        {
-          const templates = await templatesResponse.json();
-          // Build a map of contract_type -> template_id
-          for (const t of templates) {
-            if (t.contract_type && t.id) {
-              templateMap[t.contract_type.toUpperCase()] = t.id;
-              // Also map lowercase variants
-              templateMap[t.contract_type.toLowerCase()] = t.id;
-            }
-          }
-        }
+        templates = await templatesResponse.json();
       } catch (templateError) {
-        console.warn('Could not fetch templates, using defaults:', templateError);
+        console.warn('Could not fetch templates:', templateError);
       }
-      
-      if (!templateMap['MASTER_EF']) templateMap['MASTER_EF'] = 26;
-      templateMap['master_ef'] = templateMap['MASTER_EF'];
       
       const generatedContractsList: GeneratedContract[] = [];
       const timestamp = new Date().toISOString();
       
       for (const contractType of contractTypes) {
         // Get correct template based on contract type
-        const templateId = templateMap[contractType] || templateMap['MASTER_EF'] || 26;
+        const templateId = activeTemplateId(templates, contractType);
         
         const contractPayload = {
           projectId,
