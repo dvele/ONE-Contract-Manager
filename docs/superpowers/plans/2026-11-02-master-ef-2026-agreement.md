@@ -557,8 +557,16 @@ Rules:
 
 ## Deploy
 
-1. Legal fixes the Word source so Plumbing / Electrical / HVAC sit under Systems Coverage (Decision 12). When the new `source.docx` arrives, replace it and redo Task 8 Step 3; the content test catches drift.
-2. Push to `dev` (the CI deploy).
-3. In the running ECS task, run `node dist/scripts/install-master-ef-2026.cjs --dry-run`, then without `--dry-run`.
-4. In staging, generate one contract per Delivery Model and spot-check as in Task 10 Step 5.
-5. Legal reviews every `MASTER_EF_2026_STATE_NOTICES` row on `/admin/state-disclosures` (Task 11) and edits in place. Staging's `MASTER_EF_NOTICES` are one-liners; the fuller CA/CO sets in `scripts/prod-sync.sql` were never applied there. Flag Idaho in particular: its Exhibit G content mentions warranties, which may overlap Exhibit E.
+The exact commands, SQL and the `aws ecs run-task` recipe are in [`docs/aws-ecs-amplify-deploy.md` → Master EF 2026 release](../../aws-ecs-amplify-deploy.md#master-ef-2026-release). Staging: `--profile nick-work --region us-west-1`, cluster `contract-manager-cluster-dev`, service `contract-manager-service`, task family `contract-manager-task`, container `contract-manager`, logs `/ecs/contract-manager`.
+
+Content prerequisite: legal fixes the Word source so Plumbing / Electrical / HVAC sit under Systems Coverage (Decision 12). When the new `source.docx` arrives, replace it and redo Task 8 Step 3; the content test catches drift.
+
+0. Before pushing:
+   - Apply `ALTER TABLE projects ADD COLUMN IF NOT EXISTS itemize_design_fee boolean NOT NULL DEFAULT false;` to staging. Staging's drizzle push is stuck on the `project_units_property_id_unit_role_unique` question, and a push that hits a question applies nothing, so the column would never be created and every `projects` select would fail.
+   - The stuck constraint still needs its own fix: check for duplicate `(property_id, unit_role)` rows, then add the constraint by hand (SQL in the runbook). Do it once the new image runs.
+   - Pre-flight: run the parity query in the runbook. Each active template's `template_clauses` set must equal its `contract_types` clause set (both difference columns 0).
+1. Push to `dev`. Wait for the ECS service to be stable and the task healthy, and check that the log says `Schema verified: no pending changes.` (or, while the constraint is unfixed, that the WARNING names only that constraint).
+2. Immediately, before announcing the release, run the installer as a one-off `aws ecs run-task` from the service's task definition, overriding the container command: `["node","dist/scripts/install-master-ef-2026.cjs","--dry-run"]`, then without `--dry-run`. Read the subnets and security group from `aws ecs describe-services`. The image's entrypoint runs `drizzle-kit push` first, then the command. Until this step runs, new contracts (FOB included) generate on the old template, which is why it runs immediately.
+3. Spot-check one contract per Delivery Model as in Task 10 Step 5, plus one old issued contract's PDF download from its contract page (it must be unchanged).
+4. Legal reviews every `MASTER_EF_2026_STATE_NOTICES` row on `/admin/state-disclosures` (Task 11) and edits in place. Staging's `MASTER_EF_NOTICES` are one-liners; the fuller CA/CO sets in `scripts/prod-sync.sql` were never applied there. Flag Idaho in particular: its Exhibit G content mentions warranties, which may overlap Exhibit E.
+5. Rollback: if the code is reverted after the install, reactivate the old template and deactivate the new one, and take the new clauses out of the `MASTER_EF` `contract_types` match, because old code fetches clauses by `contract_types` and would render 191 (old 91 + new 100). SQL, and its inverse for a re-release, in the runbook.
