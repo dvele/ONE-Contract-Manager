@@ -351,6 +351,7 @@ export const projects = pgTable("projects", {
   storageFeePerDay: integer("storage_fee_per_day"), // cents per day
   storageFreedays: integer("storage_free_days"), // number of free days
   adminFeePercent: integer("admin_fee_percent"), // percentage (5 = 5%)
+  itemizeDesignFee: boolean("itemize_design_fee").default(false).notNull(), // show design fee as its own A.4 line
 });
 
 export const clients = pgTable("clients", {

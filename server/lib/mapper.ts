@@ -26,6 +26,7 @@ import {
   ContractFilterType,
   generateExhibitA2TableHtml,
   generateExhibitA4TableHtml,
+  generateExhibitA4CostTableHtml,
   generateExhibitA5TableHtml,
   generateExhibitB1TableHtml,
   generateResponsibilityMatrixHtml,
@@ -356,6 +357,7 @@ export const VARIABLE_CATEGORIES = {
     "UNIT_DETAILS_TABLE",
     "RESPONSIBILITY_MATRIX_TABLE",
     "EXHIBIT_C2_TABLE",
+    "EXHIBIT_A4_COST_TABLE",
     "WHAT_HAPPENS_NEXT_TABLE",
     "MILESTONE_SCHEDULE_TABLE",
     "SIGNATURE_BLOCK_TABLE",
@@ -929,6 +931,11 @@ export function mapProjectToVariables(
   const totalUnits = pricingSummary?.unitCount || projectDetails?.totalUnits || 1;
   const unitCount = Number(totalUnits);
   const unitWords = Number.isFinite(unitCount) ? numberToWords(unitCount) : "";
+  const squareFeetSum = (units ?? []).reduce(
+    (sum, u) => sum + (u.homeModel?.squareFootage ?? 0) * (u.quantity || 1),
+    0
+  );
+  const totalSquareFeet = squareFeetSum > 0 ? squareFeetSum : null;
   const BLANK = "____________________";
   const gcName = onsiteContractor?.legalName || BLANK;
   const gcLicenseNo = onsiteContractor?.licenseNumber || BLANK;
@@ -1388,6 +1395,11 @@ export function mapProjectToVariables(
       pricingSummary || null,
       pricingSummary?.serviceModel || project.onSiteSelection || "CRC",
       project.adminFeePercent
+    ),
+    EXHIBIT_A4_COST_TABLE: generateExhibitA4CostTableHtml(
+      pricingSummary || null,
+      totalSquareFeet,
+      project.itemizeDesignFee ?? false
     ),
     EXHIBIT_A5_TABLE: generateExhibitA5TableHtml(
       pricingSummary?.phases || null,

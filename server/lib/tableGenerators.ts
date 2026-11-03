@@ -9,6 +9,7 @@
  */
 
 import { buildStyledTable, TABLE_STYLES, type StyledRow } from './tableStyles';
+import { billsOnsite, billsShipping, toDeliveryModel } from '../../shared/deliveryModel';
 
 export type ContractFilterType = 'ONE' | 'MANUFACTURING' | 'ONSITE' | 'MASTER_EF';
 
@@ -427,6 +428,78 @@ export function generateExhibitA4TableHtml(
     ],
     rows,
   });
+}
+
+const A4_FOOTNOTE =
+  '*Except as expressly provided under the Feasibility Adjustment provisions of Section 3(d) of the Agreement, the pricing set forth herein is binding and shall not be modified without a written Change Order or Exhibit A amendment executed by both Parties.';
+
+/**
+ * The Master EF 2026 agreement's A.4: cost components, not payment stages.
+ *
+ * Which rows print follows the Delivery Model (`billsShipping`, `billsOnsite`),
+ * the same predicates that decide what `contractValue` contains, so the rows
+ * always add up to the Purchase Price. With `itemizeDesignFee` off the design
+ * fee rides inside the Factory row; the Purchase Price is the same either way.
+ * Rows are whole dollars allocated together so the column sums to its total.
+ */
+export function generateExhibitA4CostTableHtml(
+  pricingSummary: PricingSummary | null,
+  totalSquareFeet: number | null,
+  itemizeDesignFee: boolean
+): string {
+  if (!pricingSummary) return 'No pricing data available.';
+  const { breakdown } = pricingSummary;
+  const model = toDeliveryModel(pricingSummary.serviceModel);
+
+  const lines: { label: string; cents: number; note: string }[] = [];
+  if (itemizeDesignFee) {
+    lines.push({
+      label: 'Design / Pre-Production Fee',
+      cents: breakdown.totalDesignFee,
+      note: 'Included in Purchase Price',
+    });
+  }
+  lines.push({
+    label: 'Factory-Built Home(s)',
+    cents: breakdown.totalOffsite + (itemizeDesignFee ? 0 : breakdown.totalDesignFee),
+    note: 'Per Exhibit B',
+  });
+  const customizations = breakdown.totalCustomizations ?? 0;
+  if (customizations > 0) {
+    lines.push({ label: 'Customizations', cents: customizations, note: '' });
+  }
+  if (billsShipping(model)) {
+    lines.push({ label: 'Delivery & Set', cents: breakdown.totalShipping ?? 0, note: 'Per Exhibit C' });
+  }
+  if (billsOnsite(model)) {
+    lines.push({ label: 'On-Site Work (GC Affiliate)', cents: breakdown.totalOnsite, note: 'Dvele GC only' });
+  }
+
+  const dollars = allocateWholeDollars(lines.map((l) => l.cents));
+  const total = dollars.reduce((sum, d) => sum + d, 0);
+  const perSqft = (amount: number) =>
+    totalSquareFeet ? formatCurrencyWhole(Math.round(amount / totalSquareFeet)) : '—';
+
+  const rows: StyledRow[] = lines.map((line, i) => ({
+    cells: [line.label, formatCurrencyWhole(dollars[i]), perSqft(dollars[i]), line.note],
+  }));
+  rows.push({
+    cells: ['Purchase Price', formatCurrencyWhole(total), perSqft(total), ''],
+    isBold: true,
+    isTotal: true,
+  });
+
+  return (
+    buildStyledTable({
+      columns: [
+        { header: 'Component', align: 'left' },
+        { header: 'Price', align: 'right' },
+        { header: 'Cost/sqft', align: 'right' },
+        { header: 'Notes', align: 'left' },
+      ],
+      rows,
+    }) + `<p style="font-size: 9pt; font-style: italic;">${A4_FOOTNOTE}</p>`
+  );
 }
 
 /** One phase as `buildPhaseRollups` returns it; only the fields A.5 renders. */
