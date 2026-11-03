@@ -140,3 +140,58 @@ export function isC2Matrix(items: ResponsibilityItem[]): boolean {
   const ids = new Set(C2_WORK_CATEGORIES.map((c) => c.id));
   return items.every((i) => ids.has(i.id));
 }
+
+/**
+ * The two matrices `project_details.responsibility_matrix` can hold: the old
+ * agreement's list (RESPONSIBILITY_CATEGORIES) and the 2026 agreement's C.2.
+ * A project issued on the old agreement keeps its old matrix while the wizard
+ * edits the new one, so neither overwrites the other.
+ */
+export interface StoredMatrix {
+  legacy: ResponsibilityItem[] | null;
+  c2: ResponsibilityItem[] | null;
+}
+
+/** A non-empty array of objects with a string id, or null. */
+function itemArray(value: unknown): ResponsibilityItem[] | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const ok = value.every(
+    (i) => typeof i === 'object' && i !== null && typeof (i as { id?: unknown }).id === 'string',
+  );
+  return ok ? (value as ResponsibilityItem[]) : null;
+}
+
+/**
+ * Reads the stored text, which is either a bare array (the format before the
+ * 2026 agreement, holding one list) or `{ c2, legacy? }`. A bare array of C.2
+ * ids is C.2; any other bare array is legacy. Malformed JSON or items give
+ * null. Never throws: an unreadable value falls back to the defaults.
+ */
+export function parseStoredMatrix(raw: string | null | undefined): StoredMatrix {
+  const none: StoredMatrix = { legacy: null, c2: null };
+  if (!raw) return none;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return none;
+  }
+  const classify = (value: unknown) => {
+    const items = itemArray(value);
+    if (!items) return { c2: null, legacy: null };
+    return isC2Matrix(items) ? { c2: items, legacy: null } : { c2: null, legacy: items };
+  };
+  if (Array.isArray(parsed)) return classify(parsed);
+  if (typeof parsed !== 'object' || parsed === null) return none;
+  const obj = parsed as { c2?: unknown; legacy?: unknown };
+  return { c2: classify(obj.c2).c2, legacy: classify(obj.legacy).legacy };
+}
+
+/** Always writes the object form; null when there is nothing to keep. */
+export function serializeStoredMatrix(
+  c2: ResponsibilityItem[],
+  legacy: ResponsibilityItem[] | null,
+): string | null {
+  if (c2.length === 0 && !legacy) return null;
+  return JSON.stringify(legacy ? { c2, legacy } : { c2 });
+}

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { generateLLCName } from '@/lib/llcUtils';
 import { getC2DefaultMatrix, isC2Matrix } from './data/responsibilityDefaults';
+import { matrixFromStored, matrixToStored } from './data/storedMatrix';
 import { toDeliveryModel, billsOnsite, billsShipping, type DeliveryModel } from '@shared/deliveryModel';
 
 // Default on-site duration (days) per Delivery Model. FOB is 0: on-site work is the Buyer's.
@@ -264,6 +265,8 @@ export interface ProjectData {
   productionCompleteDate: string;
   // Exhibit C.2 - Responsibility Matrix
   responsibilityMatrix: ResponsibilityItem[];
+  // The old agreement's matrix, loaded and saved back unchanged (never edited here)
+  legacyResponsibilityMatrix: ResponsibilityItem[] | null;
 }
 
 // Wizard state interface
@@ -495,6 +498,7 @@ export const initialProjectData: ProjectData = {
   productionMidpointDate: '',
   productionCompleteDate: '',
   responsibilityMatrix: [],
+  legacyResponsibilityMatrix: null,
 };
 
 // Test draft data pre-filled through Step 8 for faster testing
@@ -796,11 +800,8 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           loadedData.manufacturingStartDate = details.productionStartDate || '';
           loadedData.projectState = details.governingLawState || '';
           // Exhibit C.2 Responsibility Matrix
-          if (details.responsibilityMatrix) {
-            try {
-              loadedData.responsibilityMatrix = JSON.parse(details.responsibilityMatrix);
-            } catch { loadedData.responsibilityMatrix = []; }
-          }
+          // Exhibit C.2 rows go to the editor; an old agreement's matrix is carried as is.
+          Object.assign(loadedData, matrixFromStored(details.responsibilityMatrix));
           // Exhibit C.4 Interface Deadlines
           if (details.foundationReadyDays != null) loadedData.foundationReadyDays = details.foundationReadyDays;
           if (details.utilityStubbedDays != null) loadedData.utilityStubbedDays = details.utilityStubbedDays;
@@ -853,8 +854,9 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         if (!loadedData.warrantyStructuralMonths) {
           loadedData.warrantyStructuralMonths = 120;
         }
-        // A stored matrix from the old category list fails isC2Matrix and is re-seeded
-        // with the agreement's C.2 defaults (isC2Matrix is true for [], hence the length check).
+        // With no stored C.2 matrix the editor starts from the agreement's C.2
+        // defaults; an old-list matrix is kept apart in legacyResponsibilityMatrix.
+        // (isC2Matrix is true for [], hence the length check.)
         if (loadedData.serviceModel && (
           !loadedData.responsibilityMatrix ||
           loadedData.responsibilityMatrix.length === 0 ||
@@ -1175,6 +1177,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
       estimatedCompletionDate: pd.estimatedCompletionDate,
       // C.2 Responsibility Matrix
       responsibilityMatrix: pd.responsibilityMatrix,
+      legacyResponsibilityMatrix: pd.legacyResponsibilityMatrix,
       // C.4 Interface Deadlines
       foundationReadyDays: pd.foundationReadyDays,
       utilityStubbedDays: pd.utilityStubbedDays,
@@ -1320,7 +1323,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           permittingDurationDays: pd.permittingDurationDays || null,
           estimatedCompletionDate: pd.estimatedCompletionDate || null,
           // Exhibit C.2 Responsibility Matrix
-          responsibilityMatrix: pd.responsibilityMatrix?.length > 0 ? JSON.stringify(pd.responsibilityMatrix) : null,
+          responsibilityMatrix: matrixToStored(pd),
           // Exhibit C.4 Interface Deadlines
           foundationReadyDays: pd.foundationReadyDays || null,
           utilityStubbedDays: pd.utilityStubbedDays || null,
@@ -2197,7 +2200,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         productionStartDate: pd.manufacturingStartDate,
         governingLawState: pd.projectState || pd.siteState,
         arbitrationLocation: pd.projectCounty ? `${pd.projectCounty}, ${pd.projectState}` : pd.arbitrationProvider,
-        responsibilityMatrix: pd.responsibilityMatrix?.length > 0 ? JSON.stringify(pd.responsibilityMatrix) : null,
+        responsibilityMatrix: matrixToStored(pd),
       };
       
       await apiRequest('PATCH', `/api/projects/${projectId}/details`, projectDetailsPayload);

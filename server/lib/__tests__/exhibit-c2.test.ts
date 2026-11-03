@@ -135,6 +135,50 @@ describe("EXHIBIT_C2_TABLE", () => {
   });
 });
 
+describe("the stored matrix shared by the old and new agreements (Ruling 31)", () => {
+  const base = (raw: string | null, onSite: string) =>
+    ({
+      project: { projectNumber: "P", name: "N", status: "draft", onSiteSelection: onSite, createdAt: null },
+      client: null,
+      childLlc: null,
+      projectDetails: { responsibilityMatrix: raw },
+      financials: null,
+      milestones: [],
+      warrantyTerms: null,
+      contractors: [],
+    }) as unknown as ProjectWithRelations;
+  const legacy = getDefaultMatrix("CRC").map((i) =>
+    i.id === "site_prep_clearing" ? { ...i, assignedTo: "company" as const } : i,
+  );
+  const c2 = getC2DefaultMatrix("CRC").map((i) =>
+    i.id === "foundation" ? { ...i, assignedTo: "company" as const } : i,
+  );
+
+  it("renders a legacy project's old matrix exactly as before", () => {
+    const vars = mapProjectToVariables(base(JSON.stringify(legacy), "CRC"));
+    expect(vars.RESPONSIBILITY_MATRIX_TABLE).toBe(generateResponsibilityMatrixHtml(legacy, "CRC"));
+    expect(vars.RESPONSIBILITY_MATRIX_TABLE).toMatchSnapshot();
+  });
+
+  it("renders both matrices from the object form, each in its own agreement", () => {
+    const vars = mapProjectToVariables(base(JSON.stringify({ c2, legacy }), "CRC"));
+    expect(vars.RESPONSIBILITY_MATRIX_TABLE).toBe(generateResponsibilityMatrixHtml(legacy, "CRC"));
+    expect(vars.EXHIBIT_C2_TABLE).toBe(generateExhibitC2TableHtml(c2));
+  });
+
+  it("does not render C.2 rows in the old agreement", () => {
+    const vars = mapProjectToVariables(base(JSON.stringify(c2), "CMOS"));
+    expect(vars.RESPONSIBILITY_MATRIX_TABLE).toBe(generateResponsibilityMatrixHtml(getDefaultMatrix("CMOS"), "CMOS"));
+    expect(vars.EXHIBIT_C2_TABLE).toBe(generateExhibitC2TableHtml(c2));
+  });
+
+  it.each(["[null]", "{}", "garbage", "[]"])("falls back to both defaults for %s without throwing", (raw) => {
+    const vars = mapProjectToVariables(base(raw, "CRC"));
+    expect(vars.RESPONSIBILITY_MATRIX_TABLE).toBe(generateResponsibilityMatrixHtml(getDefaultMatrix("CRC"), "CRC"));
+    expect(vars.EXHIBIT_C2_TABLE).toBe(generateExhibitC2TableHtml(getC2DefaultMatrix("CRC")));
+  });
+});
+
 describe("the old matrix renderer", () => {
   it("is unchanged", () => {
     expect(generateResponsibilityMatrixHtml(getDefaultMatrix("CRC"), "CRC")).toMatchSnapshot();

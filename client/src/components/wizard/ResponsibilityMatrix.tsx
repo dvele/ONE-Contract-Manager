@@ -19,9 +19,10 @@ export const ResponsibilityMatrix: React.FC = () => {
   const modelLabel = DELIVERY_MODEL_LABELS[deliveryModel];
   const defaults = getC2DefaultMatrix(deliveryModel);
   
-  // A stored matrix from the old category list is not editable here; it is
-  // replaced with the agreement's C.2 defaults. isC2Matrix is true for [], so
-  // the length check is separate.
+  // This edits the agreement's C.2 only. A project with no C.2 matrix yet is
+  // seeded with the defaults; an old-list matrix lives in
+  // legacyResponsibilityMatrix and is saved back untouched. isC2Matrix is true
+  // for [], so the length check is separate.
   const stored = projectData.responsibilityMatrix;
   const storedIsC2 = stored.length > 0 && isC2Matrix(stored);
   const matrix = storedIsC2 ? stored : defaults;

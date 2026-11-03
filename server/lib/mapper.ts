@@ -10,7 +10,7 @@ import type {
 import {
   getC2DefaultMatrix,
   getDefaultMatrix,
-  isC2Matrix,
+  parseStoredMatrix,
 } from "../../shared/responsibilityMatrix";
 import {
   toDeliveryModel,
@@ -32,7 +32,6 @@ import {
   generateExhibitB1TableHtml,
   generateResponsibilityMatrixHtml,
   generateExhibitC2TableHtml,
-  type ResponsibilityMatrixItem,
 } from "./tableGenerators";
 import { buildSignatureBlock as buildStyledSignatureBlock, signatureLine } from "./tableStyles";
 import {
@@ -997,6 +996,8 @@ export function mapProjectToVariables(
     .join("<br>");
   // Exhibit C.1's two blanks: the Buyer's GC, or the GC Affiliate under Dvele GC.
   const gcDetails = `${gcName} / ${gcLicenseNo} / ${onsiteContractor?.contactName || BLANK}`;
+  // The old agreement's matrix and the 2026 C.2 matrix share one column.
+  const storedMatrix = parseStoredMatrix(projectDetails?.responsibilityMatrix);
 
   // Build the variables object
   const variables: ContractVariables = {
@@ -1385,16 +1386,8 @@ export function mapProjectToVariables(
         (pricingSummary?.serviceModel || project.onSiteSelection) === "CMOS"
           ? "CMOS"
           : "CRC";
-      const stored = (() => {
-        try {
-          const raw = projectDetails?.responsibilityMatrix;
-          if (!raw) return null;
-          const parsed = JSON.parse(raw) as ResponsibilityMatrixItem[];
-          return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
-        } catch {
-          return null;
-        }
-      })();
+      // The old agreement's own list only: a C.2 matrix never renders here.
+      const stored = storedMatrix.legacy;
       // Exhibit C.5 reads "Responsibilities ... are allocated exclusively as
       // set forth in this Exhibit C", so a C.2 rendering "matrix not
       // configured" is an exclusive allocation to an empty table. The wizard
@@ -1407,23 +1400,12 @@ export function mapProjectToVariables(
     })(),
     // The agreement's C.2. A stored matrix saved against the old item list is
     // ignored rather than mixed with this one.
-    EXHIBIT_C2_TABLE: (() => {
-      let stored: ResponsibilityMatrixItem[] | null = null;
-      try {
-        const raw = projectDetails?.responsibilityMatrix;
-        const parsed = raw ? (JSON.parse(raw) as ResponsibilityMatrixItem[]) : null;
-        if (Array.isArray(parsed) && parsed.length > 0) stored = parsed;
-      } catch {
-        stored = null;
-      }
-      return generateExhibitC2TableHtml(
-        stored && isC2Matrix(stored)
-          ? stored
-          : getC2DefaultMatrix(
-              toDeliveryModel(pricingSummary?.serviceModel || project.onSiteSelection)
-            )
-      );
-    })(),
+    EXHIBIT_C2_TABLE: generateExhibitC2TableHtml(
+      storedMatrix.c2 ??
+        getC2DefaultMatrix(
+          toDeliveryModel(pricingSummary?.serviceModel || project.onSiteSelection)
+        )
+    ),
     MILESTONE_SCHEDULE_TABLE: "",
 
     EXHIBIT_A2_TABLE: generateExhibitA2TableHtml(
