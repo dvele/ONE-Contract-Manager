@@ -10,7 +10,7 @@ Always use plan mode for schema changes.
 
 ## After Making Changes
 
-- Run `npm run check` (TypeScript) after every non-trivial change. There is no test suite — this is the primary safety net.
+- Run `npm run check` (TypeScript) after every non-trivial change. The vitest suite runs with `npx vitest run`, alongside `npm run check`; together they are the primary safety net.
 - After any schema change, run `npm run db:push` to sync your **local** dev DB. On deploy the container auto-applies the schema via `drizzle-kit push` on startup, so committing `shared/schema.ts` and pushing to `dev` is what ships a schema change to staging (see AGENTS.md → Deployment & CI/CD).
 - Run scripts with `npx tsx scripts/script-name.ts`, not `node`.
 

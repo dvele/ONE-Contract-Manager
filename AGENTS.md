@@ -85,12 +85,13 @@ source of truth on deploy; the files in `migrations/` are stale and not used by 
 
 ## Critical Business Logic
 
-### 1. Service Model (CRC vs CMOS)
-Most of the app branches on `project.onSiteSelection`:
-- **CRC** — Company handles onsite; excludes onsite charges from pricing
-- **CMOS** — Client manages onsite; includes all phases in pricing
+### 1. Delivery Model (FOB / CRC / CMOS)
+The stored `projects.on_site_selection` code is the Delivery Model. `shared/deliveryModel.ts` is the single place to branch on it (`toDeliveryModel`, `billsShipping`, `billsOnsite`).
+- **FOB Factory** (`FOB`) — Buyer picks up at the factory; no shipping or on-site billed
+- **Delivered to Site** (`CRC`) — Dvele delivers and sets; Buyer's GC does on-site; on-site not billed
+- **Dvele GC** (`CMOS`) — turnkey via the GC Affiliate; everything billed
 
-Conditional contract content uses `[IF CRC]...[/IF]` and `[IF CMOS]...[/IF]` tags.
+Conditional contract content uses `[IF FOB]...[/IF]`, `[IF CRC]...[/IF]` and `[IF CMOS]...[/IF]` tags.
 
 ### 2. Variable Mapping (`server/lib/mapper.ts`)
 `mapper.ts` is the **single source of truth** for resolving template variables. All `{{VARIABLE_NAME}}` placeholders in contracts are resolved here. Do not resolve variables anywhere else. Variable categories: project, client, childLlc, site, home, specifications, financial, legal, dates.
