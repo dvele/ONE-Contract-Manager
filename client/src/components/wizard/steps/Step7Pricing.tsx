@@ -4,6 +4,7 @@ import { useWizard } from '../WizardContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -456,6 +457,18 @@ export const Step7Pricing: React.FC = () => {
                 )}
               </Button>
             </div>
+          </div>
+          
+          <div className="flex items-center space-x-2 pt-2 border-t">
+            <Checkbox
+              id="itemizeDesignFee"
+              checked={projectData.itemizeDesignFee === true}
+              onCheckedChange={(checked) => updateProjectData({ itemizeDesignFee: checked === true })}
+              data-testid="checkbox-itemize-design-fee"
+            />
+            <Label htmlFor="itemizeDesignFee" className="text-sm font-normal cursor-pointer">
+              Show design fee as a separate line in Exhibit A.4
+            </Label>
           </div>
         </CardContent>
       </Card>

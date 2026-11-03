@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useWizard } from '../WizardContext';
+import { useWizard, ONSITE_DEFAULT_DAYS } from '../WizardContext';
 import { PhaseScheduleEditor } from '../PhaseScheduleEditor';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Info, AlertTriangle, Target } from 'lucide-react';
+import { toDeliveryModel } from '@shared/deliveryModel';
 
 /**
  * The Exhibit D.1 review periods, in business days, as `D1_REVIEW_PERIODS` in
@@ -256,7 +257,7 @@ export const Step6DatesSchedule: React.FC = () => {
 
   useEffect(() => {
     if (!projectData.onsiteDurationDays) {
-      const defaultDays = projectData.serviceModel === 'CRC' ? 90 : 60;
+      const defaultDays = ONSITE_DEFAULT_DAYS[toDeliveryModel(projectData.serviceModel)];
       updateProjectData({ onsiteDurationDays: defaultDays });
     }
   }, [projectData.serviceModel]);

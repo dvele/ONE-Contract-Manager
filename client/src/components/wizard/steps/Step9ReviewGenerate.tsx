@@ -1,7 +1,14 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { useWizard } from "../WizardContext";
+import { useWizard, ONSITE_DEFAULT_DAYS } from "../WizardContext";
+import {
+  DELIVERY_MODEL_LABELS,
+  billsOnsite,
+  billsShipping,
+  toDeliveryModel,
+  type DeliveryModel,
+} from "@shared/deliveryModel";
 import {
   Card,
   CardContent,
@@ -61,8 +68,8 @@ interface PricingSummary {
   };
   grandTotal: number;
   projectBudget: number; // Full cost: design + offsite + onsite (always)
-  contractValue: number; // What Dvele charges: CRC excludes onsite, CMOS includes all
-  serviceModel: "CRC" | "CMOS";
+  contractValue: number; // What Dvele charges: FOB excludes shipping and onsite, CRC excludes onsite, CMOS includes all
+  serviceModel: DeliveryModel;
   paymentSchedule: {
     name: string;
     percentage: number;
@@ -162,7 +169,9 @@ export const Step9ReviewGenerate: React.FC = () => {
       "childLlcState",
       "designFee",
       "preliminaryOffsiteCost",
-      "deliveryInstallationPrice",
+      ...(billsShipping(toDeliveryModel(projectData.serviceModel))
+        ? ["deliveryInstallationPrice"]
+        : []),
       "totalPreliminaryContractPrice",
       "milestone1Percent",
       "milestone2Percent",
@@ -172,7 +181,10 @@ export const Step9ReviewGenerate: React.FC = () => {
       "effectiveDate",
       "designPhaseDays",
       "manufacturingDurationDays",
-      "onsiteDurationDays",
+      // FOB has no on-site duration (0 is the Buyer's responsibility).
+      ...(ONSITE_DEFAULT_DAYS[toDeliveryModel(projectData.serviceModel)] > 0
+        ? ["onsiteDurationDays"]
+        : []),
       "warrantyFitFinishMonths",
       "warrantyBuildingEnvelopeMonths",
       "warrantyStructuralMonths",
@@ -701,8 +713,10 @@ export const Step9ReviewGenerate: React.FC = () => {
                 </p>
               </div>
               <div>
-                <p className="text-muted-foreground">Service Model</p>
-                <Badge variant="outline">{projectData.serviceModel}</Badge>
+                <p className="text-muted-foreground">Delivery Model</p>
+                <Badge variant="outline">
+                  {DELIVERY_MODEL_LABELS[toDeliveryModel(projectData.serviceModel)]}
+                </Badge>
               </div>
               <div>
                 <p className="text-muted-foreground">Company Entity</p>
@@ -889,19 +903,17 @@ export const Step9ReviewGenerate: React.FC = () => {
                   <p className="text-muted-foreground">Onsite Estimate</p>
                   <p className="font-medium" data-testid="review-onsite">
                     {formatCurrencyCents(pricingSummary.breakdown.totalOnsite)}
-                    {pricingSummary.serviceModel === "CRC" && (
+                    {!billsOnsite(toDeliveryModel(pricingSummary.serviceModel)) && (
                       <span className="ml-1 text-xs text-muted-foreground">
-                        (Client-managed)
+                        (Buyer-managed)
                       </span>
                     )}
                   </p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Service Model</p>
+                  <p className="text-muted-foreground">Delivery Model</p>
                   <Badge variant="outline" data-testid="review-service-model">
-                    {pricingSummary.serviceModel === "CRC"
-                      ? "Client-Retained Contractor"
-                      : "Company-Managed On-Site"}
+                    {DELIVERY_MODEL_LABELS[toDeliveryModel(pricingSummary.serviceModel)]}
                   </Badge>
                 </div>
                 <div className="col-span-2 border-t pt-2">
@@ -923,9 +935,11 @@ export const Step9ReviewGenerate: React.FC = () => {
                     {formatCurrencyCents(pricingSummary.contractValue)}
                     <span className="ml-1 text-xs text-muted-foreground">
                       (What Dvele charges
-                      {pricingSummary.serviceModel === "CRC"
-                        ? " - excludes onsite"
-                        : ""}
+                      {!billsShipping(toDeliveryModel(pricingSummary.serviceModel))
+                        ? " - excludes shipping and onsite"
+                        : !billsOnsite(toDeliveryModel(pricingSummary.serviceModel))
+                          ? " - excludes onsite"
+                          : ""}
                       )
                     </span>
                   </p>

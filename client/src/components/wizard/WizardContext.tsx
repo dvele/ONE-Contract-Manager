@@ -3,7 +3,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { generateLLCName } from '@/lib/llcUtils';
-import { getDefaultMatrix } from './data/responsibilityDefaults';
+import { getC2DefaultMatrix, isC2Matrix } from './data/responsibilityDefaults';
+import { toDeliveryModel, billsOnsite, billsShipping, type DeliveryModel } from '@shared/deliveryModel';
+
+// Default on-site duration (days) per Delivery Model. FOB is 0: on-site work is the Buyer's.
+export const ONSITE_DEFAULT_DAYS: Record<DeliveryModel, number> = { FOB: 0, CRC: 90, CMOS: 60 };
 
 // Shell Testing Mode: Set to false when step content components are added
 // When true: skips form validation and allows navigation to all steps without completing forms
@@ -136,9 +140,11 @@ export interface ProjectData {
   projectType: string;
   totalUnits: number;
   agreementDate: string;
-  serviceModel: 'CRC' | 'CMOS';
+  serviceModel: DeliveryModel;
   contractType: 'MASTER_EF';
   buyerType: 'end_customer' | 'developer';
+  /** Show the design fee as its own line in Exhibit A.4 (display only; the total is unchanged). */
+  itemizeDesignFee: boolean;
   storageFeePerDay: number;
   storageFreedays: number;
   adminFeePercent: number;
@@ -304,7 +310,7 @@ export interface ClauseComparison {
   differences: Array<{
     clauseNumber: string;
     clauseName: string;
-    appliesTo: 'CRC' | 'CMOS' | 'BOTH';
+    appliesTo: DeliveryModel | 'BOTH';
     contentDiffers?: boolean;
   }>;
 }
@@ -376,6 +382,7 @@ export const initialProjectData: ProjectData = {
   serviceModel: 'CRC',
   contractType: 'MASTER_EF',
   buyerType: 'end_customer',
+  itemizeDesignFee: false,
   storageFeePerDay: 15000,
   storageFreedays: 14,
   adminFeePercent: 10,
@@ -498,6 +505,7 @@ export const testDraftData: Partial<ProjectData> = {
   projectType: 'Single Family',
   totalUnits: 1,
   serviceModel: 'CRC',
+  itemizeDesignFee: false,
   clientLegalName: 'Acme Development LLC',
   clientState: 'CA',
   clientEntityType: 'LLC',
@@ -651,9 +659,10 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           projectName: project?.name || '',
           projectNumber: project?.projectNumber || '',
           odooProjectId: project?.odooProjectId ?? null,
-          serviceModel: project?.onSiteSelection || 'CRC',
+          serviceModel: toDeliveryModel(project?.onSiteSelection),
           contractType: project?.contractType === 'MASTER_EF' ? 'MASTER_EF' : 'MASTER_EF',
           buyerType: project?.buyerType || 'end_customer',
+          itemizeDesignFee: project?.itemizeDesignFee === true,
           storageFeePerDay: project?.storageFeePerDay || 15000,
           storageFreedays: project?.storageFreedays || 14,
           adminFeePercent: project?.adminFeePercent || 10,
@@ -827,7 +836,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           loadedData.manufacturingDurationDays = 120;
         }
         if (!loadedData.onsiteDurationDays) {
-          loadedData.onsiteDurationDays = loadedData.serviceModel === 'CRC' ? 90 : 60;
+          loadedData.onsiteDurationDays = ONSITE_DEFAULT_DAYS[toDeliveryModel(loadedData.serviceModel)];
         }
         if (!loadedData.estimatedCompletionMonths) {
           loadedData.estimatedCompletionMonths = 12;
@@ -844,8 +853,14 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         if (!loadedData.warrantyStructuralMonths) {
           loadedData.warrantyStructuralMonths = 120;
         }
-        if ((!loadedData.responsibilityMatrix || loadedData.responsibilityMatrix.length === 0) && loadedData.serviceModel) {
-          loadedData.responsibilityMatrix = getDefaultMatrix(loadedData.serviceModel as 'CRC' | 'CMOS');
+        // A stored matrix from the old category list fails isC2Matrix and is re-seeded
+        // with the agreement's C.2 defaults (isC2Matrix is true for [], hence the length check).
+        if (loadedData.serviceModel && (
+          !loadedData.responsibilityMatrix ||
+          loadedData.responsibilityMatrix.length === 0 ||
+          !isC2Matrix(loadedData.responsibilityMatrix)
+        )) {
+          loadedData.responsibilityMatrix = getC2DefaultMatrix(toDeliveryModel(loadedData.serviceModel));
         }
         if (!loadedData.arbitrationProvider) {
           loadedData.arbitrationProvider = 'JAMS';
@@ -964,8 +979,11 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
     const { serviceModel, preliminaryOffsiteCost, deliveryInstallationPrice, designFee,
             sitePrepPrice, utilitiesPrice, completionPrice } = wizardState.projectData;
     
-    let total = preliminaryOffsiteCost + deliveryInstallationPrice + designFee;
-    if (serviceModel === 'CMOS') {
+    let total = preliminaryOffsiteCost + designFee;
+    if (billsShipping(toDeliveryModel(serviceModel))) {
+      total += deliveryInstallationPrice;
+    }
+    if (billsOnsite(toDeliveryModel(serviceModel))) {
       total += sitePrepPrice + utilitiesPrice + completionPrice;
     }
     
@@ -1010,9 +1028,11 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
   // Set default onsite duration based on service model
   useEffect(() => {
     const { serviceModel, onsiteDurationDays } = wizardState.projectData;
-    const defaultDays = serviceModel === 'CMOS' ? 60 : 90;
-    if ((serviceModel === 'CMOS' && onsiteDurationDays === 90) || 
-        (serviceModel === 'CRC' && onsiteDurationDays === 60)) {
+    const defaultDays = ONSITE_DEFAULT_DAYS[toDeliveryModel(serviceModel)];
+    // Only a value that is still another model's default is replaced; a typed value stays.
+    const isAnotherModelsDefault = Object.values(ONSITE_DEFAULT_DAYS).includes(onsiteDurationDays)
+      && onsiteDurationDays !== defaultDays;
+    if (isAnotherModelsDefault) {
       setWizardState(prev => ({
         ...prev,
         projectData: { ...prev.projectData, onsiteDurationDays: defaultDays }
@@ -1093,6 +1113,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
       serviceModel: pd.serviceModel,
       contractType: pd.contractType,
       buyerType: pd.buyerType,
+      itemizeDesignFee: pd.itemizeDesignFee,
       storageFeePerDay: pd.storageFeePerDay,
       storageFreedays: pd.storageFreedays,
       adminFeePercent: pd.adminFeePercent,
@@ -1194,9 +1215,10 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           name: pd.projectName,
           status: 'Draft',
           state: pd.siteState || null,
-          onSiteSelection: pd.serviceModel || 'CRC',
+          onSiteSelection: toDeliveryModel(pd.serviceModel),
           contractType: pd.contractType || 'MASTER_EF',
           buyerType: pd.buyerType || 'end_customer',
+          itemizeDesignFee: pd.itemizeDesignFee ?? false,
           storageFeePerDay: pd.storageFeePerDay || 15000,
           storageFreedays: pd.storageFreedays || 14,
           adminFeePercent: pd.adminFeePercent || 10,
@@ -1225,9 +1247,10 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         await apiRequest('PATCH', `/api/projects/${projectId}`, {
           name: pd.projectName,
           state: pd.siteState || null,
-          onSiteSelection: pd.serviceModel || 'CRC',
+          onSiteSelection: toDeliveryModel(pd.serviceModel),
           contractType: pd.contractType || 'MASTER_EF',
           buyerType: pd.buyerType || 'end_customer',
+          itemizeDesignFee: pd.itemizeDesignFee ?? false,
           storageFeePerDay: pd.storageFeePerDay || 15000,
           storageFreedays: pd.storageFreedays || 14,
           adminFeePercent: pd.adminFeePercent || 10,
@@ -1433,7 +1456,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
   const { data: comparisonData, isLoading: comparisonLoading } = useQuery<ClauseComparison>({
     queryKey: ['/api/contracts/compare-service-models'],
     queryFn: async () => {
-      const response = await apiRequest('POST', '/api/contracts/compare-service-models', { projectData: { serviceModel: 'CRC' } });
+      const response = await apiRequest('POST', '/api/contracts/compare-service-models', { projectData: {} });
       return response.json();
     },
     enabled: showComparisonModal || wizardState.currentStep === 2,
@@ -1464,7 +1487,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
     setWizardState(prev => {
       const merged = { ...updates };
       if (merged.serviceModel && merged.serviceModel !== prev.projectData.serviceModel) {
-        merged.responsibilityMatrix = getDefaultMatrix(merged.serviceModel);
+        merged.responsibilityMatrix = getC2DefaultMatrix(toDeliveryModel(merged.serviceModel));
       }
       return {
         ...prev,
@@ -1785,9 +1808,10 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         name: pd.projectName,
         status: 'Draft',
         state: pd.siteState || null,
-        onSiteSelection: pd.serviceModel || 'CRC',
+        onSiteSelection: toDeliveryModel(pd.serviceModel),
         contractType: pd.contractType || 'MASTER_EF',
         buyerType: pd.buyerType || 'end_customer',
+        itemizeDesignFee: pd.itemizeDesignFee ?? false,
         storageFeePerDay: pd.storageFeePerDay || 15000,
         storageFreedays: pd.storageFreedays || 14,
         adminFeePercent: pd.adminFeePercent || 10,
@@ -2001,9 +2025,10 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           name: pd.projectName,
           status: 'Draft',
           state: pd.siteState,
-          onSiteSelection: pd.serviceModel || 'CRC',
+          onSiteSelection: toDeliveryModel(pd.serviceModel),
           contractType: pd.contractType || 'MASTER_EF',
           buyerType: pd.buyerType || 'end_customer',
+          itemizeDesignFee: pd.itemizeDesignFee ?? false,
           storageFeePerDay: pd.storageFeePerDay || 15000,
           storageFreedays: pd.storageFreedays || 14,
           adminFeePercent: pd.adminFeePercent || 10,
@@ -2022,9 +2047,10 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           name: pd.projectName,
           status: 'Draft',
           state: pd.siteState,
-          onSiteSelection: pd.serviceModel || 'CRC',
+          onSiteSelection: toDeliveryModel(pd.serviceModel),
           contractType: pd.contractType || 'MASTER_EF',
           buyerType: pd.buyerType || 'end_customer',
+          itemizeDesignFee: pd.itemizeDesignFee ?? false,
           storageFeePerDay: pd.storageFeePerDay || 15000,
           storageFreedays: pd.storageFreedays || 14,
           adminFeePercent: pd.adminFeePercent || 10,

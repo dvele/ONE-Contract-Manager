@@ -38,8 +38,8 @@ const STEPS = [
   },
   {
     number: 2,
-    title: "Service Model",
-    description: "CRC or CMOS selection",
+    title: "Delivery Model",
+    description: "FOB, Delivered to Site or Dvele GC",
     icon: Settings2,
   },
   {

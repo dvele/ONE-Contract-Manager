@@ -1,14 +1,88 @@
 import { useWizard } from '../WizardContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowRightLeft, UserCheck, Briefcase, HelpCircle, Building2 } from 'lucide-react';
+import { Factory, Truck, Briefcase, HelpCircle, Building2 } from 'lucide-react';
+import { DELIVERY_MODEL_LABELS, toDeliveryModel, type DeliveryModel } from '@shared/deliveryModel';
+
+const DELIVERY_OPTIONS: Array<{
+  model: DeliveryModel;
+  testId: string;
+  Icon: typeof Factory;
+  badge: string;
+  badgeVariant: 'outline' | 'secondary';
+  description: string;
+  bullets: string[];
+  highlight: string;
+}> = [
+  {
+    model: 'FOB',
+    testId: 'option-fob',
+    Icon: Factory,
+    badge: 'Buyer Pickup',
+    badgeVariant: 'outline',
+    description: 'Buyer takes delivery at the factory and arranges transport, set and all on-site work',
+    bullets: [
+      'Buyer collects the homes at the factory',
+      'Buyer hires and manages its own licensed general contractor',
+      'Shipping and on-site costs are separate from Dvele contract',
+    ],
+    highlight: "Buyer's General Contractor info required in Step 3",
+  },
+  {
+    model: 'CRC',
+    testId: 'option-crc',
+    Icon: Truck,
+    badge: 'Dvele Transport',
+    badgeVariant: 'outline',
+    description: "Dvele delivers and sets the homes; Buyer's general contractor handles all on-site work",
+    bullets: [
+      'Dvele transports and sets the homes at the site',
+      "Buyer hires and manages its own licensed general contractor",
+      'On-site costs are separate from Dvele contract',
+    ],
+    highlight: "Buyer's General Contractor info required in Step 3",
+  },
+  {
+    model: 'CMOS',
+    testId: 'option-cmos',
+    Icon: Briefcase,
+    badge: 'Turnkey',
+    badgeVariant: 'secondary',
+    description: 'Dvele coordinates and manages all on-site construction work through its GC Affiliate',
+    bullets: [
+      'Dvele manages all on-site contractors and scheduling',
+      'Single point of contact for entire project',
+      'On-site costs included in total contract price',
+    ],
+    highlight: 'Includes site prep, utilities, and completion pricing',
+  },
+];
+
+const EXPLANATIONS: Record<DeliveryModel, string[]> = {
+  FOB: [
+    "You'll provide the Buyer's General Contractor in the next step",
+    'Excludes shipping and on-site pricing from the Master Purchase Agreement',
+    'Buyer arranges pickup, transport and set',
+    'Includes FOB Factory content in the agreement',
+  ],
+  CRC: [
+    "You'll provide the Buyer's General Contractor in the next step",
+    "On-site work will be between the Buyer and the Buyer's General Contractor",
+    'Excludes on-site pricing from the Master Purchase Agreement',
+    'Includes Delivered to Site content in the agreement',
+  ],
+  CMOS: [
+    'You will enter the GC Affiliate in the next step',
+    'On-site work will be managed by Dvele',
+    'Includes site prep, utilities, and completion pricing',
+    'Includes Dvele GC content in the agreement',
+  ],
+};
 
 export const Step2ServiceModel: React.FC = () => {
   const { 
     wizardState, 
-    updateProjectData,
-    setShowComparisonModal
+    updateProjectData
   } = useWizard();
   
   const { projectData, validationErrors } = wizardState;
@@ -48,9 +122,9 @@ export const Step2ServiceModel: React.FC = () => {
       
       <Card>
         <CardHeader>
-          <CardTitle>Service Model Selection</CardTitle>
+          <CardTitle>Delivery Model Selection</CardTitle>
           <CardDescription>
-            Choose how on-site construction work will be managed
+            Choose how the homes are delivered and who manages on-site construction work
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -58,129 +132,56 @@ export const Step2ServiceModel: React.FC = () => {
             <p className="text-sm text-red-500">{validationErrors.serviceModel}</p>
           )}
           
-          <div
-            className={`
-              relative p-6 border-2 rounded-lg cursor-pointer transition-all overflow-visible
-              ${projectData.serviceModel === 'CRC' 
-                ? 'border-primary bg-primary/5 shadow-md' 
-                : 'border-border hover-elevate'
-              }
-            `}
-            onClick={() => updateProjectData({ serviceModel: 'CRC' })}
-            data-testid="option-crc"
-          >
-            <div className="flex items-start gap-4">
-              <div className={`
-                w-6 h-6 rounded-full border-2 flex items-center justify-center mt-1
-                ${projectData.serviceModel === 'CRC' 
-                  ? 'border-primary bg-primary' 
-                  : 'border-muted-foreground'
+          {DELIVERY_OPTIONS.map(({ model, testId, Icon, badge, badgeVariant, description, bullets, highlight }) => (
+            <div
+              key={model}
+              className={`
+                relative p-6 border-2 rounded-lg cursor-pointer transition-all overflow-visible
+                ${projectData.serviceModel === model 
+                  ? 'border-primary bg-primary/5 shadow-md' 
+                  : 'border-border hover-elevate'
                 }
-              `}>
-                {projectData.serviceModel === 'CRC' && (
-                  <div className="w-3 h-3 rounded-full bg-white" />
-                )}
-              </div>
-              
-              <div className="flex-1">
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <UserCheck className="h-5 w-5 text-primary" />
-                  <h3 className="text-lg font-semibold">Client-Retained Contractor (CRC)</h3>
-                  <Badge variant="outline">Client Managed</Badge>
-                </div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Client hires and manages their own licensed general contractor for all on-site work
-                </p>
-                
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-start gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
-                    <span>Client is responsible for hiring and managing the GC</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
-                    <span>Client handles all on-site coordination and scheduling</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
-                    <span>On-site costs are separate from Dvele contract</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
-                    <span className="font-medium text-primary">Contractor info required in Step 3</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div
-            className={`
-              relative p-6 border-2 rounded-lg cursor-pointer transition-all overflow-visible
-              ${projectData.serviceModel === 'CMOS' 
-                ? 'border-primary bg-primary/5 shadow-md' 
-                : 'border-border hover-elevate'
-              }
-            `}
-            onClick={() => updateProjectData({ serviceModel: 'CMOS' })}
-            data-testid="option-cmos"
-          >
-            <div className="flex items-start gap-4">
-              <div className={`
-                w-6 h-6 rounded-full border-2 flex items-center justify-center mt-1
-                ${projectData.serviceModel === 'CMOS' 
-                  ? 'border-primary bg-primary' 
-                  : 'border-muted-foreground'
-                }
-              `}>
-                {projectData.serviceModel === 'CMOS' && (
-                  <div className="w-3 h-3 rounded-full bg-white" />
-                )}
-              </div>
-              
-              <div className="flex-1">
-                <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <Briefcase className="h-5 w-5 text-primary" />
-                  <h3 className="text-lg font-semibold">Company-Managed On-Site Services (CMOS)</h3>
-                  <Badge variant="secondary">Turnkey</Badge>
-                </div>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Dvele coordinates and manages all on-site construction work and contractors
-                </p>
-                
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-start gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
-                    <span>Dvele manages all on-site contractors and scheduling</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
-                    <span>Single point of contact for entire project</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
-                    <span>On-site costs included in total contract price</span>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
-                    <span className="font-medium text-primary">Includes site prep, utilities, and completion pricing</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex justify-center pt-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowComparisonModal(true)}
-              className="gap-2"
-              data-testid="button-compare-models"
+              `}
+              onClick={() => updateProjectData({ serviceModel: model })}
+              data-testid={testId}
             >
-              <ArrowRightLeft className="h-4 w-4" />
-              Compare CRC vs CMOS
-            </Button>
-          </div>
+              <div className="flex items-start gap-4">
+                <div className={`
+                  w-6 h-6 rounded-full border-2 flex items-center justify-center mt-1
+                  ${projectData.serviceModel === model 
+                    ? 'border-primary bg-primary' 
+                    : 'border-muted-foreground'
+                  }
+                `}>
+                  {projectData.serviceModel === model && (
+                    <div className="w-3 h-3 rounded-full bg-white" />
+                  )}
+                </div>
+                
+                <div className="flex-1">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
+                    <Icon className="h-5 w-5 text-primary" />
+                    <h3 className="text-lg font-semibold">{DELIVERY_MODEL_LABELS[model]}</h3>
+                    <Badge variant={badgeVariant}>{badge}</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4">{description}</p>
+                  
+                  <div className="space-y-2 text-sm">
+                    {bullets.map((text) => (
+                      <div key={text} className="flex items-start gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
+                        <span>{text}</span>
+                      </div>
+                    ))}
+                    <div className="flex items-start gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
+                      <span className="font-medium text-primary">{highlight}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
           
           <Card className="bg-muted/30 border-primary/20">
             <CardContent className="pt-6">
@@ -189,21 +190,9 @@ export const Step2ServiceModel: React.FC = () => {
                 <div className="flex-1">
                   <p className="font-medium text-sm mb-2">How this affects your contracts:</p>
                   <div className="space-y-1 text-sm text-muted-foreground">
-                    {projectData.serviceModel === 'CRC' ? (
-                      <>
-                        <p>You'll provide contractor information in the next step</p>
-                        <p>On-site work will be between your contractor and the SPV</p>
-                        <p>Excludes on-site pricing from the Master Purchase Agreement</p>
-                        <p>Includes CRC-specific clauses in the agreement</p>
-                      </>
-                    ) : (
-                      <>
-                        <p>No contractor information required</p>
-                        <p>On-site work will be managed by Dvele</p>
-                        <p>Includes site prep, utilities, and completion pricing</p>
-                        <p>Includes CMOS-specific clauses in the agreement</p>
-                      </>
-                    )}
+                    {EXPLANATIONS[toDeliveryModel(projectData.serviceModel)].map((line) => (
+                      <p key={line}>{line}</p>
+                    ))}
                   </div>
                 </div>
               </div>

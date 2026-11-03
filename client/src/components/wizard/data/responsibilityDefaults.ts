@@ -3,5 +3,9 @@
 export {
   RESPONSIBILITY_CATEGORIES,
   getDefaultMatrix,
+  C2_WORK_CATEGORIES,
+  getC2DefaultMatrix,
+  isC2Matrix,
   type ResponsibilityCategory,
+  type C2WorkCategory,
 } from '@shared/responsibilityMatrix';

@@ -12,6 +12,7 @@ import { UserCheck, Mail, Phone, Briefcase, Shield, AlertCircle, Factory, HardHa
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { billsOnsite, toDeliveryModel } from '@shared/deliveryModel';
 
 interface ContractorEntity {
   id: number;
@@ -83,6 +84,9 @@ export const Step3PartyInfo: React.FC = () => {
   } = useWizard();
   
   const { projectData, validationErrors } = wizardState;
+  
+  // Dvele GC projects use Dvele's GC Affiliate; every other model uses the Buyer's own GC.
+  const gcHeading = billsOnsite(toDeliveryModel(projectData.serviceModel)) ? 'GC Affiliate' : "Buyer's General Contractor";
   
   // State for contractor dialogs
   const [showManufacturerDialog, setShowManufacturerDialog] = useState(false);
@@ -579,22 +583,22 @@ export const Step3PartyInfo: React.FC = () => {
         </CardContent>
       </Card>
       
-      {/* On-Site Contractor Selection - Always shown */}
+      {/* On-Site Contractor Selection - Always shown (GC Affiliate for Dvele GC, Buyer's GC otherwise) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <HardHat className="h-5 w-5 text-primary" />
-            On-Site Contractor
+            {gcHeading}
             <Badge variant="outline" className="ml-2">Subcontract</Badge>
           </CardTitle>
           <CardDescription>
-            Select the on-site installation contractor (leave empty to add later)
+            Select the {gcHeading} for the on-site work (leave empty to add later)
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="onsiteSelect">
-              On-Site Contractor
+              {gcHeading}
             </Label>
             <Select
               value={projectData.onsiteContractorEntityId?.toString() || ''}
@@ -604,7 +608,7 @@ export const Step3PartyInfo: React.FC = () => {
                 id="onsiteSelect"
                 data-testid="select-onsite-contractor"
               >
-                <SelectValue placeholder="Select an on-site contractor..." />
+                <SelectValue placeholder={`Select ${gcHeading}...`} />
               </SelectTrigger>
               <SelectContent>
                 {onsiteContractors.map(c => (
@@ -616,7 +620,7 @@ export const Step3PartyInfo: React.FC = () => {
                 <SelectItem value="add-new" className="text-primary font-medium">
                   <span className="flex items-center gap-2">
                     <Plus className="h-4 w-4" />
-                    Add New On-Site Contractor
+                    Add New {gcHeading}
                   </span>
                 </SelectItem>
               </SelectContent>
@@ -665,7 +669,7 @@ export const Step3PartyInfo: React.FC = () => {
             <div>
               <p className="text-sm font-medium">Contract Variables</p>
               <p className="text-xs text-muted-foreground">
-                This step populates {projectData.serviceModel === 'CRC' ? '12+' : '10+'} contract variables
+                This step populates {billsOnsite(toDeliveryModel(projectData.serviceModel)) ? '10+' : '12+'} contract variables
               </p>
             </div>
             <Badge variant="secondary" className="text-xs">
@@ -904,7 +908,7 @@ export const Step3PartyInfo: React.FC = () => {
       <Dialog open={showOnsiteDialog} onOpenChange={setShowOnsiteDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle>{isEditMode ? 'Edit On-Site Contractor' : 'Add New On-Site Contractor'}</DialogTitle>
+            <DialogTitle>{isEditMode ? `Edit ${gcHeading}` : `Add New ${gcHeading}`}</DialogTitle>
             <DialogDescription>
               {isEditMode ? 'Update contractor details' : 'Create a new on-site contractor entity for subcontracts'}
             </DialogDescription>
