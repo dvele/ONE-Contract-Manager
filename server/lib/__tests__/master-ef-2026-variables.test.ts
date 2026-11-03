@@ -60,7 +60,7 @@ const NEW_VARS: Record<string, string[]> = {
   home: ["TOTAL_UNITS_WRITTEN"],
   pricing: ["STORAGE_TERMS"],
   onsiteContractor: ["BUYER_GC_DETAILS", "GC_AFFILIATE_DETAILS"],
-  client: ["BUYER_ENTITY_CLAUSE"],
+  client: ["BUYER_ENTITY_CLAUSE", "AGREEMENT_BUYER_ADDRESS"],
   tables: ["MASTER_EF_SIGNATURE_TABLE"],
 };
 
@@ -255,5 +255,22 @@ describe("MASTER_EF_SIGNATURE_TABLE", () => {
   });
   it("shows a placeholder GC column under CMOS with no contractor", () => {
     expect(String(build({ model: "CMOS" }).MASTER_EF_SIGNATURE_TABLE)).toContain("[GC AFFILIATE]");
+  });
+});
+
+describe("AGREEMENT_BUYER_ADDRESS", () => {
+  it("is the client's full address when there is a street address", () => {
+    const client = { legalName: "Buyer Co", address: "1 Main St", city: "Phoenix", state: "AZ", zip: "85001" };
+    const vars = build({ client });
+    expect(vars.AGREEMENT_BUYER_ADDRESS).toBe("1 Main St, Phoenix, AZ 85001");
+    expect(vars.AGREEMENT_BUYER_ADDRESS).toBe(vars.CLIENT_FULL_ADDRESS);
+  });
+
+  it("is a fill-in blank, not the state alone, with no street address", () => {
+    const vars = build({ client: { legalName: "Buyer Co", state: "WA" } });
+    expect(vars.CLIENT_FULL_ADDRESS).toBe("WA"); // unchanged for old exhibits
+    expect(vars.AGREEMENT_BUYER_ADDRESS).toBe(BLANK);
+    expect(build({ client: null }).AGREEMENT_BUYER_ADDRESS).toBe(BLANK);
+    expect(build({ client: { legalName: "B", address: "   ", city: "Seattle" } }).AGREEMENT_BUYER_ADDRESS).toBe(BLANK);
   });
 });

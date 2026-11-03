@@ -106,13 +106,26 @@ Project Data → Variable Mapper → Contract Generator
   → PDF via Puppeteer → File storage
 ```
 
-**Exhibits require a `templateId`.** `fetchExhibitsForContract` selects exhibits via
-the `template_exhibits` junction keyed by `templateId` (contract types no longer drive
-inclusion). Every generation entry point — `POST /contracts`, `download-pdf`,
-`download-all-zip`, preview, regenerate — MUST pass `templateId` or the document is
-produced with **no exhibits**. There is one active `contract_templates` row per
-contract type, so resolve it from `contractType` when no explicit id is available
-(see `resolveTemplateId` in `server/routes/contracts.ts`).
+**Clauses and exhibits both come from the `templateId`.** `fetchClausesForContract`
+selects the template's clauses through its `template_clauses` playlist (in
+`order_index` order), and `fetchExhibitsForContract` its exhibits through the
+`template_exhibits` junction; contract types no longer drive inclusion. With no
+`templateId` the clauses fall back to a `contract_types` match and the document has
+**no exhibits**, and a template with an empty playlist is refused (400) rather than
+rendered without clauses. Every generation entry point resolves its source through
+`resolveGenerationSource` (`server/lib/generationSource.ts`): the named saved contract's
+template and `contract_clauses` snapshot, else an explicit `templateId`, else the
+project's latest saved contract, else the one active template for the contract type.
+That keeps an issued contract on the template it was saved on after a newer one is
+activated. `POST /contracts` and regenerate snapshot the playlist of the `templateId`
+they are given.
+
+A new agreement version is installed as a new template, never by editing the clauses
+of one that contracts were generated from. The Master EF 2026 agreement is installed by
+`scripts/install_master_ef_2026.ts` (bundled as `dist/scripts/install-master-ef-2026.cjs`;
+`--dry-run` rolls back), which adds the template and deactivates the old one; its
+staging release steps are in
+[`docs/aws-ecs-amplify-deploy.md` → Master EF 2026 release](docs/aws-ecs-amplify-deploy.md#master-ef-2026-release).
 
 ### 4. Atomic Clause Architecture
 Clauses have separate `headerText` and `bodyHtml` fields. They are hierarchical (level 1–8, parentId for nesting) and tagged with contract types and tags (JSONB). This enables flexible composition — never merge header and body into a single field.

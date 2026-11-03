@@ -230,7 +230,7 @@ const SANCTIONED: { src: string; aut: string }[] = [
   // Preamble: the Buyer's name and state of formation / entity type (Ruling 18)
   { src: "________________, a [State of Formation] [limited liability company / corporation / other entity type],", aut: "{{CLIENT_LEGAL_NAME}}, {{BUYER_ENTITY_CLAUSE}}," },
   // Preamble: Buyer's principal address blank
-  { src: "_____________________________", aut: "{{CLIENT_FULL_ADDRESS}}" },
+  { src: "_____________________________", aut: "{{AGREEMENT_BUYER_ADDRESS}}" },
   // Preamble: unit count blank
   { src: "_______(__)", aut: "{{TOTAL_UNITS_WRITTEN}}" },
   // Preamble: Site address

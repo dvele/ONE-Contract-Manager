@@ -12,6 +12,8 @@ import { loadMasterEf2026Content } from "./lib/masterEf2026Content";
  *
  * A re-run writes nothing to the template, clauses, exhibits or LLC; the state
  * notices step is insert-if-absent. Existing state_disclosures rows are only read.
+ * The template is found by name, so renaming it makes a re-run install a
+ * second copy.
  */
 const dryRun = process.argv.includes("--dry-run");
 

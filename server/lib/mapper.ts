@@ -132,6 +132,7 @@ export const VARIABLE_CATEGORIES = {
     "CLIENT_STATE",
     "CLIENT_ZIP",
     "CLIENT_FULL_ADDRESS",
+    "AGREEMENT_BUYER_ADDRESS",
     "CLIENT_EMAIL",
     "CLIENT_PHONE",
     "CLIENT_TRUST_DATE",
@@ -1037,6 +1038,11 @@ export function mapProjectToVariables(
       client?.state,
       client?.zip
     ),
+    // The 2026 preamble's "principal address" blank: a fill-in line rather than
+    // CLIENT_FULL_ADDRESS's bare state when the client has no street address.
+    AGREEMENT_BUYER_ADDRESS: client?.address?.trim()
+      ? buildFullAddress(client.address, client.city, client.state, client.zip)
+      : BLANK,
     CLIENT_EMAIL: client?.email || "",
     CLIENT_PHONE: client?.phone || "",
     CLIENT_TRUST_DATE: client?.trustDate || "",

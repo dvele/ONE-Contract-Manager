@@ -2,7 +2,7 @@
   {
     "slug": "MEF26_PREAMBLE",
     "headerText": "DVELE MASTER FACTORY BUILT HOME AGREEMENT",
-    "bodyHtml": "<p>This Dvele Master Factory Built Home Agreement (this “Agreement”) is entered into as of {{AGREEMENT_EXECUTION_DATE_WRITTEN}} (the “Effective Date”) by and between {{SELLER_LEGAL_NAME}}, {{SELLER_ENTITY_CLAUSE}} (“Dvele”), and {{CLIENT_LEGAL_NAME}}, {{BUYER_ENTITY_CLAUSE}}, with a principal address at {{CLIENT_FULL_ADDRESS}} (“Buyer”). Buyer is purchasing {{TOTAL_UNITS_WRITTEN}} factory-built home(s) to be constructed by Dvele and delivered under the Delivery Model elected in Exhibit A for installation at {{SITE_ADDRESS}}, as more particularly described in the applicable Exhibits to this Agreement. Dvele and Buyer may be referred to individually as a “Party” and collectively as the “Parties.”</p>",
+    "bodyHtml": "<p>This Dvele Master Factory Built Home Agreement (this “Agreement”) is entered into as of {{AGREEMENT_EXECUTION_DATE_WRITTEN}} (the “Effective Date”) by and between {{SELLER_LEGAL_NAME}}, {{SELLER_ENTITY_CLAUSE}} (“Dvele”), and {{CLIENT_LEGAL_NAME}}, {{BUYER_ENTITY_CLAUSE}}, with a principal address at {{AGREEMENT_BUYER_ADDRESS}} (“Buyer”). Buyer is purchasing {{TOTAL_UNITS_WRITTEN}} factory-built home(s) to be constructed by Dvele and delivered under the Delivery Model elected in Exhibit A for installation at {{SITE_ADDRESS}}, as more particularly described in the applicable Exhibits to this Agreement. Dvele and Buyer may be referred to individually as a “Party” and collectively as the “Parties.”</p>",
     "level": 1,
     "parentSlug": null,
     "order": 1

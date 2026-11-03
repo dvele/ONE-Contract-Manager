@@ -30,14 +30,16 @@ export async function installMasterEf2026(
   try {
     await client.query("BEGIN");
 
+    // The installed template is found by name: renaming it makes a re-run
+    // install a second copy.
     const { rows: [tpl] } = await client.query(
       `SELECT id FROM contract_templates WHERE name = $1 AND organization_id = $2 ORDER BY id LIMIT 1`,
       [MASTER_EF_2026_TEMPLATE_NAME, ORG],
     );
     const { rows: old } = await client.query(
       `SELECT id FROM contract_templates
-       WHERE contract_type = $1 AND is_active = true AND name <> $2 ORDER BY id`,
-      [MASTER_EF_2026_CONTRACT_TYPE, MASTER_EF_2026_TEMPLATE_NAME],
+       WHERE contract_type = $1 AND is_active = true AND name <> $2 AND organization_id = $3 ORDER BY id`,
+      [MASTER_EF_2026_CONTRACT_TYPE, MASTER_EF_2026_TEMPLATE_NAME, ORG],
     );
     const { rowCount: llcCount } = await client.query(
       `SELECT 1 FROM llcs WHERE name = $1 AND organization_id = $2`,
@@ -139,9 +141,9 @@ export async function installMasterEf2026(
           `INSERT INTO state_disclosures (code, state, content, is_active, organization_id) VALUES ($1, $2, $3, true, $4)`,
           [MASTER_EF_2026_NOTICES_CODE, d.state, d.content, ORG],
         );
-        log(`${tag}  ${d.state}: inserted`);
+        log(`${tag}  ${d.state}: ${dryRun ? "would insert" : "inserted"}`);
       } else {
-        log(`${tag}  ${d.state}: skipped (${d.reason})`);
+        log(`${tag}  ${d.state}: ${dryRun ? "would skip" : "skipped"} (${d.reason})`);
       }
     }
 
