@@ -20,6 +20,10 @@ import { promisify } from "util";
 // @ts-ignore - mammoth doesn't have type declarations
 import mammoth from "mammoth";
 import type { ReconciliationResult } from "../services/pricingMath";
+import {
+  resolveGenerationSource,
+  GenerationSourceError,
+} from "../lib/generationSource";
 
 const execAsync = promisify(exec);
 
@@ -60,29 +64,33 @@ async function reconciliationRefusal(
   };
 }
 
-// Exhibits are fetched via the template_exhibits junction keyed by templateId, so
-// every generation path MUST pass templateId or exhibits are silently omitted
-// (the generator logs "No templateId provided ... no exhibits will be included").
-// There is one active template per contract_type, so resolve it from contractType
-// unless the caller passes an explicit templateId.
-async function resolveTemplateId(
-  contractType: string,
-  explicit?: number,
-): Promise<number | undefined> {
-  if (explicit) return explicit;
-  const r = await pool.query(
-    `SELECT id FROM contract_templates
-     WHERE contract_type = $1 AND is_active = true
-     ORDER BY id DESC LIMIT 1`,
-    [contractType],
-  );
-  const id = r.rows[0]?.id as number | undefined;
-  if (!id) {
-    console.warn(
-      `⚠️ No active contract_template for contractType "${contractType}" — exhibits will be omitted`,
-    );
+// Every generation path resolves its template and clause snapshot through
+// resolveGenerationSource (server/lib/generationSource.ts): an issued contract
+// keeps the template it was saved on and its own clause snapshot, and exhibits
+// need a templateId or the document is produced without them.
+
+/** Reads an optional positive integer id from a request body field. */
+function optionalId(value: unknown): number | undefined | null {
+  if (value === undefined || value === null || value === "") return undefined;
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+/**
+ * Maps a generation-source or empty-template error to the route's 4xx
+ * `{ error }` response, or null for any other error (the route's 500).
+ */
+async function generationRefusal(
+  error: unknown,
+): Promise<{ status: number; body: { error: string; templateId?: number } } | null> {
+  if (error instanceof GenerationSourceError) {
+    return { status: error.status, body: { error: error.message } };
   }
-  return id;
+  const { EmptyTemplateError } = await import('../lib/contractGenerator');
+  if (error instanceof EmptyTemplateError) {
+    return { status: 400, body: { error: error.message, templateId: error.templateId } };
+  }
+  return null;
 }
 
 // Sanitize an uploaded filename: keep only alphanumerics, underscores,
@@ -1339,6 +1347,7 @@ router.post("/contracts/download-all-zip", async (req, res) => {
     console.log(`Contract type for project: ${projectContractType}, generating: ${contractTypes.join(', ')}`);
     
     const generatedContracts: Array<{ buffer: Buffer; filename: string }> = [];
+    let refusal: Awaited<ReturnType<typeof generationRefusal>> = null;
     
     for (const contractType of contractTypes) {
       try {
@@ -1347,11 +1356,15 @@ router.post("/contracts/download-all-zip", async (req, res) => {
           ? projectData
           : mapProjectToVariables(fullProject, pricingSummary || undefined, contractFilterType);
         
-        const templateId = await resolveTemplateId(contractFilterType);
+        const { templateId, snapshotClauses } = await resolveGenerationSource({
+          projectId,
+          contractType: contractFilterType,
+        });
         const buffer = await generateContract({
           contractType: contractFilterType,
           projectData: contractProjectData,
           format: 'pdf',
+          snapshotClauses,
           templateId,
         });
         const filename = getContractFilename(contractType, contractProjectData, 'pdf');
@@ -1359,10 +1372,12 @@ router.post("/contracts/download-all-zip", async (req, res) => {
         console.log(`Generated ${contractType}: ${filename} (${buffer.length} bytes)`);
       } catch (err) {
         console.error(`Failed to generate ${contractType}:`, err);
+        refusal = refusal ?? await generationRefusal(err);
       }
     }
     
     if (generatedContracts.length === 0) {
+      if (refusal) return res.status(refusal.status).json(refusal.body);
       return res.status(500).json({ error: "Failed to generate any contracts" });
     }
     
@@ -1400,6 +1415,11 @@ router.post("/contracts/download-pdf", async (req, res) => {
     
     if (!contractType) {
       return res.status(400).json({ error: "contractType is required" });
+    }
+    const contractId = optionalId(req.body.contractId);
+    const explicitTemplateId = optionalId(req.body.templateId);
+    if (contractId === null || explicitTemplateId === null) {
+      return res.status(400).json({ error: "contractId and templateId must be positive integers" });
     }
     
     let projectData: any;
@@ -1529,11 +1549,17 @@ router.post("/contracts/download-pdf", async (req, res) => {
 
     const { generateContract, getContractFilename } = await import('../lib/contractGenerator');
     
-    const templateId = await resolveTemplateId(contractType, req.body.templateId);
+    const { templateId, snapshotClauses } = await resolveGenerationSource({
+      contractId,
+      projectId,
+      contractType,
+      templateId: explicitTemplateId,
+    });
     const buffer = await generateContract({
       contractType: contractType as 'ONE' | 'MANUFACTURING' | 'ONSITE' | 'MASTER_EF',
       projectData,
       format: 'pdf',
+      snapshotClauses,
       templateId,
     });
 
@@ -1547,6 +1573,8 @@ router.post("/contracts/download-pdf", async (req, res) => {
     
   } catch (error) {
     console.error("Error generating PDF:", error);
+    const refusal = await generationRefusal(error);
+    if (refusal) return res.status(refusal.status).json(refusal.body);
     res.status(500).json({
       error: "Failed to generate document",
       message: error instanceof Error ? error.message : "Unknown error"
@@ -1573,6 +1601,11 @@ router.post("/contracts/export-google-doc", async (req, res) => {
     }
     if (!projectId) {
       return res.status(400).json({ error: "projectId is required" });
+    }
+    const contractId = optionalId(req.body.contractId);
+    const explicitTemplateId = optionalId(req.body.templateId);
+    if (contractId === null || explicitTemplateId === null) {
+      return res.status(400).json({ error: "contractId and templateId must be positive integers" });
     }
 
     const { projectAccessible } = await import('../lib/unit-attachment');
@@ -1761,7 +1794,12 @@ router.post("/contracts/export-google-doc", async (req, res) => {
 
     const { generateContract, getContractFilename } = await import('../lib/contractGenerator');
 
-    const templateId = await resolveTemplateId(contractType, req.body.templateId);
+    const { templateId, snapshotClauses } = await resolveGenerationSource({
+      contractId,
+      projectId,
+      contractType,
+      templateId: explicitTemplateId,
+    });
     // Exhibits are selected through the template_exhibits junction, so no
     // template means a document with no exhibits at all. A Doc persists in the
     // project's shared Drive folder and its URL is written onto the contracts
@@ -1778,6 +1816,7 @@ router.post("/contracts/export-google-doc", async (req, res) => {
       contractType: contractFilterType,
       projectData,
       format: 'html',
+      snapshotClauses,
       templateId,
     });
     const html = buffer.toString('utf-8');
@@ -1797,11 +1836,12 @@ router.post("/contracts/export-google-doc", async (req, res) => {
       throw driveError;
     }
 
-    // The newest row for this project/type, if one was ever saved — exporting
-    // does not create one. Contracts.organization_id is nullable and unset at
-    // INSERT time (see the regenerate route above), so this is keyed on
-    // project + type alone, not the caller's organization.
-    const existingContract = await pool.query(
+    // The contract that was exported, or else the newest row for this
+    // project/type, if one was ever saved — exporting does not create one.
+    // Contracts.organization_id is nullable and unset at INSERT time (see the
+    // regenerate route above), so this is keyed on project + type alone, not
+    // the caller's organization.
+    const existingContract = contractId ? { rows: [{ id: contractId }] } : await pool.query(
       // DESC is NULLS FIRST in Postgres, so an unstamped row would outrank
       // genuinely newer ones; id breaks the remaining ties.
       `SELECT id FROM contracts
@@ -1822,6 +1862,8 @@ router.post("/contracts/export-google-doc", async (req, res) => {
     res.json({ docId, webViewLink });
   } catch (error) {
     console.error("Error exporting Google Doc:", error);
+    const refusal = await generationRefusal(error);
+    if (refusal) return res.status(refusal.status).json(refusal.body);
     res.status(500).json({ error: "Failed to export Google Doc" });
   }
 });
@@ -1846,6 +1888,11 @@ router.post("/contracts/draft-preview", async (req, res) => {
     
     if (!projectId) {
       return res.status(400).json({ error: "projectId is required for draft preview" });
+    }
+    const contractId = optionalId(req.body.contractId);
+    const explicitTemplateId = optionalId(req.body.templateId);
+    if (contractId === null || explicitTemplateId === null) {
+      return res.status(400).json({ error: "contractId and templateId must be positive integers" });
     }
     
     // Get full project data
@@ -1961,58 +2008,15 @@ router.post("/contracts/draft-preview", async (req, res) => {
       console.warn('Pricing enrichment failed for preview, using base values:', pricingError);
     }
     
-    // Use the saved contract's clause snapshot so the preview reflects the same
-    // clause content and order as the generated document (mirrors download-pdf logic).
-    const savedContractForPreview = await pool.query(
-      `SELECT id, template_id FROM contracts
-       WHERE project_id = $1 AND UPPER(contract_type) = UPPER($2)
-       ORDER BY generated_at DESC LIMIT 1`,
-      [projectId, contractType]
-    );
-
-    let previewSnapshotClauses: any[] | undefined;
-    let previewTemplateId: number | undefined;
-
-    if (savedContractForPreview.rows.length > 0) {
-      const saved = savedContractForPreview.rows[0];
-      previewTemplateId = saved.template_id ?? undefined;
-
-      const snapshotResult = await pool.query(
-        `SELECT cc.clause_id AS id, c.slug AS clause_code, cc.header_text AS name,
-                cc.body_html AS content, c.contract_types, cc.level AS hierarchy_level,
-                cc."order" AS sort_order, c.tags, c.parent_id AS parent_clause_id
-         FROM contract_clauses cc
-         LEFT JOIN clauses c ON c.id = cc.clause_id
-         WHERE cc.contract_id = $1
-         ORDER BY cc."order" ASC`,
-        [saved.id]
-      );
-
-      if (snapshotResult.rows.length > 0) {
-        previewSnapshotClauses = snapshotResult.rows.map((r: any) => ({
-          id: r.id,
-          clause_code: r.clause_code || '',
-          name: r.name || '',
-          content: r.content || '',
-          contract_type: Array.isArray(r.contract_types) ? r.contract_types[0] : r.contract_types,
-          hierarchy_level: r.hierarchy_level,
-          sort_order: r.sort_order,
-          // Restore hierarchy from the live clause's parent_id so buildBlockTree nests
-          // the snapshot the same way the PDF path does. The contract_clauses snapshot
-          // table doesn't store parent_clause_id; without this the tree is flat and
-          // applyMasterEFNumbering numbers every clause as a top-level section
-          // (5) 6) 7)… instead of 1) / a. / i.).
-          parent_clause_id: r.parent_clause_id ?? null,
-          conditions: null,
-          block_type: null,
-          disclosure_code: null,
-          category: '',
-          variables_used: [],
-          service_model_condition: null,
-        }));
-        console.log(`📄 Preview using clause snapshot (${previewSnapshotClauses.length} clauses) from contract ${saved.id}`);
-      }
-    }
+    // The viewed (or else the latest saved) contract's template and clause
+    // snapshot, so the preview shows the same document download-pdf produces.
+    const { templateId: previewTemplateId, snapshotClauses: previewSnapshotClauses } =
+      await resolveGenerationSource({
+        contractId,
+        projectId,
+        contractType,
+        templateId: explicitTemplateId,
+      });
 
     // Generate HTML (not PDF)
     const { generateContract } = await import('../lib/contractGenerator');
@@ -2034,6 +2038,8 @@ router.post("/contracts/draft-preview", async (req, res) => {
     
   } catch (error) {
     console.error("Error generating draft preview:", error);
+    const refusal = await generationRefusal(error);
+    if (refusal) return res.status(refusal.status).json(refusal.body);
     res.status(500).json({ 
       error: "Failed to generate preview",
       message: error instanceof Error ? error.message : "Unknown error"

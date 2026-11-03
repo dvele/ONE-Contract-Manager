@@ -377,6 +377,8 @@ export default function ContractDetail() {
       const response = await apiRequest("POST", "/api/contracts/download-pdf", {
         contractType: getContractTypeForApi(contract.contractType),
         projectId: contract.projectId,
+        // This contract's own template and clause snapshot, not the active template.
+        contractId: contract.id,
       });
 
       return await response.blob();
@@ -433,6 +435,8 @@ export default function ContractDetail() {
       const response = await apiRequest("POST", "/api/contracts/draft-preview", {
         contractType: getContractTypeForApi(contract.contractType),
         projectId: contract.projectId,
+        // This contract's own template and clause snapshot, not the active template.
+        contractId: contract.id,
       });
 
       const html = await response.text();

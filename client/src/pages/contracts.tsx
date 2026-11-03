@@ -131,6 +131,7 @@ export default function Contracts() {
       const response = await apiRequest("POST", "/api/contracts/draft-preview", {
         contractType: getContractTypeForApi(contractType),
         projectId,
+        contractId,
       });
       const html = await response.text();
       const newWindow = window.open("", "_blank");
@@ -164,6 +165,8 @@ export default function Contracts() {
       const response = await apiRequest("POST", "/api/contracts/download-pdf", {
         contractType: apiType,
         projectId,
+        // This contract's own template and clause snapshot, not the active template.
+        contractId,
       });
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);

@@ -13,7 +13,7 @@ interface ContractGenerationOptions {
   templateId?: number;        // Used to fetch exhibits from template_exhibits
 }
 
-interface Clause {
+export interface Clause {
   id: number;
   clause_code: string;
   name: string;
@@ -791,6 +791,18 @@ function processBlockTreeVariables(nodes: BlockNode[], variableMap: Record<strin
 }
 
 /**
+ * A template whose template_clauses playlist is empty would generate an
+ * agreement with no clauses. POST /contracts refuses that case, and so does
+ * every generation path that fetches clauses through a templateId.
+ */
+export class EmptyTemplateError extends Error {
+  constructor(public readonly templateId: number) {
+    super(`Template is empty. Please re-import the template. (template ${templateId} has no clauses)`);
+    this.name = 'EmptyTemplateError';
+  }
+}
+
+/**
  * Choose the clause query. With a templateId the template's own clauses are
  * selected through template_clauses in template order (order_index is exposed
  * as "order", so the row mapping and the final sort follow template order, as
@@ -847,6 +859,7 @@ async function fetchClausesForContract(
 
     const { sql, params } = buildClauseFetchQuery(templateId, normalizedType);
     const result = await pool.query(sql, params);
+    if (templateId && result.rows.length === 0) throw new EmptyTemplateError(templateId);
 
     const allClauses: Clause[] = result.rows.map((c: any) => ({
       id: c.id,
