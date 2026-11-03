@@ -1,0 +1,802 @@
+[
+  {
+    "slug": "MEF26_PREAMBLE",
+    "headerText": "DVELE MASTER FACTORY BUILT HOME AGREEMENT",
+    "bodyHtml": "<p>This Dvele Master Factory Built Home Agreement (this “Agreement”) is entered into as of {{AGREEMENT_EXECUTION_DATE_WRITTEN}} (the “Effective Date”) by and between {{SELLER_LEGAL_NAME}}, {{SELLER_ENTITY_CLAUSE}} (“Dvele”), and {{CLIENT_LEGAL_NAME}}, a {{CLIENT_STATE}} {{CLIENT_ENTITY_TYPE}}, with a principal address at {{CLIENT_FULL_ADDRESS}} (“Buyer”). Buyer is purchasing {{TOTAL_UNITS_WRITTEN}} factory-built home(s) to be constructed by Dvele and delivered under the Delivery Model elected in Exhibit A for installation at {{SITE_ADDRESS}}, as more particularly described in the applicable Exhibits to this Agreement. Dvele and Buyer may be referred to individually as a “Party” and collectively as the “Parties.”</p>",
+    "level": 1,
+    "parentSlug": null,
+    "order": 1
+  },
+  {
+    "slug": "MEF26_RECITALS",
+    "headerText": "RECITALS",
+    "bodyHtml": "",
+    "level": 1,
+    "parentSlug": null,
+    "order": 2
+  },
+  {
+    "slug": "MEF26_RECITAL_1",
+    "headerText": "Recital 1",
+    "bodyHtml": "<p>WHEREAS, Dvele designs and manufactures factory-built housing components and modular homes and may provide delivery, transport, assembly, installation support, and/or completion services described in Exhibit A, as agreed.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_RECITALS",
+    "order": 3
+  },
+  {
+    "slug": "MEF26_RECITAL_2",
+    "headerText": "Recital 2",
+    "bodyHtml": "<p>WHEREAS, Buyer owns and/or controls, or will own/control, or will have obtained the owner’s written authorization to use, prior to delivery, each Site, and has or will obtain the authority necessary for delivery, installation, and completion of one or more factory built homes thereon.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_RECITALS",
+    "order": 4
+  },
+  {
+    "slug": "MEF26_RECITAL_3",
+    "headerText": "Recital 3",
+    "bodyHtml": "<p>WHEREAS, Buyer desires to purchase one or more Homes from Dvele and to engage Dvele to provide certain Services, for one or more Projects and/or phases, as more fully described in Exhibit A.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_RECITALS",
+    "order": 5
+  },
+  {
+    "slug": "MEF26_RECITAL_4",
+    "headerText": "Recital 4",
+    "bodyHtml": "<p>WHEREAS, for each Home, Buyer may elect to take delivery at Dvele’s factory, to have Dvele transport the Home to the Site, or to engage Dvele as general contractor, as described in Section 2(b).</p>",
+    "level": 2,
+    "parentSlug": "MEF26_RECITALS",
+    "order": 6
+  },
+  {
+    "slug": "MEF26_RECITAL_THEREFORE",
+    "headerText": "",
+    "bodyHtml": "<p>NOW, THEREFORE, for good and valuable consideration, the Parties agree as follows:</p>",
+    "level": 5,
+    "parentSlug": "MEF26_RECITALS",
+    "order": 7
+  },
+  {
+    "slug": "MEF26_1_AGREEMENT_CONSTRUCTION",
+    "headerText": "AGREEMENT CONSTRUCTION",
+    "bodyHtml": "",
+    "level": 1,
+    "parentSlug": null,
+    "order": 8
+  },
+  {
+    "slug": "MEF26_1_A_EXHIBITS_INCORPORATED",
+    "headerText": "Exhibits Incorporated",
+    "bodyHtml": "<p>The following exhibits are attached to and incorporated into this Agreement:</p>",
+    "level": 2,
+    "parentSlug": "MEF26_1_AGREEMENT_CONSTRUCTION",
+    "order": 9
+  },
+  {
+    "slug": "MEF26_1_A_EXHIBITS_INCORPORATED_I",
+    "headerText": "",
+    "bodyHtml": "<p><strong>Exhibit A</strong> – Project Scope and Commercial Terms (Project/Phase Matrix; Milestones; Pricing; Payment Schedule; Delivery Model election)</p>",
+    "level": 3,
+    "parentSlug": "MEF26_1_A_EXHIBITS_INCORPORATED",
+    "order": 10
+  },
+  {
+    "slug": "MEF26_1_A_EXHIBITS_INCORPORATED_II",
+    "headerText": "",
+    "bodyHtml": "<p><strong>Exhibit B</strong> – Home Plans, Specifications &amp; Finishes (Plan Set Drawing Index; Technical Specifications; Finish Schedules)</p>",
+    "level": 3,
+    "parentSlug": "MEF26_1_A_EXHIBITS_INCORPORATED",
+    "order": 11
+  },
+  {
+    "slug": "MEF26_1_A_EXHIBITS_INCORPORATED_III",
+    "headerText": "",
+    "bodyHtml": "<p><strong>Exhibit C</strong> – General Contractor / On-Site Scope &amp; Responsibility Matrix (Responsibility Allocation; Interfaces; Dependencies; Site Readiness Requirements)</p>",
+    "level": 3,
+    "parentSlug": "MEF26_1_A_EXHIBITS_INCORPORATED",
+    "order": 12
+  },
+  {
+    "slug": "MEF26_1_A_EXHIBITS_INCORPORATED_IV",
+    "headerText": "",
+    "bodyHtml": "<p><strong>Exhibit D</strong> – Milestones &amp; Schedule (Feasibility and Permit Schedule; Review Permitting; Production Slot Assumptions; Reporting Cadence)</p>",
+    "level": 3,
+    "parentSlug": "MEF26_1_A_EXHIBITS_INCORPORATED",
+    "order": 13
+  },
+  {
+    "slug": "MEF26_1_A_EXHIBITS_INCORPORATED_V",
+    "headerText": "",
+    "bodyHtml": "<p><strong>Exhibit E </strong>– Limited Warranty (Coverage Terms; Exclusions; Claim Process; Manufacturer Pass-Through)</p>",
+    "level": 3,
+    "parentSlug": "MEF26_1_A_EXHIBITS_INCORPORATED",
+    "order": 14
+  },
+  {
+    "slug": "MEF26_1_A_EXHIBITS_INCORPORATED_VI",
+    "headerText": "",
+    "bodyHtml": "<p><strong>Exhibit F</strong> – State-Specific Provisions (only to the extent required by law)</p>",
+    "level": 3,
+    "parentSlug": "MEF26_1_A_EXHIBITS_INCORPORATED",
+    "order": 15
+  },
+  {
+    "slug": "MEF26_1_B_EXHIBIT_FIRST",
+    "headerText": "Exhibit-First Structure",
+    "bodyHtml": "<p>All project- and customer-specific descriptions and commercial terms are set forth in Exhibit A and related technical/operational Exhibits. No Services commence unless an Exhibit A is executed by both Parties.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_1_AGREEMENT_CONSTRUCTION",
+    "order": 16
+  },
+  {
+    "slug": "MEF26_1_C_ORDER_PRECEDENCE",
+    "headerText": "Order of Precedence",
+    "bodyHtml": "<p>If there is any conflict:</p>",
+    "level": 2,
+    "parentSlug": "MEF26_1_AGREEMENT_CONSTRUCTION",
+    "order": 17
+  },
+  {
+    "slug": "MEF26_1_C_ORDER_PRECEDENCE_I",
+    "headerText": "",
+    "bodyHtml": "<p><strong>Exhibit A</strong> controls solely for project scope, phasing, milestones, pricing, payment terms, delivery parameters, and Delivery Model elections.</p>",
+    "level": 3,
+    "parentSlug": "MEF26_1_C_ORDER_PRECEDENCE",
+    "order": 18
+  },
+  {
+    "slug": "MEF26_1_C_ORDER_PRECEDENCE_II",
+    "headerText": "",
+    "bodyHtml": "<p><strong>Exhibits B</strong> and <strong>C</strong> control for technical requirements, interfaces, and allocation of responsibilities, except that the Delivery Model elected in Exhibit A controls over any contrary allocation in Exhibit C.</p>",
+    "level": 3,
+    "parentSlug": "MEF26_1_C_ORDER_PRECEDENCE",
+    "order": 19
+  },
+  {
+    "slug": "MEF26_1_C_ORDER_PRECEDENCE_III",
+    "headerText": "",
+    "bodyHtml": "<p><strong>Exhibit D</strong> controls for schedule mechanics and milestone review/admin.</p>",
+    "level": 3,
+    "parentSlug": "MEF26_1_C_ORDER_PRECEDENCE",
+    "order": 20
+  },
+  {
+    "slug": "MEF26_1_C_ORDER_PRECEDENCE_IV",
+    "headerText": "",
+    "bodyHtml": "<p><strong>Exhibit E</strong> controls for warranty terms and claims procedures.</p>",
+    "level": 3,
+    "parentSlug": "MEF26_1_C_ORDER_PRECEDENCE",
+    "order": 21
+  },
+  {
+    "slug": "MEF26_1_C_ORDER_PRECEDENCE_V",
+    "headerText": "",
+    "bodyHtml": "<p><strong>Exhibit F</strong> controls solely to the extent required by applicable state law.</p>",
+    "level": 3,
+    "parentSlug": "MEF26_1_C_ORDER_PRECEDENCE",
+    "order": 22
+  },
+  {
+    "slug": "MEF26_1_C_ORDER_PRECEDENCE_VI",
+    "headerText": "",
+    "bodyHtml": "<p>This Agreement controls in all other respects.</p>",
+    "level": 3,
+    "parentSlug": "MEF26_1_C_ORDER_PRECEDENCE",
+    "order": 23
+  },
+  {
+    "slug": "MEF26_1_D_MULTIPLE_PROJECTS",
+    "headerText": "Multiple Projects / Multiple Exhibit As",
+    "bodyHtml": "<p>The Parties may execute one or more Exhibits A under this Agreement. Each Exhibit A constitutes a separate project engagement governed by this Agreement. Termination or completion of one Exhibit A does not affect others unless expressly stated.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_1_AGREEMENT_CONSTRUCTION",
+    "order": 24
+  },
+  {
+    "slug": "MEF26_1_E_DEFINITIONS",
+    "headerText": "Definitions",
+    "bodyHtml": "<p>Capitalized terms defined elsewhere in this Agreement have the meanings given there. In addition: (i) “Home” means each factory-built home identified in an Exhibit A, including its modules and the components, materials, and systems manufactured or installed by Dvele; (ii) “Project” means the Homes and Services under a single Exhibit A, and “Phase” means a phase of a Project identified in Exhibit A; (iii) “Site” means the real property identified in Exhibit A where a Home will be installed; (iv) “Delivery Model” has the meaning given in Section 2(b); (v) “GC” means a general contractor licensed in the Site jurisdiction; (vi) “Purchase Price” means the total price for a Home stated in Exhibit A, as adjusted by Change Order; (vii) “Green Light Conditions” means the conditions to production stated in Exhibit A, and “Green Light Production Notice” means Dvele’s written notice that the Green Light Conditions are satisfied and a production slot has been allocated; and (viii) “Tender” and “FOB Point” have the meanings given in Section 4(b).</p>",
+    "level": 2,
+    "parentSlug": "MEF26_1_AGREEMENT_CONSTRUCTION",
+    "order": 25
+  },
+  {
+    "slug": "MEF26_2_SERVICES_SCOPE",
+    "headerText": "SERVICES; SCOPE; CHANGE CONTROL",
+    "bodyHtml": "",
+    "level": 1,
+    "parentSlug": null,
+    "order": 26
+  },
+  {
+    "slug": "MEF26_2_A_SERVICES",
+    "headerText": "",
+    "bodyHtml": "<p>Dvele will provide the services described in Exhibit A (the “Services”), including, as applicable, feasibility and permit coordination, factory manufacturing, production management, delivery coordination, on-site assembly/installation support, and/or completion services as allocated in Exhibit C.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_2_SERVICES_SCOPE",
+    "order": 27
+  },
+  {
+    "slug": "MEF26_2_B_DELIVERY_MODEL",
+    "headerText": "Delivery Model; Separation of Responsibility",
+    "bodyHtml": "<p>For each Home, Buyer shall elect in Exhibit A one of the following delivery models (the “Delivery Model”), with responsibilities allocated in Exhibit C:</p>",
+    "level": 2,
+    "parentSlug": "MEF26_2_SERVICES_SCOPE",
+    "order": 28
+  },
+  {
+    "slug": "MEF26_2_B_DELIVERY_MODEL_I",
+    "headerText": "FOB Factory",
+    "bodyHtml": "<p>Dvele will Tender the Home at the FOB Point. Buyer is responsible, at its sole cost and risk, for transport from the FOB Point and for all delivery, set, installation, site work, inspections, and completion, as further provided in Section 4(b).</p>",
+    "level": 3,
+    "parentSlug": "MEF26_2_B_DELIVERY_MODEL",
+    "order": 29
+  },
+  {
+    "slug": "MEF26_2_B_DELIVERY_MODEL_II",
+    "headerText": "Delivered to Site",
+    "bodyHtml": "<p>Dvele will transport the Home to the Site and, if stated in Exhibit A, set the Home on Buyer’s foundation. Buyer (through its GC) is responsible for all other on-site work allocated to Buyer in Exhibit C, and Dvele has no responsibility for site conditions, inspections, completion, or CO/Equivalent beyond the scope allocated to Dvele in Exhibit C.</p>",
+    "level": 3,
+    "parentSlug": "MEF26_2_B_DELIVERY_MODEL",
+    "order": 30
+  },
+  {
+    "slug": "MEF26_2_B_DELIVERY_MODEL_III",
+    "headerText": "Dvele GC",
+    "bodyHtml": "<p>The Dvele affiliate identified in Exhibit A as general contractor (the “GC Affiliate”) shall hold all contractor licenses required in the Site jurisdiction, shall sign the applicable Exhibit A as a party solely with respect to the on-site work, shall be paid directly for the portion of the price allocated to such work in Exhibit A, and is solely responsible to Buyer for that work; Dvele remains responsible for the manufacture and delivery of the Home. Dvele may replace the GC Affiliate with another licensed affiliate by written notice before on-site work begins. As to the on-site work, references to Dvele in Sections 7, 9, 11, and 12 and Exhibits C and E include the GC Affiliate. The GC Affiliate will perform or subcontract the on-site responsibilities allocated to Dvele in Exhibit C through issuance of a certificate of occupancy or equivalent approval (“CO/Equivalent”), subject to Buyer meeting its responsibilities.</p>",
+    "level": 3,
+    "parentSlug": "MEF26_2_B_DELIVERY_MODEL",
+    "order": 31
+  },
+  {
+    "slug": "MEF26_2_C_CHANGE_ORDERS",
+    "headerText": "Change Orders; Substitutions",
+    "bodyHtml": "",
+    "level": 2,
+    "parentSlug": "MEF26_2_SERVICES_SCOPE",
+    "order": 32
+  },
+  {
+    "slug": "MEF26_2_C_CHANGE_ORDERS_I",
+    "headerText": "Change Orders",
+    "bodyHtml": "<p>Any Buyer-requested changes, Buyer-caused delays, or unforeseen site conditions that impact cost, scope, or schedule will be documented in a written change order or Exhibit A amendment signed by both Parties (“Change Order”). Buyer shall not unreasonably withhold, condition, or delay approval of a Change Order reasonably required to perform the Services. If the Parties cannot agree on the price or schedule effect of a change that Dvele reasonably determines is required to continue the Services safely and in compliance with code, Dvele may proceed on Buyer’s written direction and Buyer shall pay Dvele’s documented cost plus fifteen percent (15%) for the disputed work pending resolution; if Buyer gives no direction within five (5) business days, Dvele may suspend the affected work with an equitable extension of time and recovery of its standby costs.</p>",
+    "level": 3,
+    "parentSlug": "MEF26_2_C_CHANGE_ORDERS",
+    "order": 33
+  },
+  {
+    "slug": "MEF26_2_C_CHANGE_ORDERS_II",
+    "headerText": "Like-Kind Substitutions",
+    "bodyHtml": "<p>Dvele may make like-kind substitutions of materials, finishes, fixtures, or components of substantially similar quality and functionality where necessary, provided such substitutions do not materially reduce overall performance or agreed finishes category.</p>",
+    "level": 3,
+    "parentSlug": "MEF26_2_C_CHANGE_ORDERS",
+    "order": 34
+  },
+  {
+    "slug": "MEF26_2_D_NOT_INCLUDED",
+    "headerText": "What is Not Included",
+    "bodyHtml": "<p>Unless expressly included in Exhibit A (or a Change Order), Dvele does not provide: local permit fees, utility connection fees, specialty equipment not specified in Exhibit B, site landscaping / driveways / fencing, owner furnishings / window coverings, or other site work allocated to Buyer / GC in Exhibit C.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_2_SERVICES_SCOPE",
+    "order": 35
+  },
+  {
+    "slug": "MEF26_3_FEES_PAYMENT",
+    "headerText": "FEES; PAYMENT; FINANCEABILITY",
+    "bodyHtml": "",
+    "level": 1,
+    "parentSlug": null,
+    "order": 36
+  },
+  {
+    "slug": "MEF26_3_A_PRICING_PAYMENT",
+    "headerText": "Pricing and Payment Schedule",
+    "bodyHtml": "<p>All fees, the Purchase Price, milestone payments, deposits, reimbursements, and payment timing are set forth in Exhibit A. Prices exclude, and Buyer shall pay, all sales, use, excise, transfer, and similar taxes, fees, and governmental charges on the Homes or Services (other than taxes on Dvele’s net income), including gross-receipts and transaction privilege taxes and any tariffs or duties on imported components, all of which are invoiced in addition to the price. Buyer shall deliver any applicable exemption or resale certificate before the first milestone invoice. The Agreement Deposit stated in Exhibit A is earned on receipt, is non-refundable, and is applied to the Purchase Price; it represents a reasonable estimate of Dvele’s mobilization, engineering, and production-slot reservation costs and is not a penalty.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_3_FEES_PAYMENT",
+    "order": 37
+  },
+  {
+    "slug": "MEF26_3_B_GREEN_LIGHT",
+    "headerText": "Green Light Conditions; Production Scheduling",
+    "bodyHtml": "<p>Production scheduling is subject to satisfaction of the Green Light Conditions stated in Exhibit A. Issuance of a Green Light Production Notice confirms allocation of a production slot and commencement of production activities. Green Light is a scheduling mechanism only and does not affect the binding nature of this Agreement.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_3_FEES_PAYMENT",
+    "order": 38
+  },
+  {
+    "slug": "MEF26_3_C_MILESTONE_CERTIFICATION",
+    "headerText": "Milestone Certification; Deemed Acceptance",
+    "bodyHtml": "<p>Dvele will certify milestone completion in writing (email acceptable). Buyer has five (5) business days to object in writing specifying material non-conformity. Failure to object within that period constitutes acceptance of the milestone for all purposes, including payment.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_3_FEES_PAYMENT",
+    "order": 39
+  },
+  {
+    "slug": "MEF26_3_D_BINDING_COMMITMENT",
+    "headerText": "Binding Commitment; Limited Feasibility Adjustment",
+    "bodyHtml": "<p>This Agreement and the applicable Exhibit A are binding upon execution by both Parties. Buyer’s obligation to pay all amounts set forth in Exhibit A is absolute, unconditional, and irrevocable, subject only to: (i) Dvele’s uncured material breach; or (ii) a Feasibility Adjustment as described below. If, during the feasibility and permitting phase described in Exhibit D, Dvele determines in good faith that site conditions, jurisdictional requirements, engineering requirements, or regulatory requirements materially increase Dvele’s cost beyond the pricing assumptions in Exhibit A (a “Feasibility Adjustment”), Dvele shall provide written notice and a revised pricing summary with reasonable documentation. Buyer shall have ten (10) business days to either approve the revised pricing (which shall be incorporated into Exhibit A by amendment) or terminate the applicable Exhibit A engagement, in which case Buyer shall pay for Services performed, reimbursable costs, and non-cancelable third-party costs incurred through termination, and Dvele shall retain the Agreement Deposit.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_3_FEES_PAYMENT",
+    "order": 40
+  },
+  {
+    "slug": "MEF26_3_E_NO_SETOFF",
+    "headerText": "No Setoff / No Counterclaim",
+    "bodyHtml": "<p>Buyer waives any right of setoff, deduction, counterclaim, abatement, or withholding against amounts due, except to the extent arising from Dvele’s uncured material breach.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_3_FEES_PAYMENT",
+    "order": 41
+  },
+  {
+    "slug": "MEF26_3_F_REIMBURSABLES",
+    "headerText": "Reimbursables",
+    "bodyHtml": "<p>Unless otherwise stated in Exhibit A, reimbursable out-of-pocket expenses (e.g., travel, shipping premiums, printing, third-party review agency fees) are reimbursed at actual cost, with any administrative fee only if expressly stated in Exhibit A.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_3_FEES_PAYMENT",
+    "order": 42
+  },
+  {
+    "slug": "MEF26_3_G_LATE_PAYMENTS",
+    "headerText": "Late Payments; Suspension",
+    "bodyHtml": "<p>Late payments accrue interest at the lesser of 1.5% per month or the maximum rate allowed by law. If Buyer fails to pay amounts due, Dvele may suspend work and adjust schedule until payments are current. Storage, re-handling, and remobilization costs caused by Buyer delays are payable by Buyer.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_3_FEES_PAYMENT",
+    "order": 43
+  },
+  {
+    "slug": "MEF26_3_H_ASSIGNMENT_FINANCING",
+    "headerText": "Assignment; Financing; Payment Directions",
+    "bodyHtml": "<p>Buyer acknowledges Dvele may assign, pledge, sell, or grant a security interest in this Agreement, any Exhibit A, and any payment obligations/receivables to one or more financing parties (warehouse, receivables purchase, or project financing). Buyer consents to such actions without further consent. Buyer agrees to follow written payment instructions after notice of assignment. No assignment relieves Dvele of performance obligations.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_3_FEES_PAYMENT",
+    "order": 44
+  },
+  {
+    "slug": "MEF26_3_I_FINANCING_PARTY",
+    "headerText": "Financing Party Cure Rights (Non-Operator)",
+    "bodyHtml": "<p>Upon any Dvele default, Buyer shall give each financing party holding an assignment/security interest of which Buyer has notice written notice of such default and permit such financing party to cure it within the applicable cure period. No financing party is obligated to perform Dvele’s obligations and shall not be deemed an owner, contractor, or GC.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_3_FEES_PAYMENT",
+    "order": 45
+  },
+  {
+    "slug": "MEF26_4_BUYER_RESPONSIBILITIES",
+    "headerText": "BUYER RESPONSIBILITIES",
+    "bodyHtml": "",
+    "level": 1,
+    "parentSlug": null,
+    "order": 46
+  },
+  {
+    "slug": "MEF26_4_A_GENERAL",
+    "headerText": "General",
+    "bodyHtml": "<p>Buyer’s timely performance is critical. Buyer will perform the responsibilities allocated to Buyer in Exhibit C, including site access, site readiness, GC coordination (if applicable), and timely approvals.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_4_BUYER_RESPONSIBILITIES",
+    "order": 47
+  },
+  {
+    "slug": "MEF26_4_B_FOB_FACTORY",
+    "headerText": "FOB Factory Pickup",
+    "bodyHtml": "<p>If FOB Factory is elected in Exhibit A, Buyer is solely responsible, at its own risk and expense, for arranging and completing transport of each Home from the FOB Point, and for all delivery, assembly, installation, and completion at the Site; no site work verification by Dvele is required. “Tender” occurs when Dvele notifies Buyer in writing that the Home is ready for pickup at Dvele’s factory (the “FOB Point”). Buyer shall pick up the Home within ten (10) business days after Tender; thereafter, the storage fees in Exhibit A apply and Buyer bears all risk.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_4_BUYER_RESPONSIBILITIES",
+    "order": 48
+  },
+  {
+    "slug": "MEF26_4_C_RISK_LOSS",
+    "headerText": "Risk of Loss; Title",
+    "bodyHtml": "<p>Risk of loss for each Home passes to Buyer (i) for FOB Factory, upon Tender at the FOB Point; (ii) for Delivered to Site, upon delivery to the Site (or, if Dvele sets the Home, upon completion of set); and (iii) for Dvele GC, upon the earlier of CO/Equivalent or Buyer’s occupancy or use of the Home. Title to each Home remains with Dvele until Dvele receives payment in full of the Purchase Price and all other amounts due for that Home, and Buyer grants Dvele a purchase-money security interest in each Home and its proceeds to secure such payment, which Dvele may perfect by filing a financing statement; provided that, for Dvele GC, title to each Home passes to Buyer (or the Site owner) when the Home is permanently affixed to the Site, after which payment is secured by the mechanics lien, stop payment notice, and payment bond rights of the GC Affiliate and, to the extent permitted by law, Dvele as material supplier. Buyer acknowledges that the GC Affiliate and Dvele may serve preliminary notices and record mechanics liens against the Site for unpaid amounts, shall obtain the Site owner’s written acknowledgment of those rights (if Buyer is not the Site owner) before on-site work begins, and agrees that no lien waiver or release is required except a statutory conditional waiver and release delivered against payment actually received.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_4_BUYER_RESPONSIBILITIES",
+    "order": 49
+  },
+  {
+    "slug": "MEF26_4_D_SITE_INFORMATION",
+    "headerText": "Site Information",
+    "bodyHtml": "<p>Upon request, Buyer shall provide available site information (surveys, easements, utility locations, geotech/environmental reports, tests). Dvele may coordinate the provision or submission of such site information, surveys, and reports if Dvele GC is elected pursuant to Section 2(b)(iii). Notwithstanding any such coordination or assistance by Dvele or its contractors, Buyer is solely responsible for the accuracy, completeness, and sufficiency of all surveys, reports, and site information provided. Failure to timely provide information may delay schedule and increase costs, which will be addressed via Change Order.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_4_BUYER_RESPONSIBILITIES",
+    "order": 50
+  },
+  {
+    "slug": "MEF26_4_E_SITE_CONTROL",
+    "headerText": "Site Control; Authority",
+    "bodyHtml": "<p>If Delivered to Site or Dvele GC is elected, before delivery, Buyer shall provide proof of ownership / control of the Site, or the Site owner’s written authorization sufficient to authorize installation and completion, and shall maintain such ownership, control, or authorization through final payment. Buyer is solely responsible for obtaining and maintaining all agreements with the Site owner necessary to satisfy this Section.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_4_BUYER_RESPONSIBILITIES",
+    "order": 51
+  },
+  {
+    "slug": "MEF26_4_F_GC_ENGAGEMENT",
+    "headerText": "GC Engagement",
+    "bodyHtml": "<p>If FOB Factory or Delivered to Site is elected, Buyer will engage a licensed GC meeting the minimum requirements of Exhibit C and any warranty-eligibility requirements in Exhibit E/Exhibit F as applicable.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_4_BUYER_RESPONSIBILITIES",
+    "order": 52
+  },
+  {
+    "slug": "MEF26_5_DVELE_RESPONSIBILITIES",
+    "headerText": "DVELE RESPONSIBILITIES; INSURANCE",
+    "bodyHtml": "",
+    "level": 1,
+    "parentSlug": null,
+    "order": 53
+  },
+  {
+    "slug": "MEF26_5_A_FEASIBILITY_PERMIT",
+    "headerText": "Feasibility & Permit",
+    "bodyHtml": "<p>Dvele will provide the feasibility and permit services described in Exhibit A and Exhibit D, subject to Buyer providing required inputs/approvals. Any design and engineering services by Dvele are performed with the degree of skill and care ordinarily exercised by qualified professionals performing comparable services under comparable circumstances, and Dvele makes no other warranty, express or implied, as to those services. Buyer is responsible for its architect of record (if any) and for the accuracy and code compliance of all plans, specifications, and design information furnished by or for Buyer, and Dvele may rely on them without independent verification.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_5_DVELE_RESPONSIBILITIES",
+    "order": 54
+  },
+  {
+    "slug": "MEF26_5_B_PRODUCTION",
+    "headerText": "Production",
+    "bodyHtml": "<p>Upon Green Light, Dvele will commence production and manage manufacturing in accordance with Exhibit B and applicable quality processes. Dvele may use qualified third-party manufacturing partners. Each Home will be manufactured under, and bear any insignia or label required by, the factory-built or modular housing program of the state in which the Site is located, as identified in Exhibit A. Unless Dvele GC is elected, Buyer is responsible for all local building permits, foundation and site approvals, and inspections.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_5_DVELE_RESPONSIBILITIES",
+    "order": 55
+  },
+  {
+    "slug": "MEF26_5_C_DELIVERY_SITE",
+    "headerText": "Delivery / On-Site",
+    "bodyHtml": "<p>Delivery coordination and any on-site responsibilities will be performed as allocated in Exhibit C.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_5_DVELE_RESPONSIBILITIES",
+    "order": 56
+  },
+  {
+    "slug": "MEF26_5_D_INSURANCE",
+    "headerText": "Insurance",
+    "bodyHtml": "<p>Dvele will maintain workers’ compensation as required by law and commercial general liability with limits not less than $1,000,000 per occurrence / $2,000,000 aggregate (or such other amounts as stated in Exhibit A). Certificates provided upon request.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_5_DVELE_RESPONSIBILITIES",
+    "order": 57
+  },
+  {
+    "slug": "MEF26_6_SCHEDULE_DELAYS",
+    "headerText": "SCHEDULE; DELAYS; FORCE MAJEURE; PRICING ADJUSTMENTS",
+    "bodyHtml": "",
+    "level": 1,
+    "parentSlug": null,
+    "order": 58
+  },
+  {
+    "slug": "MEF26_6_A_PROJECT_SCHEDULE",
+    "headerText": "Project Schedule",
+    "bodyHtml": "<p>The schedule set forth in Exhibit D is an estimate and may adjust due to permitting, production slot availability, supply chain variability, weather, site readiness, and other factors outside Dvele’s reasonable control. Time is not of the essence unless expressly stated in Exhibit A.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_6_SCHEDULE_DELAYS",
+    "order": 59
+  },
+  {
+    "slug": "MEF26_6_B_PRECONDITIONS_PRODUCTION",
+    "headerText": "Preconditions to Production",
+    "bodyHtml": "<p>Dvele is not obligated to begin production until Green Light Conditions are met. If conditions are not timely met, Dvele may reassign the production slot and adjust schedule with notice.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_6_SCHEDULE_DELAYS",
+    "order": 60
+  },
+  {
+    "slug": "MEF26_6_C_SITE_NOT_READY",
+    "headerText": "Site Not Ready",
+    "bodyHtml": "<p>If the site is not ready as required by Exhibit C, Dvele may delay delivery and/or incur storage, re-handling, demurrage, and remobilization costs payable by Buyer. If Buyer cannot accept delivery (or, for FOB Factory, pick up the Home) within fifteen (15) days after the scheduled date, the Home is deemed delivered on that date: risk of loss passes to Buyer, the next milestone payment becomes due, and Dvele may store the Home at Buyer’s cost and risk.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_6_SCHEDULE_DELAYS",
+    "order": 61
+  },
+  {
+    "slug": "MEF26_6_D_FORCE_MAJEURE",
+    "headerText": "Force Majeure",
+    "bodyHtml": "<p>Neither Party is liable for delay/failure caused by events beyond reasonable control (acts of God, natural disasters, governmental actions, labor disputes, transportation disruptions, pandemics, supply chain disruptions, permit backlogs, carrier unavailability, factory closures/slot disruptions due to external conditions). The schedule extends equitably. Force majeure does not excuse Buyer’s obligation to pay amounts when due.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_6_SCHEDULE_DELAYS",
+    "order": 62
+  },
+  {
+    "slug": "MEF26_6_E_INFLATION_MARKET",
+    "headerText": "Inflation / Market Adjustment",
+    "bodyHtml": "<p>Post-Feasibility Delay Adjustment. If production has not commenced within six (6) months after completion of the feasibility and permitting phase due to Buyer delay, site unavailability, or force majeure, Dvele may propose a reasonable price adjustment reflecting documented increases in materials, labor, or transportation costs. Any adjustment must be documented via Exhibit A amendment or Change Order. If Buyer does not approve a proposed adjustment within ten (10) business days, Dvele may terminate the applicable Exhibit A, and Section 11(f) applies.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_6_SCHEDULE_DELAYS",
+    "order": 63
+  },
+  {
+    "slug": "MEF26_7_LIMITED_WARRANTY",
+    "headerText": "LIMITED WARRANTY; DISCLAIMER; REMEDIES",
+    "bodyHtml": "",
+    "level": 1,
+    "parentSlug": null,
+    "order": 64
+  },
+  {
+    "slug": "MEF26_7_A_LIMITED_WARRANTY",
+    "headerText": "",
+    "bodyHtml": "<p>Limited Warranty: Dvele provides the limited warranty set forth in Exhibit E, which covers only the Home as manufactured by or for Dvele and any on-site work performed by Dvele or the GC Affiliate, subject to exclusions, allocation of responsibilities in Exhibit C, and any warranty-eligibility requirements in Exhibit E / Exhibit F.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_7_LIMITED_WARRANTY",
+    "order": 65
+  },
+  {
+    "slug": "MEF26_7_B_EXCLUSIVE_REMEDY",
+    "headerText": "Exclusive Remedy: Disclaimer",
+    "bodyHtml": "<p class=\"conspicuous\">EXCEPT AS EXPRESSLY STATED IN EXHIBIT E, DVELE DISCLAIMS ALL OTHER WARRANTIES TO THE MAXIMUM EXTENT PERMITTED BY LAW, INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE LIMITED WARRANTY IS THE SOLE AND EXCLUSIVE REMEDY FOR DEFECTS IN COVERED COMPONENTS. IF APPLICABLE LAW DOES NOT PERMIT THE DISCLAIMER OF IMPLIED WARRANTIES FOR A HOME, ANY IMPLIED WARRANTY IS LIMITED IN DURATION TO THE APPLICABLE COVERAGE PERIOD IN EXHIBIT E.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_7_LIMITED_WARRANTY",
+    "order": 66
+  },
+  {
+    "slug": "MEF26_7_C_MANUFACTURER_PASS",
+    "headerText": "Manufacturer Pass-Through",
+    "bodyHtml": "<p>To the extent available, Dvele will pass through manufacturer warranties for appliances/fixtures/equipment; such manufacturer warranties are the exclusive remedy for those components except to the extent defects arise from Dvele’s workmanship within the applicable coverage.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_7_LIMITED_WARRANTY",
+    "order": 67
+  },
+  {
+    "slug": "MEF26_8_INTELLECTUAL_PROPERTY",
+    "headerText": "INTELLECTUAL PROPERTY; LICENSE; PUBLICITY",
+    "bodyHtml": "",
+    "level": 1,
+    "parentSlug": null,
+    "order": 68
+  },
+  {
+    "slug": "MEF26_8_A_OWNERSHIP_WORK",
+    "headerText": "Ownership of Work Product",
+    "bodyHtml": "<p>Dvele owns all drawings, plans, specifications, and deliverables created by or for Dvele (“Work Product”), including all intellectual property rights.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_8_INTELLECTUAL_PROPERTY",
+    "order": 69
+  },
+  {
+    "slug": "MEF26_8_B_LIMITED_PROJECT",
+    "headerText": "Limited Project License",
+    "bodyHtml": "<p>Upon payment of amounts due through the applicable milestone, Buyer receives a non-exclusive, non-transferable license to use the Work Product solely for the applicable Project. If Buyer uses Work Product without Dvele’s further involvement or outside the Project, Buyer assumes all risk and will defend/indemnify Dvele from resulting claims to the fullest extent permitted by law.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_8_INTELLECTUAL_PROPERTY",
+    "order": 70
+  },
+  {
+    "slug": "MEF26_8_C_PUBLICITY",
+    "headerText": "Publicity",
+    "bodyHtml": "<p>Buyer grants Dvele the right to photograph and use images of the Home for marketing, provided Dvele will not publicly disclose the specific address without Buyer’s consent (not unreasonably withheld for portfolio-type references).</p>",
+    "level": 2,
+    "parentSlug": "MEF26_8_INTELLECTUAL_PROPERTY",
+    "order": 71
+  },
+  {
+    "slug": "MEF26_9_LIMITATION_LIABILITY",
+    "headerText": "LIMITATION OF LIABILITY",
+    "bodyHtml": "",
+    "level": 1,
+    "parentSlug": null,
+    "order": 72
+  },
+  {
+    "slug": "MEF26_9_A_EXCLUSION_CONSEQUENTIAL",
+    "headerText": "Exclusion of Consequential Damages",
+    "bodyHtml": "<p class=\"conspicuous\">TO THE FULLEST EXTENT PERMITTED BY LAW, NEITHER PARTY IS LIABLE FOR CONSEQUENTIAL, INCIDENTAL, SPECIAL, INDIRECT, OR PUNITIVE DAMAGES (INCLUDING LOST PROFITS OR LOSS OF USE), REGARDLESS OF THEORY; PROVIDED THAT THIS SECTION 9(a) DOES NOT LIMIT BUYER’S OBLIGATION TO PAY AMOUNTS DUE, BUYER’S DEFENSE AND INDEMNIFICATION OBLIGATIONS, OR BUYER’S LIABILITY FOR USE OF WORK PRODUCT OUTSIDE THE SCOPE OF SECTION 8(b).</p>",
+    "level": 2,
+    "parentSlug": "MEF26_9_LIMITATION_LIABILITY",
+    "order": 73
+  },
+  {
+    "slug": "MEF26_9_B_LIABILITY_CAP",
+    "headerText": "Liability Cap",
+    "bodyHtml": "<p class=\"conspicuous\">DVELE’S TOTAL LIABILITY ARISING OUT OF OR RELATING TO THIS AGREEMENT WILL NOT EXCEED THE TOTAL AMOUNTS PAID BY BUYER UNDER THE APPLICABLE EXHIBIT A GIVING RISE TO THE CLAIM, EXCEPT FOR FRAUD, GROSS NEGLIGENCE, OR WILLFUL MISCONDUCT.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_9_LIMITATION_LIABILITY",
+    "order": 74
+  },
+  {
+    "slug": "MEF26_10_MILESTONE_REVIEW",
+    "headerText": "MILESTONE REVIEW; CLARIFICATION",
+    "bodyHtml": "",
+    "level": 1,
+    "parentSlug": null,
+    "order": 75
+  },
+  {
+    "slug": "MEF26_10_A_MILESTONE_REVIEW",
+    "headerText": "Milestone Review",
+    "bodyHtml": "<p>Milestone review periods and deliverables are set forth in Exhibit D.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_10_MILESTONE_REVIEW",
+    "order": 76
+  },
+  {
+    "slug": "MEF26_10_B_CLARIFICATION_COMMITMENT",
+    "headerText": "Clarification of Commitment",
+    "bodyHtml": "<p>Buyer’s commitment to proceed arises upon execution of the applicable Exhibit A and is not conditioned on issuance of a Green Light Production Notice. Green Light conditions relate solely to production scheduling and commencement and do not affect enforceability.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_10_MILESTONE_REVIEW",
+    "order": 77
+  },
+  {
+    "slug": "MEF26_11_DEFAULT_TERMINATION",
+    "headerText": "DEFAULT; TERMINATION; EFFECTS",
+    "bodyHtml": "",
+    "level": 1,
+    "parentSlug": null,
+    "order": 78
+  },
+  {
+    "slug": "MEF26_11_A_PAYMENT_DEFAULT",
+    "headerText": "Payment Default",
+    "bodyHtml": "<p>Failure to pay amounts due is a default. If not cured within five (5) days after notice, Dvele may suspend performance and/or terminate the applicable Exhibit A engagement.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_11_DEFAULT_TERMINATION",
+    "order": 79
+  },
+  {
+    "slug": "MEF26_11_B_OTHER_MATERIAL",
+    "headerText": "Other Material Breach",
+    "bodyHtml": "<p>Other material breach not cured within ten (10) days after notice (or such shorter period where cure is not possible and the breach is continuing) permits suspension/termination.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_11_DEFAULT_TERMINATION",
+    "order": 80
+  },
+  {
+    "slug": "MEF26_11_C_TERMINATION_CAUSE",
+    "headerText": "Termination for Cause",
+    "bodyHtml": "<p>Either Party may terminate for the other Party’s uncured material breach. Dvele may also terminate any Exhibit A on notice if Buyer becomes insolvent, makes an assignment for the benefit of creditors, or becomes subject to any bankruptcy or receivership proceeding.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_11_DEFAULT_TERMINATION",
+    "order": 81
+  },
+  {
+    "slug": "MEF26_11_D_TERMINATION_DURING",
+    "headerText": "Termination During Feasibility Phase",
+    "bodyHtml": "<p>Buyer may terminate the applicable Exhibit A only in connection with a Feasibility Adjustment as provided in Section 3(d). Except as expressly provided therein, Buyer shall have no right to terminate for convenience.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_11_DEFAULT_TERMINATION",
+    "order": 82
+  },
+  {
+    "slug": "MEF26_11_E_PERMITTING_DELAY",
+    "headerText": "Permitting Delay Exit",
+    "bodyHtml": "<p>If permits are not obtained within 6 months of submission due to factors outside Dvele’s control, Dvele may terminate the applicable Exhibit A with notice; Buyer pays for Services performed, reimbursables, and non-cancelable third-party costs incurred to date, and Dvele retains the Agreement Deposit.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_11_DEFAULT_TERMINATION",
+    "order": 83
+  },
+  {
+    "slug": "MEF26_11_F_EFFECT_TERMINATION",
+    "headerText": "Effect of Termination; Survival of Payment Obligations",
+    "bodyHtml": "<p>In the event of termination hereunder, Buyer shall remain responsible for payment of (i) all fees for Services performed through the effective date of termination, (ii) all approved reimbursable expenses incurred by Dvele, and (iii) any non-cancelable third-party costs committed by Dvele in reliance on this Agreement, as set forth in the applicable Exhibit A, and Dvele shall retain the Agreement Deposit. Upon payment of such amounts, neither Party shall have any further obligation with respect to the terminated Exhibit A, except for provisions that by their nature survive termination. If an Exhibit A is terminated due to Buyer’s default, Buyer shall also pay, as liquidated damages and not as a penalty, fifteen percent (15%) of the unpaid price for each affected Home, the Parties agreeing that Dvele’s actual damages (including lost production-slot opportunity) would be difficult to ascertain and that this amount is a reasonable estimate. The preceding sentence does not apply to a Buyer that elects the End Customer Buyer Type in Exhibit A, for which Dvele’s remedy is retention of the Agreement Deposit plus the amounts described in clauses (i)–(iii) above.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_11_DEFAULT_TERMINATION",
+    "order": 84
+  },
+  {
+    "slug": "MEF26_11_G_WORK_PRODUCT",
+    "headerText": "Work Product Upon Termination",
+    "bodyHtml": "<p>Buyer’s license to use Work Product is limited to Work Product delivered and paid for through the last paid milestone and solely for the Project.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_11_DEFAULT_TERMINATION",
+    "order": 85
+  },
+  {
+    "slug": "MEF26_12_DISPUTE_RESOLUTION",
+    "headerText": "DISPUTE RESOLUTION; GOVERNING LAW",
+    "bodyHtml": "",
+    "level": 1,
+    "parentSlug": null,
+    "order": 86
+  },
+  {
+    "slug": "MEF26_12_A_ESCALATION_MEDIATION",
+    "headerText": "Escalation and Mediation",
+    "bodyHtml": "<p>The Parties will first attempt good-faith executive negotiation. If unresolved, the Parties will pursue non-binding mediation in {{ARBITRATION_LOCATION}} unless otherwise agreed.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_12_DISPUTE_RESOLUTION",
+    "order": 87
+  },
+  {
+    "slug": "MEF26_12_B_ARBITRATION",
+    "headerText": "Arbitration",
+    "bodyHtml": "<p>Any dispute not resolved by mediation shall be finally resolved by binding arbitration administered by JAMS in {{ARBITRATION_LOCATION}}, under its Comprehensive Arbitration Rules; if Buyer elects the End Customer Buyer Type in Exhibit A, the arbitration shall comply with the JAMS Consumer Arbitration Minimum Standards, and Dvele shall pay JAMS fees in excess of the consumer filing fee. Judgment may be entered in any court of competent jurisdiction. Either Party may seek temporary or preliminary injunctive relief in court to protect its intellectual property or confidential information, and Dvele and any GC Affiliate may commence an action in any court of competent jurisdiction to record, perfect, preserve, or enforce any mechanics lien, stop payment notice, or payment bond claim, or to enforce Dvele’s title and security interest in any Home, without waiving this arbitration agreement; any such action may be stayed pending arbitration of the underlying dispute once the lien, notice, or bond right has been preserved.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_12_DISPUTE_RESOLUTION",
+    "order": 88
+  },
+  {
+    "slug": "MEF26_12_C_LIMITATIONS_PERIOD",
+    "headerText": "Limitations Period",
+    "bodyHtml": "<p>Any claim against Dvele must be brought within twelve (12) months after the cause of action accrues, except that claims under Exhibit E must be submitted within the applicable coverage period and any action on such a claim must be brought within twelve (12) months after the earlier of Dvele’s written denial of the claim or expiration of that coverage period, and except where a longer period is required by applicable law (and, for a Buyer that elects the End Customer Buyer Type in Exhibit A, each twelve (12)-month period in this Section is two (2) years).</p>",
+    "level": 2,
+    "parentSlug": "MEF26_12_DISPUTE_RESOLUTION",
+    "order": 89
+  },
+  {
+    "slug": "MEF26_12_D_GOVERNING_LAW",
+    "headerText": "Governing Law",
+    "bodyHtml": "<p>This Agreement is governed by the laws of the State of {{AGREEMENT_GOVERNING_LAW_STATE}}, without regard to conflict-of-laws principles, provided Exhibit F controls where required by other state law for a given Project.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_12_DISPUTE_RESOLUTION",
+    "order": 90
+  },
+  {
+    "slug": "MEF26_13_MISCELLANEOUS",
+    "headerText": "MISCELLANEOUS",
+    "bodyHtml": "",
+    "level": 1,
+    "parentSlug": null,
+    "order": 91
+  },
+  {
+    "slug": "MEF26_13_A_ENTIRE_AGREEMENT",
+    "headerText": "Entire Agreement; Amendments",
+    "bodyHtml": "<p>This Agreement and the Exhibits constitute the entire agreement between the Parties regarding its subject matter and supersede all prior and contemporaneous agreements, understandings, negotiations, and communications, whether written or oral. Amendments require a writing signed by both Parties. Exhibit A may be amended by a written Exhibit A amendment, provided no amendment modifies Sections 3(d)–3(i) (bankability provisions) unless expressly stated.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_13_MISCELLANEOUS",
+    "order": 92
+  },
+  {
+    "slug": "MEF26_13_B_NOTICES",
+    "headerText": "Notices",
+    "bodyHtml": "<p>Notices must be in writing and delivered by personal delivery, overnight courier, or email with confirmed receipt, to the addresses set forth in Exhibit A (or updated by notice).</p>",
+    "level": 2,
+    "parentSlug": "MEF26_13_MISCELLANEOUS",
+    "order": 93
+  },
+  {
+    "slug": "MEF26_13_C_CONFIDENTIALITY",
+    "headerText": "Confidentiality",
+    "bodyHtml": "<p>Each Party shall keep confidential, and use only to perform this Agreement, the other Party’s non-public business, pricing, technical, and design information disclosed under this Agreement, including Work Product, and Exhibit B specifications, except information that is or becomes public through no fault of the receiving Party, was lawfully known to or independently developed by it, or is required to be disclosed by law. These obligations survive for three (3) years after the last Exhibit A is completed or terminated, and for so long as any information remains a trade secret.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_13_MISCELLANEOUS",
+    "order": 94
+  },
+  {
+    "slug": "MEF26_13_D_THIRD_PARTY_BENEFICIARIES",
+    "headerText": "No Third-Party Beneficiaries",
+    "bodyHtml": "<p>Nothing in this Agreement confers any right or remedy on any subsequent owner, tenant, occupant, or other third party, except financing parties as expressly provided in Section 3 and subsequent owners of a Home to the extent of the Limited Warranty transferred under Exhibit E.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_13_MISCELLANEOUS",
+    "order": 95
+  },
+  {
+    "slug": "MEF26_13_E_SEVERABILITY_WAIVER",
+    "headerText": "Severability; Waiver",
+    "bodyHtml": "<p>If any provision is held unenforceable, it will be enforced to the maximum extent permissible and the remainder of this Agreement will remain in effect. No waiver is effective unless in writing, and no failure or delay in exercising a right operates as a waiver.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_13_MISCELLANEOUS",
+    "order": 96
+  },
+  {
+    "slug": "MEF26_13_F_HOME_DATA",
+    "headerText": "Home Data",
+    "bodyHtml": "<p>Dvele does not collect personal information from Home systems except as stated in Exhibit A. Any such collection is subject to Dvele’s privacy notice and applicable privacy law, and Buyer shall provide any required notice to subsequent owners and occupants.</p>",
+    "level": 2,
+    "parentSlug": "MEF26_13_MISCELLANEOUS",
+    "order": 97
+  },
+  {
+    "slug": "MEF26_13_G_ASSIGNMENT",
+    "headerText": "Assignment",
+    "bodyHtml": "<p>Buyer may not assign this Agreement without Dvele’s consent. Dvele may assign to affiliates, successors, and financing parties as provided in Section 3(h).</p>",
+    "level": 2,
+    "parentSlug": "MEF26_13_MISCELLANEOUS",
+    "order": 98
+  },
+  {
+    "slug": "MEF26_14_SURVIVAL",
+    "headerText": "SURVIVAL",
+    "bodyHtml": "<p>Sections 3 (as to accrued amounts), 7, 8, 9, 11(f)–11(g), 12, and 13, Exhibit C.6, and Exhibit E survive termination or expiration in accordance with their terms.</p>",
+    "level": 1,
+    "parentSlug": null,
+    "order": 99
+  },
+  {
+    "slug": "MEF26_15_SIGNATURES_COUNTERPARTS",
+    "headerText": "SIGNATURES; COUNTERPARTS; AUTHORITY",
+    "bodyHtml": "<p>In witness hereof, the Parties have executed this Agreement as of the Effective Date first written above. This Agreement may be executed in one or more counterparts, each of which shall be deemed an original, and all of which together shall constitute one and the same instrument. Signatures delivered by electronic transmission (including PDF or other electronic means) shall be deemed to have the same legal effect as original signatures. Each person executing this Agreement on behalf of a Party represents and warrants that such person has full authority to bind such Party to the terms of this Agreement. This Agreement shall be enforceable by and against the Parties and their respective permitted successors and assigns.</p>\n{{MASTER_EF_SIGNATURE_TABLE}}",
+    "level": 1,
+    "parentSlug": null,
+    "order": 100
+  }
+]
