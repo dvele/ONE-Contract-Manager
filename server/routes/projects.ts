@@ -6,9 +6,11 @@ import {
   clients,
   projectDetails,
   contractors,
+  contractorEntities,
   warrantyTerms,
 } from "../../shared/schema";
 import { generateLLCName } from "../../shared/llcName";
+import { withContractorEntityDefaults } from "../lib/contractorEntityDefaults";
 import { eq, ne, and, sql, desc } from "drizzle-orm";
 import { z } from "zod";
 import {
@@ -601,7 +603,20 @@ router.get("/projects/:projectId/contractors/:type", async (req, res) => {
 router.post("/projects/:projectId/contractors", async (req, res) => {
   try {
     const projectId = parseInt(req.params.projectId);
-    const { contractorType, ...otherData } = req.body;
+    // `contractorEntityId` is not a contractors column; it names the master-list
+    // entry the wizard picked, whose license and contact fill any gaps.
+    const { contractorType, contractorEntityId, ...requestData } = req.body;
+    const entityId = Number(contractorEntityId);
+    const [entity] = Number.isInteger(entityId) && entityId > 0
+      ? await db
+          .select()
+          .from(contractorEntities)
+          .where(and(
+            eq(contractorEntities.id, entityId),
+            eq(contractorEntities.organizationId, req.organizationId)
+          ))
+      : [];
+    const otherData = withContractorEntityDefaults(requestData, entity ?? null);
     
     const existing = await db
       .select()
@@ -619,7 +634,7 @@ router.post("/projects/:projectId/contractors", async (req, res) => {
         .returning();
       res.json(result);
     } else {
-      const [result] = await db.insert(contractors).values({ ...req.body, projectId }).returning();
+      const [result] = await db.insert(contractors).values({ ...otherData, contractorType, projectId }).returning();
       res.json(result);
     }
   } catch (error) {
