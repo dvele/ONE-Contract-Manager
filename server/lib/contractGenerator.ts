@@ -279,7 +279,7 @@ export async function generateContract(options: ContractGenerationOptions): Prom
   console.log(`\n=== Generating ${contractType} Contract (${format.toUpperCase()}) ===`);
 
   // Step 1: Use snapshot if provided (already-saved contract), otherwise fetch live from library
-  const clauses = snapshotClauses ?? await fetchClausesForContract(contractType, projectData);
+  const clauses = snapshotClauses ?? await fetchClausesForContract(contractType, projectData, templateId);
   console.log(`✓ ${snapshotClauses ? 'Loaded' : 'Fetched'} ${clauses.length} clauses`);
   
   // Extract project state for state-specific filtering
@@ -790,9 +790,39 @@ function processBlockTreeVariables(nodes: BlockNode[], variableMap: Record<strin
   }
 }
 
+/**
+ * Choose the clause query. With a templateId the template's own clauses are
+ * selected through template_clauses in template order (order_index is exposed
+ * as "order", so the row mapping and the final sort follow template order, as
+ * the saved snapshot does). Without one, fall back to the contract_types match.
+ */
+export function buildClauseFetchQuery(
+  templateId: number | undefined,
+  normalizedType: string
+): { sql: string; params: any[] } {
+  if (templateId) {
+    return {
+      sql: `SELECT c.id, c.slug, c.parent_id, c.level, tc.order_index AS "order", c.header_text, c.body_html, c.contract_types, c.tags
+       FROM template_clauses tc
+       JOIN clauses c ON c.id = tc.clause_id
+       WHERE tc.template_id = $1
+       ORDER BY tc.order_index ASC`,
+      params: [templateId],
+    };
+  }
+  return {
+    sql: `SELECT id, slug, parent_id, level, "order", header_text, body_html, contract_types, tags
+       FROM clauses
+       WHERE contract_types @> $1::jsonb
+       ORDER BY "order", slug`,
+    params: [JSON.stringify([normalizedType])],
+  };
+}
+
 async function fetchClausesForContract(
   contractType: string, 
-  projectData: Record<string, any>
+  projectData: Record<string, any>,
+  templateId?: number
 ): Promise<Clause[]> {
   try {
     // Normalize to the short-form codes that match what's stored in clauses.contract_types
@@ -815,13 +845,8 @@ async function fetchClausesForContract(
     
     console.log(`Fetching clauses for contract type: ${normalizedType}`);
 
-    const result = await pool.query(
-      `SELECT id, slug, parent_id, level, "order", header_text, body_html, contract_types, tags
-       FROM clauses
-       WHERE contract_types @> $1::jsonb
-       ORDER BY "order", slug`,
-      [JSON.stringify([normalizedType])]
-    );
+    const { sql, params } = buildClauseFetchQuery(templateId, normalizedType);
+    const result = await pool.query(sql, params);
 
     const allClauses: Clause[] = result.rows.map((c: any) => ({
       id: c.id,
