@@ -2,6 +2,8 @@ import puppeteer from 'puppeteer';
 import { buildSignatureBlock } from './tableStyles';
 import { formatDateWritten } from './mapper';
 import { pool } from '../db';
+import { toDeliveryModel, type DeliveryModel } from '../../shared/deliveryModel';
+import { processConditionalTags } from './conditionalTags';
 
 interface ContractGenerationOptions {
   contractType: 'MASTER_EF' | 'ONE' | 'MANUFACTURING' | 'ONSITE';
@@ -35,82 +37,11 @@ let stateDisclosureCache: Map<string, string> = new Map();
 let currentProjectState: string = '';
 
 // Current service model for conditional [IF] tag processing
-let currentServiceModel: string = '';
+let currentServiceModel: DeliveryModel | '' = '';
 let signatureComponentResolved: boolean = false;
 
 // Current contract type for rendering/numbering decisions
 let currentContractType: string = '';
-
-/**
- * Process [IF CMOS]/[IF CRC] conditional tags in content
- * Removes content wrapped in opposite service model tags
- * Strips the literal [IF ...] and [/IF] tags from output
- */
-function processConditionalTags(content: string, serviceModel: string): string {
-  if (!content) return '';
-  
-  let result = content;
-  const model = serviceModel.toUpperCase();
-  
-  // Handle verbose conditional format from exhibits FIRST
-  // [IF CLIENT HAS ELECTED 'CLIENT-RETAINED CONTRACTOR (CRC)':] ... content until next [IF or end
-  if (model === 'CRC') {
-    // Remove CMOS verbose blocks (from CMOS header to next [IF or end of content)
-    result = result.replace(
-      /\[IF CLIENT HAS ELECTED ['']COMPANY-MANAGED ON-SITE SERVICES \(CMOS\)['']:?\]([\s\S]*?)(?=\[IF CLIENT HAS ELECTED|$)/gi,
-      ''
-    );
-    // Unwrap CRC verbose blocks (keep content, remove header)
-    result = result.replace(
-      /\[IF CLIENT HAS ELECTED ['']CLIENT-RETAINED CONTRACTOR \(CRC\)['']:?\]\s*/gi,
-      ''
-    );
-  }
-  if (model === 'CMOS') {
-    // Remove CRC verbose blocks
-    result = result.replace(
-      /\[IF CLIENT HAS ELECTED ['']CLIENT-RETAINED CONTRACTOR \(CRC\)['']:?\]([\s\S]*?)(?=\[IF CLIENT HAS ELECTED|$)/gi,
-      ''
-    );
-    // Unwrap CMOS verbose blocks (keep content, remove header)
-    result = result.replace(
-      /\[IF CLIENT HAS ELECTED ['']COMPANY-MANAGED ON-SITE SERVICES \(CMOS\)['']:?\]\s*/gi,
-      ''
-    );
-  }
-  
-  // If CRC project, remove all [IF CMOS]...[/IF] content
-  if (model === 'CRC') {
-    // Remove [IF CMOS]...[/IF] blocks (including nested content)
-    result = result.replace(/\[IF\s+CMOS\][\s\S]*?\[\/IF\]/gi, '');
-    // Also remove [IF COMPANY-MANAGED]...[/IF] blocks
-    result = result.replace(/\[IF\s+COMPANY-MANAGED\][\s\S]*?\[\/IF\]/gi, '');
-  }
-  
-  // If CMOS project, remove all [IF CRC]...[/IF] content
-  if (model === 'CMOS') {
-    // Remove [IF CRC]...[/IF] blocks (including nested content)
-    result = result.replace(/\[IF\s+CRC\][\s\S]*?\[\/IF\]/gi, '');
-    // Also remove [IF CLIENT-RETAINED]...[/IF] blocks
-    result = result.replace(/\[IF\s+CLIENT-RETAINED\][\s\S]*?\[\/IF\]/gi, '');
-  }
-  
-  // Keep and unwrap the matching service model content (remove tags but keep content)
-  if (model === 'CRC') {
-    result = result.replace(/\[IF\s+CRC\]([\s\S]*?)\[\/IF\]/gi, '$1');
-    result = result.replace(/\[IF\s+CLIENT-RETAINED\]([\s\S]*?)\[\/IF\]/gi, '$1');
-  }
-  if (model === 'CMOS') {
-    result = result.replace(/\[IF\s+CMOS\]([\s\S]*?)\[\/IF\]/gi, '$1');
-    result = result.replace(/\[IF\s+COMPANY-MANAGED\]([\s\S]*?)\[\/IF\]/gi, '$1');
-  }
-  
-  // Remove any remaining [IF ...] and [/IF] tags that might have been left over
-  result = result.replace(/\[IF\s+[A-Z_-]+\]/gi, '');
-  result = result.replace(/\[\/IF\]/gi, '');
-  
-  return result.trim();
-}
 
 /**
  * Resolve dynamic table variables from table_definitions table
@@ -368,7 +299,7 @@ export async function generateContract(options: ContractGenerationOptions): Prom
   currentContractType = contractTypeNormMap[contractType] || contractType.toUpperCase();
   
   // Set current service model for [IF] tag processing
-  currentServiceModel = (projectData.serviceModel || projectData.ON_SITE_SELECTION || 'CRC').toUpperCase();
+  currentServiceModel = toDeliveryModel(projectData.serviceModel || projectData.ON_SITE_SELECTION);
   console.log(`📍 Service model for [IF] tag processing: ${currentServiceModel}`);
   
   // Clear and preload block components for this service model
@@ -895,7 +826,7 @@ async function fetchClausesForContract(
 
     console.log(`Fetched ${allClauses.length} clauses from DB`);
     
-    const serviceModel = (projectData.serviceModel || 'CRC').toUpperCase();
+    const serviceModel = toDeliveryModel(projectData.serviceModel);
     console.log('📝 Generating for Service Model:', serviceModel);
     
     console.log(`\n🔍 STEP 1: Condition-Based Filtering (Project Service Model: ${serviceModel}):`);
@@ -925,6 +856,12 @@ async function fetchClausesForContract(
         const isCrcCondition = onSiteSelection.includes('CLIENT-RETAINED') || onSiteSelection === 'CRC';
         const isCmosCondition = onSiteSelection.includes('COMPANY-MANAGED') || onSiteSelection === 'CMOS';
         
+        // A FOB project matches neither on-site model, so drop clauses conditioned only on CRC or CMOS
+        if (serviceModel === 'FOB' && (isCrcCondition || isCmosCondition) && !(isCrcCondition && isCmosCondition)) {
+          console.log(`   ✗ DROPPED: [${clause.id}] ${clause.clause_code} - ${isCrcCondition ? 'CRC' : 'CMOS'} condition in FOB project`);
+          return false;
+        }
+
         // If this is a CRC project, only keep CRC clauses (drop CMOS)
         if (serviceModel === 'CRC' && isCmosCondition && !isCrcCondition) {
           console.log(`   ✗ DROPPED: [${clause.id}] ${clause.clause_code} - CMOS condition in CRC project`);
@@ -1032,7 +969,7 @@ export function clearBlockComponentCache() {
  * This allows synchronous resolution in replaceVariables
  */
 export async function preloadBlockComponents(organizationId: number, serviceModel: string): Promise<void> {
-  const model = (serviceModel || 'CRC').toUpperCase();
+  const model = toDeliveryModel(serviceModel);
   
   // Fetch all components for this organization and service model
   const { Pool } = await import('pg');
@@ -3560,7 +3497,7 @@ function buildVariableMap(projectData: Record<string, any>): Record<string, stri
   const projectName = projectData.projectName || '';
   const projectNumber = projectData.projectNumber || '';
   const totalUnits = parseInt(projectData.totalUnits) || 1;
-  const serviceModel = projectData.serviceModel || 'CRC';
+  const serviceModel = toDeliveryModel(projectData.serviceModel);
   
   // Site/Property Information
   const siteAddress = projectData.siteAddress || '';
@@ -3744,7 +3681,8 @@ function buildVariableMap(projectData: Record<string, any>): Record<string, stri
   map['MILESTONE_5_NAME'] = 'Delivery';
   
   // --- SERVICE MODEL SELECTION ---
-  map['ON_SITE_SERVICES_SELECTION'] = serviceModel === 'CRC' 
+  // FOB takes the CRC-style output: the Buyer does the on-site work
+  map['ON_SITE_SERVICES_SELECTION'] = serviceModel !== 'CMOS' 
     ? 'CLIENT-RETAINED CONTRACTOR' 
     : 'COMPANY-MANAGED ON-SITE SERVICES';
   map['PRELIMINARY_ONSITE_PRICE'] = serviceModel === 'CMOS' 
@@ -3783,7 +3721,8 @@ function buildVariableMap(projectData: Record<string, any>): Record<string, stri
   map['HOME_MODEL_1'] = projectData.unit1Model || '';
   
   // --- CRC-SPECIFIC (Client-Retained Contractor) ---
-  if (serviceModel === 'CRC') {
+  // FOB takes the CRC-style values: the Buyer's contractor does the on-site work
+  if (serviceModel === 'CRC' || serviceModel === 'FOB') {
     map['ONSITE_PROVIDER_NAME'] = projectData.contractorName || '';
     map['CONTRACTOR_LICENSE'] = projectData.contractorLicense || '';
     map['CONTRACTOR_NAME'] = projectData.contractorName || '';

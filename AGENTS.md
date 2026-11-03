@@ -101,7 +101,7 @@ Conditional contract content uses `[IF FOB]...[/IF]`, `[IF CRC]...[/IF]` and `[I
 Project Data → Variable Mapper → Contract Generator
   → Table Generators (dynamic exhibits)
   → Clause Library (atomic header/body clauses)
-  → Conditional processing ([IF CRC/CMOS], [STATE_DISCLOSURE:CODE])
+  → Conditional processing ([IF FOB/CRC/CMOS], [STATE_DISCLOSURE:CODE])
   → Exhibit injection ({{EXHIBIT_A}} through {{EXHIBIT_G}})
   → PDF via Puppeteer → File storage
 ```
