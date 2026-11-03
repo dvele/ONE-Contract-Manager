@@ -136,3 +136,18 @@ export async function resolveGenerationSource(req: {
   return { templateId: await resolveActiveTemplateId(contractType) };
 }
 
+/**
+ * A template's clause playlist, read through template_clauses in template
+ * order: the same set POST /contracts snapshots, never a contract_types match.
+ */
+export async function fetchTemplatePlaylistClauses(templateId: number): Promise<any[]> {
+  const r = await pool.query(
+    `SELECT c.id, c.slug, c.header_text, c.body_html, c.level, c.tags
+     FROM template_clauses tc
+     JOIN clauses c ON c.id = tc.clause_id
+     WHERE tc.template_id = $1
+     ORDER BY tc.order_index ASC`,
+    [templateId],
+  );
+  return r.rows;
+}

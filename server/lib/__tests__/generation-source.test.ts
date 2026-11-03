@@ -137,3 +137,19 @@ describe("generateContract with an empty template playlist (Ruling 30)", () => {
     expect(err).not.toBeInstanceOf(EmptyTemplateError);
   });
 });
+
+describe("fetchTemplatePlaylistClauses (compare-service-models, Ruling 33)", () => {
+  it("selects the template's clauses through template_clauses in template order", async () => {
+    const { fetchTemplatePlaylistClauses } = await import("../generationSource");
+    handlers = [{ match: /FROM template_clauses tc/, rows: () => [{ id: 1, slug: "MEF26_PREAMBLE" }] }];
+    const rows = await fetchTemplatePlaylistClauses(28);
+    expect(rows).toEqual([{ id: 1, slug: "MEF26_PREAMBLE" }]);
+    const q = calls[0];
+    expect(q.sql).toContain("JOIN clauses c ON c.id = tc.clause_id");
+    expect(q.sql).toContain("WHERE tc.template_id = $1");
+    expect(q.sql).toContain("ORDER BY tc.order_index ASC");
+    expect(q.sql).not.toContain("contract_types");
+    expect(q.sql).not.toContain("base_clause_ids");
+    expect(q.params).toEqual([28]);
+  });
+});

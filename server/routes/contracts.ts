@@ -22,6 +22,8 @@ import mammoth from "mammoth";
 import type { ReconciliationResult } from "../services/pricingMath";
 import {
   resolveGenerationSource,
+  resolveActiveTemplateId,
+  fetchTemplatePlaylistClauses,
   GenerationSourceError,
 } from "../lib/generationSource";
 
@@ -2055,37 +2057,13 @@ router.post("/contracts/compare-service-models", async (req, res) => {
       return res.status(400).json({ error: "projectData is required" });
     }
     
+    // The active MASTER_EF template's own playlist, so the comparison shows
+    // the clauses a generation would use rather than a contract_types match.
+    const templateId = await resolveActiveTemplateId('MASTER_EF');
+    const playlist = templateId ? await fetchTemplatePlaylistClauses(templateId) : [];
+
     const getClauses = async (serviceModel: string) => {
-      const modifiedData = { ...projectData, serviceModel };
-      
-      const templateQuery = `
-        SELECT id, base_clause_ids, conditional_rules, display_name FROM contract_templates
-        WHERE contract_type IN ('ONE', 'ONE_AGREEMENT')
-      `;
-      const templateResult = await pool.query(templateQuery);
-      
-      if (templateResult.rows.length === 0) {
-        return { clauses: [], clauseIds: [] };
-      }
-      
-      const template = templateResult.rows[0];
-      const clauseIds = template.base_clause_ids || [];
-      
-      if (clauseIds.length === 0) {
-        return { clauses: [], clauseIds: [] };
-      }
-      
-      // Use atomic clause structure (header_text, body_html)
-      const clausesQuery = `
-        SELECT id, slug, header_text, body_html, level, tags
-        FROM clauses
-        WHERE id = ANY($1)
-        ORDER BY "order"
-      `;
-      
-      const clausesResult = await pool.query(clausesQuery, [clauseIds]);
-      
-      const filteredClauses = clausesResult.rows.filter((clause: any) => {
+      const filteredClauses = playlist.filter((clause: any) => {
         // Filter by service model tag if present
         if (!clause.tags) return true;
         const tags = clause.tags;
