@@ -363,8 +363,8 @@ export default function AdminStateDisclosures() {
               <AlertDialogTitle>Delete State Disclosure</AlertDialogTitle>
               <AlertDialogDescription>
                 Are you sure you want to delete {deleteDisclosure?.state}{" "}
-                {deleteDisclosure?.code ?? "(no code)"}? It will be marked inactive and can be
-                reactivated by editing it.
+                {deleteDisclosure?.code ?? "(no code)"}? It will be marked inactive and removed
+                from this list.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

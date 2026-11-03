@@ -16,6 +16,12 @@ describe("stateDisclosureSchema", () => {
     expect(stateDisclosureSchema.safeParse({ ...ok, state: "A" }).success).toBe(false);
     expect(stateDisclosureSchema.safeParse({ ...ok, content: "" }).success).toBe(false);
   });
+  it("accepts only two capital letters for state", () => {
+    expect(stateDisclosureSchema.safeParse({ ...ok, state: "AZ" }).success).toBe(true);
+    for (const state of ["A1", "--", "1 ", "A", "az"]) {
+      expect(stateDisclosureSchema.safeParse({ ...ok, state }).success).toBe(false);
+    }
+  });
   it("defaults isActive to true", () => {
     const { isActive, ...rest } = ok;
     const r = stateDisclosureSchema.parse(rest);
