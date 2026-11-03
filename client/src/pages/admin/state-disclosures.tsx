@@ -2,11 +2,11 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { AdminLayout } from "@/components/admin-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -34,13 +34,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -53,30 +46,19 @@ import {
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-
-const US_STATES = [
-  "AZ", "CA", "CO", "FL", "GA", "ID", "IL", "MA", "MI", "NV", "NY", "OR", "PA", "TX", "UT", "WA"
-];
+import {
+  stateDisclosureSchema,
+  contentPreview,
+  type StateDisclosureFormValues,
+} from "@/lib/stateDisclosureForm";
 
 interface StateDisclosure {
   id: number;
+  code: string | null;
   state: string;
-  disclosure_type: string;
-  title: string;
-  content?: string;
-  requires_initials: boolean;
+  content: string;
   is_active: boolean;
 }
-
-const stateDisclosureSchema = z.object({
-  state: z.string().min(1, "State is required"),
-  disclosureType: z.string().min(1, "Disclosure type is required"),
-  title: z.string().min(1, "Title is required"),
-  content: z.string().optional(),
-  requiresInitials: z.boolean().default(false),
-});
-
-type StateDisclosureFormValues = z.infer<typeof stateDisclosureSchema>;
 
 export default function AdminStateDisclosures() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -92,16 +74,16 @@ export default function AdminStateDisclosures() {
     resolver: zodResolver(stateDisclosureSchema),
     defaultValues: {
       state: "",
-      disclosureType: "",
-      title: "",
+      code: "",
       content: "",
-      requiresInitials: false,
+      isActive: true,
     },
   });
 
   const createMutation = useMutation({
     mutationFn: async (data: StateDisclosureFormValues) => {
-      return apiRequest("POST", "/api/state-disclosures", data);
+      const { state, code, content } = data;
+      return apiRequest("POST", "/api/state-disclosures", { state, code, content });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/state-disclosures"] });
@@ -146,7 +128,7 @@ export default function AdminStateDisclosures() {
 
   const handleOpenCreate = () => {
     setEditingDisclosure(null);
-    form.reset();
+    form.reset({ state: "", code: "", content: "", isActive: true });
     setIsDialogOpen(true);
   };
 
@@ -154,10 +136,9 @@ export default function AdminStateDisclosures() {
     setEditingDisclosure(disclosure);
     form.reset({
       state: disclosure.state,
-      disclosureType: disclosure.disclosure_type,
-      title: disclosure.title,
+      code: disclosure.code ?? "",
       content: disclosure.content || "",
-      requiresInitials: disclosure.requires_initials,
+      isActive: disclosure.is_active,
     });
     setIsDialogOpen(true);
   };
@@ -179,7 +160,7 @@ export default function AdminStateDisclosures() {
               State Disclosures
             </h1>
             <p className="text-muted-foreground mt-1">
-              Manage state-specific legal disclosures
+              Manage state-specific legal disclosures. Reference a code in a template as [STATE_DISCLOSURE:CODE].
             </p>
           </div>
           <Button onClick={handleOpenCreate} data-testid="button-add-disclosure">
@@ -200,9 +181,9 @@ export default function AdminStateDisclosures() {
               <TableHeader>
                 <TableRow>
                   <TableHead>State</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Initials</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Preview</TableHead>
+                  <TableHead>Active</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -219,15 +200,21 @@ export default function AdminStateDisclosures() {
                       <TableCell>
                         <Badge variant="outline">{disclosure.state}</Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {disclosure.disclosure_type}
-                      </TableCell>
-                      <TableCell className="font-medium">{disclosure.title}</TableCell>
-                      <TableCell>
-                        {disclosure.requires_initials ? (
-                          <Badge variant="secondary">Required</Badge>
+                      <TableCell className="font-mono text-sm">
+                        {disclosure.code ? (
+                          disclosure.code
                         ) : (
-                          <span className="text-muted-foreground">-</span>
+                          <span className="text-amber-600 dark:text-amber-400">— no code —</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground max-w-md">
+                        {contentPreview(disclosure.content)}
+                      </TableCell>
+                      <TableCell>
+                        {disclosure.is_active ? (
+                          <Badge variant="secondary">Active</Badge>
+                        ) : (
+                          <Badge variant="outline">Inactive</Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -279,32 +266,32 @@ export default function AdminStateDisclosures() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>State</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-state">
-                              <SelectValue placeholder="Select state" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {US_STATES.map((state) => (
-                              <SelectItem key={state} value={state}>
-                                {state}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            maxLength={2}
+                            placeholder="e.g., AZ"
+                            onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                            data-testid="input-state"
+                          />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   <FormField
                     control={form.control}
-                    name="disclosureType"
+                    name="code"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Disclosure Type</FormLabel>
+                        <FormLabel>Code</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="e.g., WARRANTY" data-testid="input-type" />
+                          <Input
+                            {...field}
+                            className="font-mono"
+                            placeholder="e.g., MASTER_EF_2026_STATE_NOTICES"
+                            data-testid="input-code"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -314,31 +301,36 @@ export default function AdminStateDisclosures() {
 
                 <FormField
                   control={form.control}
-                  name="title"
+                  name="content"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Title</FormLabel>
+                      <FormLabel>Content</FormLabel>
                       <FormControl>
-                        <Input {...field} data-testid="input-title" />
+                        <Textarea {...field} rows={8} data-testid="input-content" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="content"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Content</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} rows={4} data-testid="input-content" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {editingDisclosure && (
+                  <FormField
+                    control={form.control}
+                    name="isActive"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-md border p-3">
+                        <FormLabel>Active</FormLabel>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-active"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 <DialogFooter>
                   <Button
@@ -370,8 +362,9 @@ export default function AdminStateDisclosures() {
             <AlertDialogHeader>
               <AlertDialogTitle>Delete State Disclosure</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete "{deleteDisclosure?.title}"? This action cannot
-                be undone.
+                Are you sure you want to delete {deleteDisclosure?.state}{" "}
+                {deleteDisclosure?.code ?? "(no code)"}? It will be marked inactive and can be
+                reactivated by editing it.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
