@@ -6,7 +6,8 @@ import { generateLLCName } from '@/lib/llcUtils';
 import { getC2DefaultMatrix, isC2Matrix } from './data/responsibilityDefaults';
 import { matrixFromStored, matrixToStored } from './data/storedMatrix';
 import { activeTemplateId } from './data/templateLookup';
-import { toDeliveryModel, billsOnsite, billsShipping, type DeliveryModel } from '@shared/deliveryModel';
+import { toDeliveryModel, billsOnsite, billsShipping, DELIVERY_MODEL_LABELS, type DeliveryModel } from '@shared/deliveryModel';
+import { createTestDraftProject } from './data/testDraft';
 
 // Default on-site duration (days) per Delivery Model. FOB is 0: on-site work is the Buyer's.
 export const ONSITE_DEFAULT_DAYS: Record<DeliveryModel, number> = { FOB: 0, CRC: 90, CMOS: 60 };
@@ -360,7 +361,7 @@ export interface WizardContextType {
   goToStep: (stepNumber: number) => void;
   saveDraft: () => void;
   loadDraft: () => void;
-  loadTestDraft: () => void;
+  loadTestDraft: (model: DeliveryModel) => Promise<void>;
   generateContracts: () => Promise<void>;
   setShowComparisonModal: (show: boolean) => void;
   setShowClausePreview: (show: boolean) => void;
@@ -502,65 +503,6 @@ export const initialProjectData: ProjectData = {
   legacyResponsibilityMatrix: null,
 };
 
-// Test draft data pre-filled through Step 8 for faster testing
-export const testDraftData: Partial<ProjectData> = {
-  projectNumber: 'TEST-2026-001',
-  odooProjectId: null,
-  projectName: 'Sample Test Project',
-  projectType: 'Single Family',
-  totalUnits: 1,
-  serviceModel: 'CRC',
-  itemizeDesignFee: false,
-  clientLegalName: 'Acme Development LLC',
-  clientState: 'CA',
-  clientEntityType: 'LLC',
-  clientEmail: 'contact@acmedev.com',
-  clientSignerName: 'John Smith',
-  clientSignerTitle: 'Managing Partner',
-  clientPhone: '555-123-4567',
-  contractorName: 'California Builders Inc',
-  contractorLicense: 'CA-LIC-789012',
-  contractorAddress: '456 Construction Way, Los Angeles, CA 90001',
-  contractorInsurance: 'Policy-INS-2026-001',
-  childLlcName: 'Dvele Partners Sample LLC',
-  childLlcState: 'DE',
-  siteAddress: '123 Oak Street',
-  siteCity: 'San Francisco',
-  siteState: 'CA',
-  siteZip: '94102',
-  siteCounty: 'San Francisco',
-  units: [{ id: 1, model: 'Dvele Model X', squareFootage: 2000, bedrooms: 3, bathrooms: 2, price: 450000 }],
-  effectiveDate: new Date().toISOString().split('T')[0],
-  designFee: 15000,
-  designRevisionRounds: 3,
-  preliminaryOffsiteCost: 350000,
-  deliveryInstallationPrice: 45000,
-  totalPreliminaryContractPrice: 410000,
-  milestone1Percent: 20,
-  milestone2Percent: 20,
-  milestone3Percent: 20,
-  milestone4Percent: 20,
-  milestone5Percent: 15,
-  retainagePercent: 5,
-  retainageDays: 60,
-  manufacturingDesignPayment: 10000,
-  manufacturingProductionStart: 50000,
-  manufacturingProductionComplete: 100000,
-  manufacturingDeliveryReady: 40000,
-  designPhaseDays: 60,
-  manufacturingDurationDays: 120,
-  onsiteDurationDays: 45,
-  permittingDurationDays: 45,
-  warrantyFitFinishMonths: 24,
-  warrantyBuildingEnvelopeMonths: 60,
-  warrantyStructuralMonths: 120,
-  projectState: 'CA',
-  projectCounty: 'San Francisco',
-  projectFederalDistrict: 'Northern District of California',
-  overrideJurisdiction: false,
-  arbitrationProvider: 'JAMS',
-};
-
 // Create context
 const WizardContext = createContext<WizardContextType | undefined>(undefined);
 
@@ -628,18 +570,12 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
     }
   }, [nextNumberData, loadProjectId]);
 
-  // Load draft data when loadProjectId is provided
-  useEffect(() => {
-    if (!loadProjectId) {
-      setIsLoadingDraft(false);
-      return;
-    }
-    
-    const loadDraft = async () => {
+  // Load a saved project into the wizard. Shared by resuming a draft and by
+  // "Load Test Draft", which saves a project first and then loads it like any other.
+  const loadSavedDraft = useCallback(async (projectId: number, announce = true): Promise<boolean> => {
       try {
         setIsLoadingDraft(true);
-        const projectId = parseInt(loadProjectId);
-        
+
         // Fetch all data in parallel for efficiency
         const [projectRes, clientRes, financialsRes, detailsRes, warrantyRes, contractorsRes, unitsRes] = await Promise.all([
           apiRequest('GET', `/api/projects/${projectId}`),
@@ -918,11 +854,13 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         });
         
         const projectName = project.name || loadedData.projectName || 'your project';
-        toast({
-          title: "Draft Loaded",
-          description: `Resuming draft for "${projectName}"`,
-        });
-        
+        if (announce) {
+          toast({
+            title: "Draft Loaded",
+            description: `Resuming draft for "${projectName}"`,
+          });
+        }
+        return true;
       } catch (error) {
         console.error('Failed to load draft:', error);
         toast({
@@ -930,13 +868,20 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           description: "Could not load the saved draft. Starting fresh.",
           variant: "destructive",
         });
+        return false;
       } finally {
         setIsLoadingDraft(false);
       }
-    };
-    
-    loadDraft();
-  }, [loadProjectId, toast]);
+  }, [toast]);
+
+  // Load draft data when loadProjectId is provided
+  useEffect(() => {
+    if (!loadProjectId) {
+      setIsLoadingDraft(false);
+      return;
+    }
+    loadSavedDraft(parseInt(loadProjectId));
+  }, [loadProjectId, loadSavedDraft]);
 
   // Sync units array when totalUnits changes
   useEffect(() => {
@@ -1974,21 +1919,32 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
     }
   }, [toast]);
 
-  // Load test draft for faster testing
-  const loadTestDraft = useCallback(() => {
-    // Generate unique project number to avoid duplicates
-    const uniqueProjectNumber = `TEST-${Date.now().toString(36).toUpperCase()}`;
-    setWizardState(prev => ({
-      ...prev,
-      projectData: { ...prev.projectData, ...testDraftData, projectNumber: uniqueProjectNumber },
-      currentStep: 9,
-      completedSteps: new Set([1, 2, 3, 4, 5, 6, 7, 8]),
-    }));
-    toast({
-      title: "Test Draft Loaded",
-      description: "Pre-filled test data loaded. Now on Step 9.",
-    });
-  }, [toast]);
+  // Load test draft for faster testing: save a complete project for the chosen
+  // Delivery Model (phases, properties and homes included), load it, open Step 9.
+  const loadTestDraft = useCallback(async (model: DeliveryModel) => {
+    let projectId: number;
+    try {
+      setIsLoadingDraft(true);
+      projectId = await createTestDraftProject(model, apiRequest);
+    } catch (error) {
+      console.error('Failed to create test draft:', error);
+      setIsLoadingDraft(false);
+      toast({
+        title: "Could Not Create Test Draft",
+        description: error instanceof Error ? error.message : "The test project could not be saved.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (await loadSavedDraft(projectId, false)) {
+      setWizardState(prev => ({ ...prev, currentStep: 9 }));
+      queryClient.invalidateQueries({ queryKey: ['/api/projects'] });
+      toast({
+        title: "Test Draft Loaded",
+        description: `${DELIVERY_MODEL_LABELS[model]} test project saved with phases, properties and homes. Now on Step 9.`,
+      });
+    }
+  }, [loadSavedDraft, toast, queryClient]);
 
   // Toggle section
   const toggleSection = useCallback((section: string) => {

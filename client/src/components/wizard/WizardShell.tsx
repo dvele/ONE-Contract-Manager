@@ -26,8 +26,19 @@ import {
   Shield,
   ClipboardCheck,
   Zap,
+  ChevronDown,
 } from "lucide-react";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { DELIVERY_MODEL_LABELS, type DeliveryModel } from "@shared/deliveryModel";
+
+/** In the agreement's order, matching Step 2's cards. */
+const TEST_DRAFT_MODELS: DeliveryModel[] = ["FOB", "CRC", "CMOS"];
 
 const STEPS = [
   {
@@ -231,13 +242,25 @@ export const WizardShell: React.FC = () => {
             </Button>
 
             {wizardState.currentStep === 1 && (
-              <Button
-                variant="secondary"
-                onClick={loadTestDraft}
-                data-testid="button-load-test-draft">
-                <Zap className="mr-2 h-4 w-4" />
-                Load Test Draft
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="secondary" data-testid="button-load-test-draft">
+                    <Zap className="mr-2 h-4 w-4" />
+                    Load Test Draft
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {TEST_DRAFT_MODELS.map((model) => (
+                    <DropdownMenuItem
+                      key={model}
+                      onSelect={() => loadTestDraft(model)}
+                      data-testid={`menu-load-test-draft-${model.toLowerCase()}`}>
+                      {DELIVERY_MODEL_LABELS[model]}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
 
