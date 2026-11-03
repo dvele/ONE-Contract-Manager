@@ -562,6 +562,134 @@ function repriceAgainst(schedule: PaymentMilestone[], base: number): PaymentMile
   return repriced;
 }
 
+/** The agreement's four payments (A.5); each is a percentage of the base it splits. */
+export const AGREEMENT_MILESTONES = [
+  { name: "1st Payment", trigger: "Agreement Deposit", percentage: 10, due: "Upon execution of Exhibit A" },
+  { name: "2nd Payment", trigger: "Production Approved - Manufacturing starts", percentage: 40, due: "Upon Green Light Production Notice" },
+  { name: "3rd Payment", trigger: "Manufacturing - Final Module Started", percentage: 40, due: "Upon start of final module" },
+  { name: "4th Payment", trigger: "Modules Complete - Before pickup or transport", percentage: 10, due: "Dvele Quality certification complete" },
+];
+
+/** A phase as the 2026 A.5 reads it: `phaseValue` excludes the design fee. */
+export type A5Phase2026 = A5Phase & {
+  phaseValue: number;
+  milestoneSource: 'stored' | 'default';
+};
+
+/**
+ * Splits `total` cents in proportion to `weights`. Each share is floored, then
+ * the leftover cents go one each to the largest fractional parts, so the shares
+ * sum to `total` exactly.
+ */
+function splitCents(total: number, weights: number[]): number[] {
+  const weightTotal = weights.reduce((sum, w) => sum + w, 0);
+  if (weights.length === 0 || weightTotal <= 0) return weights.map(() => 0);
+
+  const exact = weights.map((w) => (total * w) / weightTotal);
+  const shares = exact.map(Math.floor);
+  let residual = total - shares.reduce((sum, s) => sum + s, 0);
+  const byFraction = exact
+    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
+    .sort((a, b) => b.fraction - a.fraction);
+  for (let i = 0; i < byFraction.length && residual > 0; i++, residual--) {
+    shares[byFraction[i].index] += 1;
+  }
+  return shares;
+}
+
+/**
+ * A.5 under the 2026 agreement: four payments over a price that already
+ * includes the design fee, so there is no Design Fee row. Phased projects
+ * spread the fee across phases by phase value; each phase's base then splits by
+ * the agreement's percentages, or by its stored milestones' percentages.
+ * Projects with no phases split `contractValue` directly.
+ */
+export function generateExhibitA5PaymentTableHtml(
+  phases: A5Phase2026[] | null,
+  pricingSummary: PricingSummary | null
+): string {
+  if (!pricingSummary) return 'No pricing data available.';
+
+  type Line = {
+    homeId: string;
+    phase: string;
+    name: string;
+    trigger: string;
+    percentage: number;
+    cents: number;
+    due: string;
+  };
+  const lines: Line[] = [];
+
+  if ((phases?.length ?? 0) > 0) {
+    const phaseList = phases!;
+    const feeShares = splitCents(
+      pricingSummary.breakdown.totalDesignFee,
+      phaseList.map((p) => p.phaseValue)
+    );
+    phaseList.forEach((phase, i) => {
+      const base = phase.phaseValue + feeShares[i];
+      const homeId = phase.properties.map((p) => p.propertyCode).join(', ');
+      const useDefault = phase.milestoneSource === 'default';
+      const source: { name: string; trigger: string; percentage: number; due: string }[] =
+        useDefault
+          ? AGREEMENT_MILESTONES
+          : phase.milestones.map((m) => ({ ...m, due: '' }));
+      const amounts = splitCents(base, source.map((m) => m.percentage));
+      source.forEach((m, j) => {
+        lines.push({
+          homeId,
+          phase: String(phase.phaseNumber),
+          name: m.name,
+          trigger: m.trigger,
+          percentage: m.percentage,
+          cents: amounts[j],
+          due: m.due,
+        });
+      });
+    });
+  } else {
+    const amounts = splitCents(
+      pricingSummary.contractValue,
+      AGREEMENT_MILESTONES.map((m) => m.percentage)
+    );
+    AGREEMENT_MILESTONES.forEach((m, j) => {
+      lines.push({
+        homeId: '',
+        phase: '',
+        name: m.name,
+        trigger: m.trigger,
+        percentage: m.percentage,
+        cents: amounts[j],
+        due: m.due,
+      });
+    });
+  }
+
+  const dollars = allocateWholeDollars(lines.map((l) => l.cents));
+  const rows: StyledRow[] = lines.map((l, i) => ({
+    cells: [l.homeId, l.phase, l.name, l.trigger, `${l.percentage}%`, formatCurrencyWhole(dollars[i]), l.due],
+  }));
+  rows.push({
+    cells: ['', '', 'Total', '', '—', formatCurrencyWhole(dollars.reduce((sum, d) => sum + d, 0)), ''],
+    isBold: true,
+    isTotal: true,
+  });
+
+  return buildStyledTable({
+    columns: [
+      { header: 'Home ID', align: 'left' },
+      { header: 'Phase', align: 'left' },
+      { header: 'Payment', align: 'left' },
+      { header: 'Trigger', align: 'left' },
+      { header: '% payment', align: 'center' },
+      { header: 'Price', align: 'right' },
+      { header: 'Due', align: 'left' },
+    ],
+    rows,
+  });
+}
+
 export function generateExhibitA5TableHtml(
   phases: A5Phase[] | null,
   pricingSummary: PricingSummary | null,

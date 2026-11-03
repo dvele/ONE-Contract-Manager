@@ -28,6 +28,7 @@ import {
   generateExhibitA4TableHtml,
   generateExhibitA4CostTableHtml,
   generateExhibitA5TableHtml,
+  generateExhibitA5PaymentTableHtml,
   generateExhibitB1TableHtml,
   generateResponsibilityMatrixHtml,
   generateExhibitC2TableHtml,
@@ -358,6 +359,7 @@ export const VARIABLE_CATEGORIES = {
     "RESPONSIBILITY_MATRIX_TABLE",
     "EXHIBIT_C2_TABLE",
     "EXHIBIT_A4_COST_TABLE",
+    "EXHIBIT_A5_PAYMENT_TABLE",
     "WHAT_HAPPENS_NEXT_TABLE",
     "MILESTONE_SCHEDULE_TABLE",
     "SIGNATURE_BLOCK_TABLE",
@@ -804,6 +806,8 @@ export interface PricingSummaryForMapper {
       percentage: number;
       amount: number;
     }[];
+    phaseValue: number;
+    milestoneSource: "stored" | "default";
     dates: PhaseDates;
   }[];
 }
@@ -1405,6 +1409,10 @@ export function mapProjectToVariables(
       pricingSummary?.phases || null,
       pricingSummary || null,
       pricingSummary?.serviceModel || project.onSiteSelection || "CRC"
+    ),
+    EXHIBIT_A5_PAYMENT_TABLE: generateExhibitA5PaymentTableHtml(
+      pricingSummary?.phases || null,
+      pricingSummary || null
     ),
     EXHIBIT_B1_TABLE: generateExhibitB1TableHtml(
       pricingSummary?.phases || null
