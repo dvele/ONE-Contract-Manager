@@ -183,10 +183,34 @@ aws logs tail /ecs/contract-manager --since 30m \
 
    ```sql
    ALTER TABLE projects ADD COLUMN IF NOT EXISTS itemize_design_fee boolean NOT NULL DEFAULT false;
+   ALTER TABLE project_details
+     ADD COLUMN IF NOT EXISTS permitting_authority text,
+     ADD COLUMN IF NOT EXISTS fbh_approval_number text,
+     ADD COLUMN IF NOT EXISTS site_access_assumptions text;
+   ALTER TABLE contractor_entities ADD COLUMN IF NOT EXISTS insurance_phone text;
+   ALTER TABLE contractors
+     ADD COLUMN IF NOT EXISTS insurance_phone text,
+     ADD COLUMN IF NOT EXISTS contractor_entity_id integer;
+   DO $$ BEGIN
+     IF NOT EXISTS (SELECT 1 FROM pg_constraint
+                    WHERE conname = 'contractors_contractor_entity_id_contractor_entities_id_fk') THEN
+       ALTER TABLE contractors
+         ADD CONSTRAINT contractors_contractor_entity_id_contractor_entities_id_fk
+         FOREIGN KEY (contractor_entity_id) REFERENCES contractor_entities(id);
+     END IF;
+   END $$;
    ```
 
    Do this immediately before the push. A task still on the old image ignores the
-   column (old code does not select it).
+   columns (old code does not select them). The constraint name matches the one
+   drizzle-kit would choose, so push sees nothing left to add. (Applied to staging
+   on 2026-11-04.)
+
+   Everything the image build needs must be in the Docker build context:
+   `.dockerignore` drops `server/templates` except `master-ef-2026-10`, which
+   `script/build.ts` inlines into the installer bundle. A new template folder
+   needs its own `!` line there, and `.dockerignore` is in the deploy workflow's
+   path filter so a change to it deploys.
 2. **The stuck constraint still needs its own fix** (not part of this release, but
    until it is done every boot logs the schema WARNING). Check for rows that would
    violate it, resolve any, then add it by hand. Do it once the new image is running,
