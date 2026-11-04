@@ -19,6 +19,12 @@ dist
 generated_contracts
 server/templates
 *.log
+
+# The Master EF 2026 installer is bundled at build time from this folder
+# (script/build.ts inlines its clauses and exhibits), so the builder stage
+# needs it. The source document is not read by anything.
+!server/templates/master-ef-2026-10
+server/templates/master-ef-2026-10/source.docx
 .DS_Store
 
 # Docs (not needed to build or run)
