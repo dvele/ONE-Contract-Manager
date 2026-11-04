@@ -10,10 +10,12 @@ import { loadMasterEf2026Content } from "./lib/masterEf2026Content";
  *
  *   --dry-run   plan and apply inside the transaction, then roll back
  *
- * A re-run writes nothing to the template, clauses, exhibits or LLC; the state
- * notices step is insert-if-absent. Existing state_disclosures rows are only read.
- * The template is found by name, so renaming it makes a re-run install a
- * second copy.
+ * A re-run writes nothing to the template, clauses or LLC. It rewrites any
+ * exhibit of the installed template whose text differs from its file, and the
+ * state notices step upserts the reviewed files in server/templates/
+ * master-ef-2026-10/state-notices/ (so a text change ships on re-run) and is
+ * insert-if-absent for every other state. The template is found by name, so
+ * renaming it makes a re-run install a second copy.
  */
 const dryRun = process.argv.includes("--dry-run");
 

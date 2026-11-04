@@ -14,6 +14,7 @@ const content: MasterEf2026Content = {
     { slug: "MEF26_B", headerText: "B", bodyHtml: "", level: 1, parentSlug: null, order: 3 },
   ],
   exhibits: ["A", "B", "C", "D", "E", "F"].map((letter) => ({ letter, title: `Title ${letter}`, content: `<h2>${letter}</h2>` })),
+  stateNotices: { AZ: "<p>AZ-1 reviewed</p>", CA: "<p>CA-1 reviewed</p>" },
 };
 
 const AZ_NOTICES = "<p>The Arizona Registrar of Contractors may be contacted at the number below.</p>";
@@ -29,7 +30,8 @@ const base: ExistingState = {
     { state: "FL", notices: FL_NOTICES, exhibitG: null },
     { state: "WY", notices: null, exhibitG: null },
   ],
-  existingNoticeStates: [],
+  existingNotices: [],
+  existingExhibits: [],
 };
 
 describe("planMasterEf2026Install", () => {
@@ -58,7 +60,17 @@ describe("planMasterEf2026Install", () => {
     expect(plan.llc).toBeNull();
     expect(plan.deactivateTemplateIds).toEqual([]);
     // the disclosure step still runs
-    expect(plan.disclosures.filter((d) => d.action === "insert")).toHaveLength(2);
+    expect(plan.disclosures.filter((d) => d.action === "insert")).toHaveLength(3);
+  });
+
+  it("plans an update for an installed exhibit whose text differs from the file, and nothing on a fresh install", () => {
+    const installed = [
+      { id: 90, letter: "A", content: "<h2>A</h2>" },
+      { id: 91, letter: "B", content: "<h2>B old</h2>" },
+    ];
+    const plan = planMasterEf2026Install(content, { ...base, templateId: 99, existingExhibits: installed });
+    expect(plan.exhibitUpdates).toEqual([{ id: 91, letter: "B", content: "<h2>B</h2>" }]);
+    expect(planMasterEf2026Install(content, { ...base, existingExhibits: installed }).exhibitUpdates).toEqual([]);
   });
 
   it("rejects a clause whose parent comes later", () => {
@@ -66,48 +78,63 @@ describe("planMasterEf2026Install", () => {
     expect(() => planMasterEf2026Install(bad, base)).toThrow(/parent/);
   });
 
-  it("plans combined notices per state, none for a state with neither source", () => {
+  it("plans the reviewed file for a reviewed state and the combined fallback for the rest", () => {
     const plan = planMasterEf2026Install(content, base);
-    expect(plan.disclosures.map((d) => d.state)).toEqual(["AZ", "FL"]);
-    expect(plan.disclosures.every((d) => d.action === "insert")).toBe(true);
+    expect(plan.disclosures.map((d) => [d.state, d.action])).toEqual([
+      ["AZ", "insert"],
+      ["CA", "insert"],
+      ["FL", "insert"],
+    ]);
+    expect(plan.disclosures.find((d) => d.state === "AZ")?.content).toBe("<p>AZ-1 reviewed</p>");
+    expect(plan.disclosures.find((d) => d.state === "FL")?.content).toBe(FL_NOTICES);
   });
 
-  it("plans no write for a state that already has the notices row", () => {
-    const plan = planMasterEf2026Install(content, { ...base, existingNoticeStates: ["AZ"] });
-    const az = plan.disclosures.find((d) => d.state === "AZ");
-    expect(az).toMatchObject({ action: "skip" });
-    expect(az?.content).toBeUndefined();
-    expect(plan.disclosures.find((d) => d.state === "FL")?.action).toBe("insert");
+  it("updates a reviewed state whose row differs, skips one that is current", () => {
+    const plan = planMasterEf2026Install(content, {
+      ...base,
+      existingNotices: [
+        { state: "AZ", content: "<h3>Arizona Notices</h3><p>old</p>" },
+        { state: "CA", content: "<p>CA-1 reviewed</p>" },
+      ],
+    });
+    expect(plan.disclosures.find((d) => d.state === "AZ")).toMatchObject({ action: "update", content: "<p>AZ-1 reviewed</p>" });
+    expect(plan.disclosures.find((d) => d.state === "CA")).toMatchObject({ action: "skip", reason: "already current" });
   });
 
-  it("only ever plans inserts for state_disclosures", () => {
-    const plan = planMasterEf2026Install(content, base);
-    expect(Object.keys(plan)).not.toContain("updateDisclosures");
-    expect(plan.disclosures.every((d) => d.action === "insert" || d.action === "skip")).toBe(true);
+  it("plans no write for an unreviewed state that already has the notices row", () => {
+    const plan = planMasterEf2026Install(content, { ...base, existingNotices: [{ state: "FL", content: "<p>whatever</p>" }] });
+    const fl = plan.disclosures.find((d) => d.state === "FL");
+    expect(fl).toMatchObject({ action: "skip" });
+    expect(fl?.content).toBeUndefined();
+  });
+
+  it("never updates an unreviewed state's row", () => {
+    const plan = planMasterEf2026Install(content, { ...base, existingNotices: [{ state: "FL", content: "<p>differs</p>" }] });
+    expect(plan.disclosures.filter((d) => d.action === "update")).toEqual([]);
   });
 });
 
 describe("composeStateNotices", () => {
-  it("AZ with both sources carries the Registrar sentence and AZ-4", () => {
-    const out = composeStateNotices("AZ", AZ_NOTICES, AZ_G)!;
-    expect(out.startsWith("<h3>Arizona Notices</h3>")).toBe(true);
+  it("AZ with both sources carries the Registrar sentence and AZ-4, with no heading", () => {
+    const out = composeStateNotices(AZ_NOTICES, AZ_G)!;
+    expect(out).not.toContain("<h3>");
     expect(out).toContain("Registrar of Contractors");
     expect(out).toContain("AZ-4: Bonding Requirements");
     expect(out.indexOf("Registrar")).toBeLessThan(out.indexOf("AZ-4"));
   });
 
   it("FL with notices only has its one line and no empty section", () => {
-    expect(composeStateNotices("FL", FL_NOTICES, null)).toBe(`<h3>Florida Notices</h3>\n${FL_NOTICES}`);
-    expect(composeStateNotices("FL", FL_NOTICES, "  ")).toBe(`<h3>Florida Notices</h3>\n${FL_NOTICES}`);
+    expect(composeStateNotices(FL_NOTICES, null)).toBe(FL_NOTICES);
+    expect(composeStateNotices(FL_NOTICES, "  ")).toBe(FL_NOTICES);
   });
 
   it("gives null when a state has neither source", () => {
-    expect(composeStateNotices("WY", null, null)).toBeNull();
-    expect(composeStateNotices("WY", "", " ")).toBeNull();
+    expect(composeStateNotices(null, null)).toBeNull();
+    expect(composeStateNotices("", " ")).toBeNull();
   });
 
   it("renames whole words only, capitalized only", () => {
-    const out = composeStateNotices("AZ", "<p>Company is registered</p>", "<p>Companyside Contractors Client clients company</p>")!;
+    const out = composeStateNotices("<p>Company is registered</p>", "<p>Companyside Contractors Client clients company</p>")!;
     expect(out).toContain("Dvele is registered");
     expect(out).toContain("Companyside");
     expect(out).toContain("Contractors");

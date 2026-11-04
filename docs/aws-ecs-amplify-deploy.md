@@ -272,8 +272,12 @@ old agreement, unchanged.
 
 ### 4. Legal review
 
-Legal reviews every `MASTER_EF_2026_STATE_NOTICES` row on `/admin/state-disclosures`
-and edits in place (see the plan's Deploy step 4).
+Legal reviews every `MASTER_EF_2026_STATE_NOTICES` row on `/admin/state-disclosures`.
+Arizona and California come from `server/templates/master-ef-2026-10/state-notices/`
+and the installer re-loads them whenever the file changes, so an approved edit to
+either goes into the file and ships with the next deploy and install run; an edit
+made on the admin page is overwritten by that run. Every other state is still
+edited in place on the admin page (see the plan's Deploy step 4).
 
 ### 5. Rollback
 

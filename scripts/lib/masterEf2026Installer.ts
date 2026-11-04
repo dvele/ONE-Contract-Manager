@@ -52,9 +52,19 @@ export async function installMasterEf2026(
       [ORG, [MASTER_EF_NOTICES_CODE, EXHIBIT_G_CONTENT_CODE]],
     );
     const { rows: haveRows } = await client.query(
-      `SELECT DISTINCT state FROM state_disclosures WHERE organization_id = $1 AND code = $2`,
+      `SELECT DISTINCT ON (state) state, content FROM state_disclosures
+       WHERE organization_id = $1 AND code = $2 ORDER BY state, id`,
       [ORG, MASTER_EF_2026_NOTICES_CODE],
     );
+
+    const { rows: exhibitRows } = tpl
+      ? await client.query(
+          `SELECT e.id, e.letter, e.content FROM exhibits e
+           JOIN template_exhibits te ON te.exhibit_id = e.id
+           WHERE te.template_id = $1 ORDER BY e.letter`,
+          [tpl.id],
+        )
+      : { rows: [] as { id: number; letter: string; content: string }[] };
 
     const byState = new Map<string, StateSource>();
     for (const row of sourceRows) {
@@ -70,17 +80,19 @@ export async function installMasterEf2026(
       oldTemplateIds: old.map((r) => r.id),
       llcExists: (llcCount ?? 0) > 0,
       stateSources: [...byState.values()],
-      existingNoticeStates: haveRows.map((r) => r.state),
+      existingNotices: haveRows.map((r) => ({ state: r.state, content: r.content })),
+      existingExhibits: exhibitRows.map((r) => ({ id: r.id, letter: r.letter, content: r.content })),
     });
 
     if (tpl) {
-      log(`${tag}"${MASTER_EF_2026_TEMPLATE_NAME}" already installed (template ${tpl.id}); no template, clause, exhibit or LLC writes`);
+      log(`${tag}"${MASTER_EF_2026_TEMPLATE_NAME}" already installed (template ${tpl.id}); no template, clause or LLC writes`);
     }
     log(
       `${tag}plan: ${plan.template ? 1 : 0} template, ${plan.clauses.length} clauses, ${plan.clauses.length} clause links, ` +
-        `${plan.exhibits.length} exhibits, ${plan.exhibits.length} exhibit links, ${plan.llc ? 1 : 0} LLC, ` +
+        `${plan.exhibits.length} exhibits, ${plan.exhibits.length} exhibit links, ${plan.exhibitUpdates.length} exhibit update(s), ${plan.llc ? 1 : 0} LLC, ` +
         `${plan.deactivateTemplateIds.length} template(s) to deactivate [${plan.deactivateTemplateIds.join(", ")}], ` +
         `${plan.disclosures.filter((d) => d.action === "insert").length} disclosure insert(s), ` +
+        `${plan.disclosures.filter((d) => d.action === "update").length} update(s), ` +
         `${plan.disclosures.filter((d) => d.action === "skip").length} skipped`,
     );
 
@@ -127,6 +139,11 @@ export async function installMasterEf2026(
       }
     }
 
+    for (const e of plan.exhibitUpdates) {
+      await client.query(`UPDATE exhibits SET content = $1, updated_at = now() WHERE id = $2`, [e.content, e.id]);
+      log(`${tag}  Exhibit ${e.letter}: ${dryRun ? "would update" : "updated"} (exhibit ${e.id})`);
+    }
+
     if (plan.llc) {
       await client.query(
         `INSERT INTO llcs (name, state_of_formation, entity_type, status, organization_id) VALUES ($1, $2, $3, $4, $5)`,
@@ -142,6 +159,13 @@ export async function installMasterEf2026(
           [MASTER_EF_2026_NOTICES_CODE, d.state, d.content, ORG],
         );
         log(`${tag}  ${d.state}: ${dryRun ? "would insert" : "inserted"}`);
+      } else if (d.action === "update") {
+        await client.query(
+          `UPDATE state_disclosures SET content = $1, is_active = true, updated_at = now()
+           WHERE organization_id = $2 AND code = $3 AND state = $4`,
+          [d.content, ORG, MASTER_EF_2026_NOTICES_CODE, d.state],
+        );
+        log(`${tag}  ${d.state}: ${dryRun ? "would update" : "updated"}`);
       } else {
         log(`${tag}  ${d.state}: ${dryRun ? "would skip" : "skipped"} (${d.reason})`);
       }
