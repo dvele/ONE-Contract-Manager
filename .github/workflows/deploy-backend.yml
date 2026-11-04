@@ -16,6 +16,8 @@ on:
       # trigger this workflow. A fix to the entrypoint's drizzle-kit push sat
       # on dev undeployed while staging served 500s because of it.
       - "docker-entrypoint.sh"
+      # Decides what reaches the build context; a fix to it is a deploy too.
+      - ".dockerignore"
       - "drizzle.config.ts"
       - "package.json"
       - "package-lock.json"
