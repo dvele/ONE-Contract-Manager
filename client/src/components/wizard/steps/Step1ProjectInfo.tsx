@@ -441,7 +441,40 @@ export const Step1ProjectInfo: React.FC = () => {
               />
             </div>
           </div>
-          
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="permittingAuthority">
+                Permitting Authority
+              </Label>
+              <Input
+                id="permittingAuthority"
+                value={projectData.permittingAuthority}
+                onChange={(e) => updateProjectData({ permittingAuthority: e.target.value })}
+                placeholder="e.g., County of Sonoma Permit and Resource Management"
+                data-testid="input-permitting-authority"
+              />
+              <p className="text-xs text-muted-foreground">
+                Prints in Exhibit A.1; a blank line if empty
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="fbhApprovalNumber">
+                State Factory-Built Housing Approval No.
+              </Label>
+              <Input
+                id="fbhApprovalNumber"
+                value={projectData.fbhApprovalNumber}
+                onChange={(e) => updateProjectData({ fbhApprovalNumber: e.target.value })}
+                placeholder="Issued on plan approval; leave blank until issued"
+                data-testid="input-fbh-approval-number"
+              />
+              <p className="text-xs text-muted-foreground">
+                The program (HCD, ADOH) is filled in from the Site state
+              </p>
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="siteApn">
               APN (Assessor's Parcel Number)

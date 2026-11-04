@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { billsOnsite, toDeliveryModel } from '@shared/deliveryModel';
+import { centsToDollarsInput, dollarsInputToCents } from '@shared/money';
 
 interface ContractorEntity {
   id: number;
@@ -34,6 +35,7 @@ interface ContractorEntity {
   insuranceAmount?: number;
   insuranceExpiration?: string;
   insuranceCarrier?: string;
+  insurancePhone?: string;
   isActive: boolean;
 }
 
@@ -55,6 +57,7 @@ interface ContractorFormData {
   insuranceAmount: string;
   insuranceExpiration: string;
   insuranceCarrier: string;
+  insurancePhone: string;
 }
 
 const emptyContractorForm: ContractorFormData = {
@@ -75,6 +78,7 @@ const emptyContractorForm: ContractorFormData = {
   insuranceAmount: '',
   insuranceExpiration: '',
   insuranceCarrier: '',
+  insurancePhone: '',
 };
 
 export const Step3PartyInfo: React.FC = () => {
@@ -158,10 +162,11 @@ export const Step3PartyInfo: React.FC = () => {
     contactName: entity.contactName || '',
     contactEmail: entity.contactEmail || '',
     contactPhone: entity.contactPhone || '',
-    bondAmount: entity.bondAmount?.toString() || '',
-    insuranceAmount: entity.insuranceAmount?.toString() || '',
+    bondAmount: centsToDollarsInput(entity.bondAmount),
+    insuranceAmount: centsToDollarsInput(entity.insuranceAmount),
     insuranceExpiration: entity.insuranceExpiration || '',
     insuranceCarrier: entity.insuranceCarrier || '',
+    insurancePhone: entity.insurancePhone || '',
   });
   
   // Helper to convert form data to entity payload
@@ -179,10 +184,12 @@ export const Step3PartyInfo: React.FC = () => {
     contactName: form.contactName || undefined,
     contactEmail: form.contactEmail || undefined,
     contactPhone: form.contactPhone || undefined,
-    bondAmount: form.bondAmount ? parseInt(form.bondAmount) : undefined,
-    insuranceAmount: form.insuranceAmount ? parseInt(form.insuranceAmount) : undefined,
+    // Typed in dollars, stored in cents like every other money column.
+    bondAmount: dollarsInputToCents(form.bondAmount),
+    insuranceAmount: dollarsInputToCents(form.insuranceAmount),
     insuranceExpiration: form.insuranceExpiration || undefined,
     insuranceCarrier: form.insuranceCarrier || undefined,
+    insurancePhone: form.insurancePhone || undefined,
   });
   
   // Handle manufacturer selection
@@ -561,7 +568,7 @@ export const Step3PartyInfo: React.FC = () => {
                       <div className="flex items-center gap-2 mt-1">
                         <Shield className="h-3 w-3 text-muted-foreground" />
                         <span className="text-xs text-muted-foreground">
-                          {entity.insuranceCarrier || 'Insurance'}: ${entity.insuranceAmount?.toLocaleString() || 'N/A'}
+                          {entity.insuranceCarrier || 'Insurance'}: ${entity.insuranceAmount ? (entity.insuranceAmount / 100).toLocaleString() : 'N/A'}
                           {entity.insuranceExpiration && ` (exp: ${entity.insuranceExpiration})`}
                         </span>
                       </div>
@@ -641,7 +648,7 @@ export const Step3PartyInfo: React.FC = () => {
                       <div className="flex items-center gap-2 mt-1">
                         <Shield className="h-3 w-3 text-muted-foreground" />
                         <span className="text-xs text-muted-foreground">
-                          {entity.insuranceCarrier || 'Insurance'}: ${entity.insuranceAmount?.toLocaleString() || 'N/A'}
+                          {entity.insuranceCarrier || 'Insurance'}: ${entity.insuranceAmount ? (entity.insuranceAmount / 100).toLocaleString() : 'N/A'}
                           {entity.insuranceExpiration && ` (exp: ${entity.insuranceExpiration})`}
                         </span>
                       </div>
@@ -1086,6 +1093,19 @@ export const Step3PartyInfo: React.FC = () => {
                     placeholder="e.g., State Farm, Liberty Mutual"
                     data-testid="input-onsite-insurance-carrier"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>Insurer Phone</Label>
+                  <Input
+                    type="tel"
+                    value={contractorForm.insurancePhone}
+                    onChange={(e) => updateFormField('insurancePhone', e.target.value)}
+                    placeholder="e.g., 800-555-0100"
+                    data-testid="input-onsite-insurance-phone"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Printed on the California liability-insurance notice (Exhibit F) with the carrier
+                  </p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">

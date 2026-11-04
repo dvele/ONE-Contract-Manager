@@ -53,14 +53,25 @@ const gc = {
 };
 
 const NEW_VARS: Record<string, string[]> = {
-  childLlc: ["SELLER_LEGAL_NAME", "SELLER_ENTITY_CLAUSE"],
+  childLlc: ["SELLER_LEGAL_NAME", "SELLER_ENTITY_CLAUSE", "AGREEMENT_SELLER_NOTICE"],
   legal: ["AGREEMENT_GOVERNING_LAW_STATE", "WARRANTY_STATUTE_PREFIX", "AGREEMENT_DISPUTE_LOCATION"],
   project: ["PROJECT_STATE_NAME", "DELIVERY_MODEL_ELECTION", "BUYER_TYPE_ELECTION"],
   conditional: ["DELIVERY_MODEL", "IS_FOB"],
   home: ["TOTAL_UNITS_WRITTEN"],
-  pricing: ["STORAGE_TERMS"],
-  onsiteContractor: ["BUYER_GC_DETAILS", "GC_AFFILIATE_DETAILS"],
+  pricing: ["STORAGE_TERMS", "AGREEMENT_SITE_ACCESS_ASSUMPTIONS"],
+  onsiteContractor: [
+    "BUYER_GC_DETAILS",
+    "GC_AFFILIATE_DETAILS",
+    "ONSITE_CONTRACTOR_INSURANCE_PHONE",
+    "AGREEMENT_GC_NAME",
+    "AGREEMENT_GC_LICENSE_NUMBER",
+    "AGREEMENT_GC_INSURER",
+    "AGREEMENT_GC_INSURER_PHONE",
+    "GC_CGL_INSURED_MARK",
+    "GC_CGL_UNINSURED_MARK",
+  ],
   client: ["BUYER_ENTITY_CLAUSE", "AGREEMENT_BUYER_ADDRESS"],
+  site: ["AGREEMENT_SITE_COUNTY", "AGREEMENT_PERMITTING_AUTHORITY", "AGREEMENT_FBH_PROGRAM_APPROVAL"],
   tables: ["MASTER_EF_SIGNATURE_TABLE"],
 };
 
@@ -166,6 +177,11 @@ describe("delivery model", () => {
       `☐ Dvele GC (Turnkey through CO/Equivalent; GC Affiliate: ${BLANK}; License No. / State: ${BLANK} / ${BLANK})`,
     ]);
   });
+  it.each(["FOB", "CRC"])("does not name the Buyer's GC as the GC Affiliate under %s", (model) => {
+    const el = String(build({ model, contractors: [gc] }).DELIVERY_MODEL_ELECTION);
+    expect(el).not.toContain("Acme Builders");
+    expect(el).toContain(`GC Affiliate: ${BLANK}; License No. / State: ${BLANK} / ${BLANK}`);
+  });
   it("orders the options FOB, Delivered to Site, Dvele GC", () => {
     const el = String(build({ model: "FOB" }).DELIVERY_MODEL_ELECTION);
     expect(el.indexOf("FOB Factory")).toBeLessThan(el.indexOf("Delivered to Site"));
@@ -255,6 +271,85 @@ describe("MASTER_EF_SIGNATURE_TABLE", () => {
   });
   it("shows a placeholder GC column under CMOS with no contractor", () => {
     expect(String(build({ model: "CMOS" }).MASTER_EF_SIGNATURE_TABLE)).toContain("[GC AFFILIATE]");
+  });
+});
+
+describe("AGREEMENT_SITE_COUNTY", () => {
+  it("is the site county from the wizard", () => {
+    const v = build({ projectDetails: { deliveryCounty: "Maricopa" } });
+    expect(v.AGREEMENT_SITE_COUNTY).toBe("Maricopa");
+    expect(v.DELIVERY_COUNTY).toBe("Maricopa");
+    expect(v.PROJECT_COUNTY).toBe("Maricopa");
+  });
+  it("is a fill-in blank when no county is recorded", () => {
+    expect(build().AGREEMENT_SITE_COUNTY).toBe("____________");
+    expect(build({ projectDetails: { deliveryCounty: "  " } }).AGREEMENT_SITE_COUNTY).toBe("____________");
+    expect(build().DELIVERY_COUNTY).toBe("");
+  });
+});
+
+describe("A.1 jurisdiction row", () => {
+  it("prints the permitting authority or a blank", () => {
+    expect(build({ projectDetails: { permittingAuthority: "County of Sonoma PRMD" } }).AGREEMENT_PERMITTING_AUTHORITY).toBe(
+      "County of Sonoma PRMD"
+    );
+    expect(build().AGREEMENT_PERMITTING_AUTHORITY).toBe("____________");
+  });
+  it("names the state factory-built housing program and the approval number", () => {
+    expect(build({ project: { state: "CA" }, projectDetails: { fbhApprovalNumber: "FBH-2026-0417" } }).AGREEMENT_FBH_PROGRAM_APPROVAL).toBe(
+      "HCD Factory-Built Housing Program (Health & Safety Code § 19960 et seq.) / Approval No. FBH-2026-0417"
+    );
+    expect(build({ project: { state: "AZ" } }).AGREEMENT_FBH_PROGRAM_APPROVAL).toBe(
+      "ADOH Office of Manufactured Housing, Factory-Built Buildings (A.R.S. § 41-4001 et seq.) / Approval No. ____________"
+    );
+    expect(build({ project: { state: "CO" } }).AGREEMENT_FBH_PROGRAM_APPROVAL).toBe("____________ / Approval No. ____________");
+  });
+});
+
+describe("AGREEMENT_SITE_ACCESS_ASSUMPTIONS", () => {
+  it("prints the wizard's text or a blank", () => {
+    expect(build({ projectDetails: { siteAccessAssumptions: " crane on north road " } }).AGREEMENT_SITE_ACCESS_ASSUMPTIONS).toBe(
+      "crane on north road"
+    );
+    expect(build().AGREEMENT_SITE_ACCESS_ASSUMPTIONS).toBe(BLANK);
+  });
+});
+
+describe("AGREEMENT_SELLER_NOTICE", () => {
+  it("joins the seller LLC's address to the notice email", () => {
+    const llc = { legalName: "Dvele AZ, LLC", formationState: "AZ", address: "1 Factory Rd", city: "Phoenix", state: "AZ", zip: "85001" };
+    expect(build({ llc }).AGREEMENT_SELLER_NOTICE).toBe("1 Factory Rd, Phoenix, AZ 85001 / finance@dvele.com");
+  });
+  it("is a blank plus the email until the LLC record has an address", () => {
+    expect(build().AGREEMENT_SELLER_NOTICE).toBe(`${BLANK} / finance@dvele.com`);
+    expect(build({ llc: null }).AGREEMENT_SELLER_NOTICE).toBe(`${BLANK} / finance@dvele.com`);
+  });
+});
+
+describe("Exhibit F California contractor notices", () => {
+  const insured = { ...gc, insuranceCarrier: "Golden Gate Mutual", insurancePhone: "800-555-0142" };
+  it("prints the contractor, license, insurer and phone, ticking the insured box", () => {
+    const v = build({ model: "CRC", contractors: [insured] });
+    expect(v.AGREEMENT_GC_NAME).toBe("Acme Builders");
+    expect(v.AGREEMENT_GC_LICENSE_NUMBER).toBe("ROC-123");
+    expect(v.AGREEMENT_GC_INSURER).toBe("Golden Gate Mutual");
+    expect(v.AGREEMENT_GC_INSURER_PHONE).toBe("800-555-0142");
+    expect(v.ONSITE_CONTRACTOR_INSURANCE_PHONE).toBe("800-555-0142");
+    expect(v.GC_CGL_INSURED_MARK).toBe("☒");
+    expect(v.GC_CGL_UNINSURED_MARK).toBe("☐");
+  });
+  it("leaves both boxes unticked and the insurer blank when no carrier is recorded", () => {
+    const v = build({ model: "CRC", contractors: [gc] });
+    expect(v.AGREEMENT_GC_INSURER).toBe(BLANK);
+    expect(v.AGREEMENT_GC_INSURER_PHONE).toBe(BLANK);
+    expect(v.GC_CGL_INSURED_MARK).toBe("☐");
+    expect(v.GC_CGL_UNINSURED_MARK).toBe("☐");
+  });
+  it("blanks everything with no on-site contractor", () => {
+    const v = build({ model: "FOB" });
+    expect(v.AGREEMENT_GC_NAME).toBe(BLANK);
+    expect(v.AGREEMENT_GC_LICENSE_NUMBER).toBe(BLANK);
+    expect(v.GC_CGL_INSURED_MARK).toBe("☐");
   });
 });
 

@@ -254,13 +254,17 @@ const SANCTIONED: { src: string; aut: string }[] = [
   // A.1 Delivery Model cell (Ruling 17; checked by the A.1 election test)
   { src: "☐ FOB Factory (Buyer Pickup/Transport) ☐ Delivered to Site (Dvele Transport; Buyer/GC Site Work) ☐ Dvele GC (Turnkey through CO/Equivalent; GC Affiliate: ____________________; License No. / State: ____________ / [State])", aut: "{{DELIVERY_MODEL_ELECTION}}" },
   // A.1 Jurisdiction blank cell: state name, county, permitting authority, program & approval no. (Ruling 20)
-  { src: "", aut: "{{PROJECT_STATE_NAME}} / ____________ / ____________; ____________" },
+  { src: "", aut: "{{PROJECT_STATE_NAME}} / {{AGREEMENT_SITE_COUNTY}} / {{AGREEMENT_PERMITTING_AUTHORITY}}; {{AGREEMENT_FBH_PROGRAM_APPROVAL}}" },
   // A.1 Site(s) blank cell
   { src: "", aut: "{{SITE_ADDRESS}}" },
   // A.1 Buyer Notice blank cell
   { src: "", aut: "{{CLIENT_FULL_ADDRESS}} / {{CLIENT_EMAIL}}" },
+  // A.1 Dvele Notice cell: the seller LLC's address joins the docx's email
+  { src: "finance@dvele.com", aut: "{{AGREEMENT_SELLER_NOTICE}}" },
   // A.8 storage fee blanks and their default
   { src: "$______/day per Home after ______ days free (if left blank, $250/day per Home after ten (10) business days)", aut: "{{STORAGE_TERMS}}" },
+  // A.8 delivery window / crane day / Site access blank
+  { src: "____________________", aut: "{{AGREEMENT_SITE_ACCESS_ASSUMPTIONS}}" },
   // C.1: the docx's literal bullet character is a list item in the content
   { src: "●", aut: "" },
   // C.1 Buyer GC blank (Ruling 16)
@@ -330,7 +334,17 @@ describe("Master EF 2026 authored content", () => {
     // mapProjectToVariables resolves them but VARIABLE_CATEGORIES never listed
     // them. They are accepted as long as the mapper resolves them.
     const resolved = new Set(Object.keys(mapProjectToVariables(MINIMAL_PROJECT)));
-    const used = Array.from(new Set(Array.from(content.matchAll(/\{\{([A-Z0-9_]+)\}\}/g), (m) => m[1])));
+    // The reviewed F.2 notices are substituted on the exhibit path too; an
+    // unregistered name there would print literally.
+    const noticesDir = path.join(DIR, "state-notices");
+    const notices = fs
+      .readdirSync(noticesDir)
+      .filter((f) => f.endsWith(".html"))
+      .map((f) => fs.readFileSync(path.join(noticesDir, f), "utf8"))
+      .join("\n");
+    const used = Array.from(
+      new Set(Array.from(`${content}\n${notices}`.matchAll(/\{\{([A-Z0-9_]+)\}\}/g), (m) => m[1]))
+    );
     expect(used.length).toBeGreaterThan(0);
     expect(used.filter((v) => !resolved.has(v))).toEqual([]);
     expect(used.filter((v) => !registered.has(v)).sort()).toEqual([
@@ -342,11 +356,7 @@ describe("Master EF 2026 authored content", () => {
 
   it("no doc blanks survive outside the allow-list", () => {
     // Literal blanks left for hand completion, and the initials line kept verbatim.
-    const allowList = [
-      "Delivery window, crane day, and Site access assumptions: ____________________ (if blank, as stated in Exhibit C)",
-      "please initial here: __________",
-      "{{PROJECT_STATE_NAME}} / ____________ / ____________; ____________",
-    ];
+    const allowList = ["please initial here: __________"];
     let rest = content;
     for (const allowed of allowList) {
       expect(rest).toContain(allowed);

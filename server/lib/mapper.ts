@@ -154,6 +154,7 @@ export const VARIABLE_CATEGORIES = {
     "CHILD_LLC_INSURANCE_STATUS",
     "SELLER_LEGAL_NAME",
     "SELLER_ENTITY_CLAUSE",
+    "AGREEMENT_SELLER_NOTICE",
   ],
   site: [
     "DELIVERY_ADDRESS",
@@ -162,6 +163,9 @@ export const VARIABLE_CATEGORIES = {
     "DELIVERY_ZIP",
     "DELIVERY_FULL_ADDRESS",
     "DELIVERY_COUNTY",
+    "AGREEMENT_SITE_COUNTY",
+    "AGREEMENT_PERMITTING_AUTHORITY",
+    "AGREEMENT_FBH_PROGRAM_APPROVAL",
     "DELIVERY_APN",
     "SITE_ACREAGE",
     "SITE_ZONING",
@@ -219,6 +223,7 @@ export const VARIABLE_CATEGORIES = {
     "INFLATION_ADJUSTMENT_PERCENT",
     "MATERIAL_INCREASE_THRESHOLD",
     "STORAGE_TERMS",
+    "AGREEMENT_SITE_ACCESS_ASSUMPTIONS",
   ],
   milestones: [
     // Client milestones
@@ -301,8 +306,16 @@ export const VARIABLE_CATEGORIES = {
     "ONSITE_CONTRACTOR_CONTACT_PHONE",
     "ONSITE_CONTRACTOR_BOND_AMOUNT",
     "ONSITE_CONTRACTOR_INSURANCE_AMOUNT",
+    "ONSITE_CONTRACTOR_INSURANCE_PHONE",
     "BUYER_GC_DETAILS",
     "GC_AFFILIATE_DETAILS",
+    // Exhibit F's California contractor notices (fill-in blanks when unknown)
+    "AGREEMENT_GC_NAME",
+    "AGREEMENT_GC_LICENSE_NUMBER",
+    "AGREEMENT_GC_INSURER",
+    "AGREEMENT_GC_INSURER_PHONE",
+    "GC_CGL_INSURED_MARK",
+    "GC_CGL_UNINSURED_MARK",
   ],
   liquidatedDamages: [
     "LIQUIDATED_DAMAGES_PER_DAY",
@@ -582,6 +595,20 @@ export function getFederalDistrict(state: string): string {
     OR: "District of Oregon",
   };
   return districts[state] || "";
+}
+
+/**
+ * The state factory-built housing program named in Exhibit A.1's Jurisdiction
+ * row, by Site state. A fill-in blank for a state with no program recorded.
+ */
+export function getFactoryBuiltProgram(state: string | null | undefined): string {
+  const programs: Record<string, string> = {
+    CA: "HCD Factory-Built Housing Program (Health & Safety Code § 19960 et seq.)",
+    California: "HCD Factory-Built Housing Program (Health & Safety Code § 19960 et seq.)",
+    AZ: "ADOH Office of Manufactured Housing, Factory-Built Buildings (A.R.S. § 41-4001 et seq.)",
+    Arizona: "ADOH Office of Manufactured Housing, Factory-Built Buildings (A.R.S. § 41-4001 et seq.)",
+  };
+  return programs[(state || "").trim()] || "____________";
 }
 
 function buildMapperSignatureBlock(
@@ -986,11 +1013,16 @@ export function mapProjectToVariables(
     ? `${sellerState} limited liability company`
     : "limited liability company";
   const sellerEntityClause = `${indefiniteArticle(sellerPhrase)} ${sellerPhrase}`;
-  // Exhibit A.1's Delivery Model options, worded as in the agreement.
+  // Exhibit A.1's Delivery Model options, worded as in the agreement. The
+  // on-site contractor is the GC Affiliate only under Dvele GC; under the other
+  // models it is the Buyer's GC, so the unelected Dvele GC line stays blank.
+  const isDveleGc = deliveryModel === "CMOS";
   const deliveryModelOptions: Record<DeliveryModel, string> = {
     FOB: "FOB Factory (Buyer Pickup/Transport)",
     CRC: "Delivered to Site (Dvele Transport; Buyer/GC Site Work)",
-    CMOS: `Dvele GC (Turnkey through CO/Equivalent; GC Affiliate: ${gcName}; License No. / State: ${gcLicenseNo} / ${gcLicenseState})`,
+    CMOS: isDveleGc
+      ? `Dvele GC (Turnkey through CO/Equivalent; GC Affiliate: ${gcName}; License No. / State: ${gcLicenseNo} / ${gcLicenseState})`
+      : `Dvele GC (Turnkey through CO/Equivalent; GC Affiliate: ${BLANK}; License No. / State: ${BLANK} / ${BLANK})`,
   };
   const deliveryModelElection = (["FOB", "CRC", "CMOS"] as DeliveryModel[])
     .map((m) => `${m === deliveryModel ? "☒" : "☐"} ${deliveryModelOptions[m]}`)
@@ -1010,7 +1042,7 @@ export function mapProjectToVariables(
     PROJECT_STATUS: project.status,
     PROJECT_STATE: project.state || "",
     PROJECT_STATE_CODE: getStateCodeReference(project.state || ""),
-    PROJECT_COUNTY: (projectDetails as any)?.county || "",
+    PROJECT_COUNTY: projectDetails?.deliveryCounty || "",
     PROJECT_FEDERAL_DISTRICT: getFederalDistrict(project.state || ""),
     LIEN_LAW_STATE: project.state || "",
     ON_SITE_SELECTION: project.onSiteSelection || "CRC",
@@ -1076,6 +1108,13 @@ export function mapProjectToVariables(
     CHILD_LLC_INSURANCE_STATUS: childLlc?.insuranceStatus || "Pending",
     SELLER_LEGAL_NAME: childLlc?.legalName || "[SELLER]",
     SELLER_ENTITY_CLAUSE: sellerEntityClause,
+    // Exhibit A.1's Dvele Notice Address / Email: the seller LLC's address from
+    // the admin LLC record, a fill-in blank until one is entered there.
+    AGREEMENT_SELLER_NOTICE: `${
+      childLlc?.address?.trim()
+        ? buildFullAddress(childLlc.address, childLlc.city, childLlc.state, childLlc.zip)
+        : BLANK
+    } / finance@dvele.com`,
     CHILD_LLC_INSURANCE_EXPIRATION: childLlc?.insuranceExpiration || "",
     CHILD_LLC_ANNUAL_REPORT_DUE: childLlc?.annualReportDue || "",
 
@@ -1116,6 +1155,15 @@ export function mapProjectToVariables(
       projectDetails?.deliveryZip
     ),
     DELIVERY_COUNTY: projectDetails?.deliveryCounty || "",
+    // Exhibit A.1's Jurisdiction row: a fill-in blank, not an empty slot, when
+    // the wizard has no county.
+    AGREEMENT_SITE_COUNTY: projectDetails?.deliveryCounty?.trim() || "____________",
+    AGREEMENT_PERMITTING_AUTHORITY: projectDetails?.permittingAuthority?.trim() || "____________",
+    // The program follows the Site state; the approval number is issued on plan
+    // approval, usually after signing, so it is a blank until the wizard has it.
+    AGREEMENT_FBH_PROGRAM_APPROVAL: `${getFactoryBuiltProgram(project.state)} / Approval No. ${
+      projectDetails?.fbhApprovalNumber?.trim() || "____________"
+    }`,
     DELIVERY_APN: projectDetails?.deliveryApn || "",
     SITE_ACREAGE: projectDetails?.siteAcreage || "",
     SITE_ZONING: projectDetails?.siteZoning || "",
@@ -1332,6 +1380,9 @@ export function mapProjectToVariables(
       (project.storageFeePerDay || 0) > 0
         ? `${formatCurrency((project.storageFeePerDay || 0) / 100)}/day per Home after ${project.storageFreedays || 14} days free`
         : "$250/day per Home after ten (10) business days",
+    // Exhibit A.8's delivery window, crane day and Site access line; the
+    // exhibit says Exhibit C governs when it is left blank.
+    AGREEMENT_SITE_ACCESS_ASSUMPTIONS: projectDetails?.siteAccessAssumptions?.trim() || BLANK,
 
     // Contact information
     CLIENT_PRIMARY_CONTACT:
@@ -1582,6 +1633,17 @@ export function mapProjectToVariables(
       onsiteContractor?.insuranceExpiration || "",
     ONSITE_CONTRACTOR_INSURANCE_CARRIER:
       onsiteContractor?.insuranceCarrier || "",
+    ONSITE_CONTRACTOR_INSURANCE_PHONE: onsiteContractor?.insurancePhone || "",
+    // Exhibit F's California notices name the contractor performing on-site
+    // work: the GC Affiliate under Dvele GC, the Buyer's GC otherwise. The
+    // "carries insurance" box is ticked only when a carrier is recorded; the
+    // "does not carry" box is never asserted from missing data.
+    AGREEMENT_GC_NAME: gcName,
+    AGREEMENT_GC_LICENSE_NUMBER: gcLicenseNo,
+    AGREEMENT_GC_INSURER: onsiteContractor?.insuranceCarrier?.trim() || BLANK,
+    AGREEMENT_GC_INSURER_PHONE: onsiteContractor?.insurancePhone?.trim() || BLANK,
+    GC_CGL_INSURED_MARK: onsiteContractor?.insuranceCarrier?.trim() ? "☒" : "☐",
+    GC_CGL_UNINSURED_MARK: "☐",
 
     // ===================
     // LIQUIDATED DAMAGES

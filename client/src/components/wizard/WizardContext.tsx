@@ -175,6 +175,10 @@ export interface ProjectData {
   siteZip: string;
   siteCounty: string;
   siteApn: string;
+  // Exhibit A.1 Jurisdiction row and A.8 assumptions line
+  permittingAuthority: string;
+  fbhApprovalNumber: string;
+  siteAccessAssumptions: string;
   billingAddressDifferent: boolean;
   billingAddress: string;
   billingCity: string;
@@ -415,6 +419,9 @@ export const initialProjectData: ProjectData = {
   siteZip: '',
   siteCounty: '',
   siteApn: '',
+  permittingAuthority: '',
+  fbhApprovalNumber: '',
+  siteAccessAssumptions: '',
   billingAddressDifferent: false,
   billingAddress: '',
   billingCity: '',
@@ -631,6 +638,9 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           loadedData.siteZip = details.deliveryZip || '';
           loadedData.siteCounty = details.deliveryCounty || '';
           loadedData.siteApn = details.deliveryApn || '';
+          loadedData.permittingAuthority = details.permittingAuthority || '';
+          loadedData.fbhApprovalNumber = details.fbhApprovalNumber || '';
+          loadedData.siteAccessAssumptions = details.siteAccessAssumptions || '';
           loadedData.totalUnits = details.totalUnits || 1;
           
         }
@@ -1072,6 +1082,9 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
       siteZip: pd.siteZip,
       siteCounty: pd.siteCounty,
       siteApn: pd.siteApn,
+      permittingAuthority: pd.permittingAuthority,
+      fbhApprovalNumber: pd.fbhApprovalNumber,
+      siteAccessAssumptions: pd.siteAccessAssumptions,
       // Client info
       clientLegalName: pd.clientLegalName,
       clientEntityType: pd.clientEntityType,
@@ -1256,6 +1269,9 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           deliveryZip: pd.siteZip || null,
           deliveryCounty: pd.siteCounty || null,
           deliveryApn: pd.siteApn || null,
+          permittingAuthority: pd.permittingAuthority || null,
+          fbhApprovalNumber: pd.fbhApprovalNumber || null,
+          siteAccessAssumptions: pd.siteAccessAssumptions || null,
           totalUnits: pd.totalUnits || 1,
           agreementExecutionDate: pd.effectiveDate || null,
           estimatedDeliveryDate: pd.targetDeliveryDate || null,
@@ -2147,6 +2163,9 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         deliveryZip: pd.siteZip,
         deliveryCounty: pd.siteCounty,
         deliveryApn: pd.siteApn,
+        permittingAuthority: pd.permittingAuthority || null,
+        fbhApprovalNumber: pd.fbhApprovalNumber || null,
+        siteAccessAssumptions: pd.siteAccessAssumptions || null,
         homeModel: pd.units[0]?.model || pd.homeModel,
         homeSqFt: pd.units[0]?.squareFootage || pd.homeSquareFootage,
         homeBedrooms: pd.units[0]?.bedrooms || pd.homeBedrooms,

@@ -8,6 +8,8 @@ const ENTITY = {
   contactEmail: "morgan@example.com",
   entityType: "LLC",
   address: "1 Entity Way",
+  insuranceCarrier: "Liberty Mutual",
+  insurancePhone: "800-555-0100",
 };
 
 describe("withContractorEntityDefaults", () => {
@@ -25,6 +27,9 @@ describe("withContractorEntityDefaults", () => {
       entityType: "LLC",
       // The wizard sends "" when no address was typed; the entity's fills it.
       address: "1 Entity Way",
+      // Exhibit F's California insurance notice prints these.
+      insuranceCarrier: "Liberty Mutual",
+      insurancePhone: "800-555-0100",
     });
   });
 

@@ -511,7 +511,7 @@ export default function AdminLLCs() {
                     name="address"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Delivery Address</FormLabel>
+                        <FormLabel>Address</FormLabel>
                         <FormControl>
                           <Input
                             {...field}

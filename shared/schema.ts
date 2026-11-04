@@ -304,10 +304,11 @@ export const contractorEntities = pgTable("contractor_entities", {
   contactName: text("contact_name"),
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
-  bondAmount: integer("bond_amount"),
-  insuranceAmount: integer("insurance_amount"),
+  bondAmount: integer("bond_amount"), // cents
+  insuranceAmount: integer("insurance_amount"), // cents
   insuranceExpiration: text("insurance_expiration"),
   insuranceCarrier: text("insurance_carrier"),
+  insurancePhone: text("insurance_phone"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at"),
@@ -405,7 +406,10 @@ export const projectDetails = pgTable("project_details", {
   deliveryApn: text("delivery_apn"), // Assessor's Parcel Number
   siteAcreage: text("site_acreage"),
   siteZoning: text("site_zoning"),
-  
+  // Exhibit A.1 Jurisdiction row
+  permittingAuthority: text("permitting_authority"),
+  fbhApprovalNumber: text("fbh_approval_number"), // state factory-built housing plan approval
+
   // Home Specifications
   homeModel: text("home_model"),
   homeSqFt: integer("home_sq_ft"),
@@ -453,6 +457,9 @@ export const projectDetails = pgTable("project_details", {
   // Legal
   governingLawState: text("governing_law_state"),
   arbitrationLocation: text("arbitration_location"),
+
+  // Exhibit A.8 - delivery window, crane day and Site access assumptions
+  siteAccessAssumptions: text("site_access_assumptions"),
 });
 
 // =============================================================================
@@ -577,7 +584,9 @@ export const contractors = pgTable("contractors", {
   projectId: integer("project_id")
     .references(() => projects.id)
     .notNull(),
-  
+  // The master-list entry (contractor_entities) this row was picked from, if any.
+  contractorEntityId: integer("contractor_entity_id").references(() => contractorEntities.id),
+
   // Contractor Type
   contractorType: text("contractor_type").notNull(), // 'manufacturer', 'onsite_general', 'onsite_sub'
   
@@ -602,12 +611,13 @@ export const contractors = pgTable("contractors", {
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
   
-  // Insurance & Bonding
+  // Insurance & Bonding (cents)
   bondAmount: integer("bond_amount"),
   insuranceAmount: integer("insurance_amount"),
   insuranceExpiration: text("insurance_expiration"),
   insuranceCarrier: text("insurance_carrier"),
-  
+  insurancePhone: text("insurance_phone"),
+
   // Status
   isActive: boolean("is_active").default(true),
 });

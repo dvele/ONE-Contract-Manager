@@ -25,6 +25,7 @@ export const ENTITY_COPIED_FIELDS = [
   "insuranceAmount",
   "insuranceExpiration",
   "insuranceCarrier",
+  "insurancePhone",
 ] as const;
 
 type EntityRow = Partial<Record<(typeof ENTITY_COPIED_FIELDS)[number], unknown>>;

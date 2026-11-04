@@ -140,6 +140,10 @@ router.post("/llcs", async (req: Request, res: Response) => {
       ON CONFLICT (name) DO UPDATE SET
         project_name = COALESCE(EXCLUDED.project_name, llcs.project_name),
         project_address = COALESCE(EXCLUDED.project_address, llcs.project_address),
+        address = COALESCE(EXCLUDED.address, llcs.address),
+        city = COALESCE(EXCLUDED.city, llcs.city),
+        state_address = COALESCE(EXCLUDED.state_address, llcs.state_address),
+        zip = COALESCE(EXCLUDED.zip, llcs.zip),
         updated_at = NOW()
       RETURNING 
         id,

@@ -603,8 +603,9 @@ router.get("/projects/:projectId/contractors/:type", async (req, res) => {
 router.post("/projects/:projectId/contractors", async (req, res) => {
   try {
     const projectId = parseInt(req.params.projectId);
-    // `contractorEntityId` is not a contractors column; it names the master-list
-    // entry the wizard picked, whose license and contact fill any gaps.
+    // `contractorEntityId` names the master-list entry the wizard picked. It is
+    // stored only when it resolves to an entity in this org, whose license and
+    // contact details then fill any gaps in the request.
     const { contractorType, contractorEntityId, ...requestData } = req.body;
     const entityId = Number(contractorEntityId);
     const [entity] = Number.isInteger(entityId) && entityId > 0
@@ -616,7 +617,10 @@ router.post("/projects/:projectId/contractors", async (req, res) => {
             eq(contractorEntities.organizationId, req.organizationId)
           ))
       : [];
-    const otherData = withContractorEntityDefaults(requestData, entity ?? null);
+    const otherData = withContractorEntityDefaults(
+      { ...requestData, contractorEntityId: entity ? entity.id : null },
+      entity ?? null
+    );
     
     const existing = await db
       .select()

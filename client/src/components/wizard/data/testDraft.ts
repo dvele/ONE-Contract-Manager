@@ -29,14 +29,26 @@ interface TestDraftProfile {
     email: string;
     phone: string;
   };
-  site: { address: string; city: string; state: string; zip: string; county: string };
+  site: {
+    address: string;
+    city: string;
+    state: string;
+    zip: string;
+    county: string;
+    permittingAuthority: string;
+    fbhApprovalNumber: string;
+  };
   arbitrationLocation: string;
+  /** Exhibit A.8's delivery window, crane day and Site access line. */
+  siteAccessAssumptions: string;
   onsiteContractor: {
     legalName: string;
     licenseNumber: string;
     licenseState: string;
     contactName: string;
     contactEmail: string;
+    insuranceCarrier?: string;
+    insurancePhone?: string;
   };
 }
 
@@ -59,8 +71,17 @@ export const TEST_DRAFT_PROFILES: Record<DeliveryModel, TestDraftProfile> = {
       email: "contracts@sonoranhomes.example",
       phone: "602-555-0101",
     },
-    site: { address: "210 Desert Bloom Ln", city: "Scottsdale", state: "AZ", zip: "85251", county: "Maricopa" },
+    site: {
+      address: "210 Desert Bloom Ln",
+      city: "Scottsdale",
+      state: "AZ",
+      zip: "85251",
+      county: "Maricopa",
+      permittingAuthority: "City of Scottsdale Planning and Development Services",
+      fbhApprovalNumber: "",
+    },
     arbitrationLocation: "Maricopa County, Arizona",
+    siteAccessAssumptions: "",
     onsiteContractor: {
       legalName: "Sonoran Site Builders LLC",
       licenseNumber: "ROC-123456",
@@ -82,14 +103,26 @@ export const TEST_DRAFT_PROFILES: Record<DeliveryModel, TestDraftProfile> = {
       email: "owner@goldenstate.example",
       phone: "415-555-0102",
     },
-    site: { address: "44 Vineyard Rd", city: "Sonoma", state: "CA", zip: "95476", county: "Sonoma" },
+    site: {
+      address: "44 Vineyard Rd",
+      city: "Sonoma",
+      state: "CA",
+      zip: "95476",
+      county: "Sonoma",
+      permittingAuthority: "County of Sonoma Permit and Resource Management Department",
+      fbhApprovalNumber: "FBH-2026-0417",
+    },
     arbitrationLocation: "Sonoma County, California",
+    siteAccessAssumptions:
+      "Delivery window of five business days after Buyer's readiness notice; crane staged on the north access road; 14 ft clearance on Vineyard Rd.",
     onsiteContractor: {
       legalName: "Bay Area Builders Inc",
       licenseNumber: "CSLB-1048576",
       licenseState: "CA",
       contactName: "Sam Ortega",
       contactEmail: "sam@bayareabuilders.example",
+      insuranceCarrier: "Golden Gate Mutual Insurance",
+      insurancePhone: "800-555-0142",
     },
   },
   CMOS: {
@@ -105,8 +138,17 @@ export const TEST_DRAFT_PROFILES: Record<DeliveryModel, TestDraftProfile> = {
       email: "jordan.lee@example.com",
       phone: "520-555-0103",
     },
-    site: { address: "8 Saguaro Ct", city: "Tucson", state: "AZ", zip: "85718", county: "Pima" },
+    site: {
+      address: "8 Saguaro Ct",
+      city: "Tucson",
+      state: "AZ",
+      zip: "85718",
+      county: "Pima",
+      permittingAuthority: "Pima County Development Services",
+      fbhApprovalNumber: "",
+    },
     arbitrationLocation: "Pima County, Arizona",
+    siteAccessAssumptions: "",
     onsiteContractor: {
       legalName: "Dvele Construction AZ, LLC",
       licenseNumber: "ROC-654321",
@@ -173,8 +215,11 @@ export async function createTestDraftProject(
     deliveryState: profile.site.state,
     deliveryZip: profile.site.zip,
     deliveryCounty: profile.site.county,
+    permittingAuthority: profile.site.permittingAuthority || null,
+    fbhApprovalNumber: profile.site.fbhApprovalNumber || null,
     agreementExecutionDate: now.toISOString().split("T")[0],
     arbitrationLocation: profile.arbitrationLocation,
+    siteAccessAssumptions: profile.siteAccessAssumptions || null,
     totalUnits: PHASE_COUNT,
   });
   await request("POST", `/api/projects/${projectId}/contractors`, {

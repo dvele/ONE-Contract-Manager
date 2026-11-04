@@ -4,6 +4,7 @@ import { PhaseScheduleEditor } from '../PhaseScheduleEditor';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Clock, Info, AlertTriangle, Target } from 'lucide-react';
 import { toDeliveryModel } from '@shared/deliveryModel';
@@ -533,6 +534,34 @@ export const Step6DatesSchedule: React.FC = () => {
                 </p>
               </div>
             ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-primary" aria-hidden="true" />
+            Delivery Window and Site Access
+            <Badge variant="outline" className="text-xs">Exhibit A.8</Badge>
+          </CardTitle>
+          <CardDescription>
+            Delivery window, crane day and Site access assumptions agreed for this project.
+            Prints in Exhibit A.8; if left empty, Exhibit C governs.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-1">
+            <Label htmlFor="siteAccessAssumptions">Assumptions</Label>
+            <Textarea
+              id="siteAccessAssumptions"
+              name="siteAccessAssumptions"
+              rows={3}
+              value={projectData.siteAccessAssumptions || ''}
+              onChange={(e) => updateProjectData({ siteAccessAssumptions: e.target.value })}
+              placeholder="e.g., Delivery window of 5 business days after Buyer's readiness notice; crane staged on the north access road; 14 ft clearance on Vineyard Rd"
+              data-testid="input-site-access-assumptions"
+            />
           </div>
         </CardContent>
       </Card>
