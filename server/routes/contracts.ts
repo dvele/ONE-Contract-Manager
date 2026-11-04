@@ -26,6 +26,7 @@ import {
   fetchTemplatePlaylistClauses,
   GenerationSourceError,
 } from "../lib/generationSource";
+import { DRAFT_PROJECT_CHILD_TABLES } from "../lib/draftProject";
 
 const execAsync = promisify(exec);
 
@@ -2761,14 +2762,10 @@ router.delete("/projects/:projectId/draft", async (req, res) => {
 
     let projectDeleted = false;
     if (projectResult.rows[0]?.status === "Draft") {
-      // Delete all child records before deleting the project
-      await client.query(`DELETE FROM project_units WHERE project_id = $1`, [projectId]);
-      await client.query(`DELETE FROM clients WHERE project_id = $1`, [projectId]);
-      await client.query(`DELETE FROM project_details WHERE project_id = $1`, [projectId]);
-      await client.query(`DELETE FROM financials WHERE project_id = $1`, [projectId]);
-      await client.query(`DELETE FROM milestones WHERE project_id = $1`, [projectId]);
-      await client.query(`DELETE FROM warranty_terms WHERE project_id = $1`, [projectId]);
-      await client.query(`DELETE FROM contractors WHERE project_id = $1`, [projectId]);
+      // Delete all child records before deleting the project, in FK-safe order.
+      for (const table of DRAFT_PROJECT_CHILD_TABLES) {
+        await client.query(`DELETE FROM ${table} WHERE project_id = $1`, [projectId]);
+      }
       await client.query(`DELETE FROM projects WHERE id = $1`, [projectId]);
       projectDeleted = true;
     }
