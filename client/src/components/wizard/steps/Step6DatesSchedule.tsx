@@ -233,28 +233,16 @@ export const Step6DatesSchedule: React.FC = () => {
     updateProjectData({ [field]: value });
   };
 
-  // `effectiveDate`, not `agreementDate`, is what the wizard saves to
+  // Step 1's Agreement Execution Date is `effectiveDate`: the wizard saves it to
   // projectDetails.agreementExecutionDate, and that column is what the server
-  // anchors every derived date to. Showing agreementDate here would name a
-  // start the schedule does not actually use.
-  const projectStart = projectData.effectiveDate || projectData.agreementDate;
+  // anchors every derived date to.
+  const projectStart = projectData.effectiveDate;
 
   const projectStartLabel = useMemo(() => {
     if (!projectStart) return 'Not set';
     const parsed = new Date(`${projectStart}T00:00:00Z`);
     return Number.isNaN(parsed.getTime()) ? projectStart : dateFormat.format(parsed);
   }, [projectStart]);
-
-  // Auto-set effectiveDate from agreementDate on mount or when agreementDate changes
-  useEffect(() => {
-    if (!projectData.effectiveDate && projectData.agreementDate) {
-      updateProjectData({ effectiveDate: projectData.agreementDate });
-    } else if (!projectData.effectiveDate && !projectData.agreementDate) {
-      // Default to today if no dates are set
-      const today = new Date().toISOString().split('T')[0];
-      updateProjectData({ effectiveDate: today });
-    }
-  }, [projectData.agreementDate, projectData.effectiveDate, updateProjectData]);
 
   useEffect(() => {
     if (!projectData.onsiteDurationDays) {

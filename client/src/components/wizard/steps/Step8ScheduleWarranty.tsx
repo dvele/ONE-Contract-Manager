@@ -44,13 +44,8 @@ export const Step8ScheduleWarranty: React.FC = () => {
       updates.arbitrationProvider = 'JAMS';
     }
     
-    // Default effectiveDate from agreementDate if not set
-    if (!projectData.effectiveDate && projectData.agreementDate) {
-      updates.effectiveDate = projectData.agreementDate;
-    } else if (!projectData.effectiveDate) {
-      updates.effectiveDate = new Date().toISOString().split('T')[0];
-    }
-    
+    // No date default here: the effective date is set on Step 1 and validated there.
+
     if (Object.keys(updates).length > 0) {
       updateProjectData(updates);
     }
@@ -158,7 +153,7 @@ export const Step8ScheduleWarranty: React.FC = () => {
                 data-testid="input-effective-date"
               />
               <p className="text-xs text-muted-foreground">
-                Set in Step 6 (Dates & Schedule)
+                The Agreement Execution Date from Step 1
               </p>
             </div>
             <div className="flex items-end">

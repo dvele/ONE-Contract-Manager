@@ -295,22 +295,22 @@ export const Step1ProjectInfo: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="agreementDate" className="flex items-center gap-2">
+            <Label htmlFor="effectiveDate" className="flex items-center gap-2">
               Agreement Execution Date <span className="text-red-500">*</span>
             </Label>
             <Input
-              id="agreementDate"
+              id="effectiveDate"
               type="date"
-              value={projectData.agreementDate}
-              onChange={(e) => updateProjectData({ agreementDate: e.target.value })}
-              className={validationErrors.agreementDate ? 'border-red-500' : ''}
+              value={projectData.effectiveDate}
+              onChange={(e) => updateProjectData({ effectiveDate: e.target.value })}
+              className={validationErrors.effectiveDate ? 'border-red-500' : ''}
               data-testid="input-agreement-date"
             />
-            {validationErrors.agreementDate && (
-              <p className="text-sm text-red-500">{validationErrors.agreementDate}</p>
+            {validationErrors.effectiveDate && (
+              <p className="text-sm text-red-500">{validationErrors.effectiveDate}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Date when the contract will be signed
+              Date when the contract will be signed. It is the agreement's Effective Date and the start every schedule date derives from.
             </p>
           </div>
 

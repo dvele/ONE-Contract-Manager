@@ -142,7 +142,6 @@ export interface ProjectData {
   projectName: string;
   projectType: string;
   totalUnits: number;
-  agreementDate: string;
   serviceModel: DeliveryModel;
   contractType: 'MASTER_EF';
   buyerType: 'end_customer' | 'developer';
@@ -387,7 +386,6 @@ export const initialProjectData: ProjectData = {
   projectName: '',
   projectType: 'Single Family Residence',
   totalUnits: 1,
-  agreementDate: new Date().toISOString().split('T')[0],
   serviceModel: 'CRC',
   contractType: 'MASTER_EF',
   buyerType: 'end_customer',
@@ -1547,8 +1545,10 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         if (data.totalUnits < 1 || data.totalUnits > 50) {
           errors.totalUnits = 'Total units must be between 1 and 50';
         }
-        if (!data.agreementDate) {
-          errors.agreementDate = 'Agreement date is required';
+        // One date: Step 1's Agreement Execution Date is the effective date the
+        // schedule, Step 8 and the agreement all use (projectDetails.agreementExecutionDate).
+        if (!data.effectiveDate) {
+          errors.effectiveDate = 'Agreement execution date is required';
         }
         // Site address validation (moved from Step 4)
         if (!data.siteAddress.trim()) errors.siteAddress = 'Site address is required';
