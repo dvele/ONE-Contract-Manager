@@ -302,8 +302,12 @@ router.post("/projects", async (req, res) => {
 
     let { llcId, ...projectData } = req.body;
 
-    // Auto-generate LLC if not provided
-    if (!llcId) {
+    // Auto-generate an LLC only when the request says nothing about one (the
+    // original ONE-agreement behaviour, kept for callers that rely on it). The
+    // wizard always sends llcId: the seller it selected, or null when it is
+    // about to create and link a project-specific entity itself — otherwise
+    // every draft minted a stray "DP <name> LLC" here first.
+    if (llcId === undefined) {
       // Get site address from project details or project name
       const siteAddress = projectData.siteAddress || projectData.name || "New Project";
 

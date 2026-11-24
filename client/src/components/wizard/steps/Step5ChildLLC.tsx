@@ -71,7 +71,7 @@ export const Step5ChildLLC: React.FC = () => {
             Company Entity Setup
           </CardTitle>
           <CardDescription>
-            Each project is managed through a dedicated company entity
+            The entity that signs as Dvele. Dvele AZ, LLC is the seller on the 2026 agreement and is selected by default; create a project-specific entity only when the deal calls for one.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -266,7 +266,16 @@ export const Step5ChildLLC: React.FC = () => {
                     <Label>Select LLC <span className="text-red-500">*</span></Label>
                     <Select
                       value={projectData.selectedExistingLlcId}
-                      onValueChange={(value) => updateProjectData({ selectedExistingLlcId: value })}
+                      onValueChange={(value) => {
+                        // Carry the chosen LLC's name into the wizard state too:
+                        // Step 9 and the saved draft read childLlcName, which
+                        // otherwise keeps the auto-generated name.
+                        const chosen = llcs.find((llc) => llc.id.toString() === value);
+                        updateProjectData({
+                          selectedExistingLlcId: value,
+                          ...(chosen ? { childLlcName: chosen.name } : {}),
+                        });
+                      }}
                     >
                       <SelectTrigger
                         className={validationErrors.selectedExistingLlcId ? 'border-red-500' : ''}

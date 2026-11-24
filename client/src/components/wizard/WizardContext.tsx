@@ -3,6 +3,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { generateLLCName } from '@/lib/llcUtils';
+import { isDefaultSellerLlc } from '@shared/seller';
 import { getC2DefaultMatrix, isC2Matrix } from './data/responsibilityDefaults';
 import { matrixFromStored, matrixToStored } from './data/storedMatrix';
 import { activeTemplateId } from './data/templateLookup';
@@ -405,7 +406,9 @@ export const initialProjectData: ProjectData = {
   clientSignerTitle: '',
   clientEmail: '',
   clientPhone: '',
-  llcOption: 'new',
+  // The seller entity is an existing LLC (Dvele AZ, LLC, resolved by name once
+  // the LLC list loads); "new" is the opt-in for a project-specific entity.
+  llcOption: 'existing',
   selectedExistingLlcId: '',
   childLlcName: '',
   childLlcState: 'DE',
@@ -1121,6 +1124,7 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
       projectCounty: pd.projectCounty,
       // LLC
       llcOption: pd.llcOption,
+      selectedExistingLlcId: pd.selectedExistingLlcId,
       childLlcName: pd.childLlcName,
       childLlcState: pd.childLlcState,
       childLlcEin: pd.childLlcEin,
@@ -1186,6 +1190,9 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           storageFeePerDay: pd.storageFeePerDay || 15000,
           storageFreedays: pd.storageFreedays || 14,
           adminFeePercent: pd.adminFeePercent || 10,
+          // The selected seller, or null so the server does not mint a stray
+          // "DP <name> LLC" before the "new LLC" path below creates the real one.
+          llcId: pd.llcOption === 'existing' && pd.selectedExistingLlcId ? parseInt(pd.selectedExistingLlcId, 10) : null,
           // Schedule durations. The three the server derives dates from send
           // null, not 0, when Step 6 has not been reached: a 0 there is the
           // fabricated-date bug the column default used to cause, and the
@@ -1370,6 +1377,13 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           } catch (e) {
             // LLC might already exist, ignore
           }
+        } else if (pd.llcOption === 'existing' && pd.selectedExistingLlcId) {
+          // Link the chosen LLC now. Until this was saved only at generation,
+          // so a reload took the project's previous LLC (the one auto-created
+          // from the site address) and the choice looked as if it reverted.
+          await apiRequest('PATCH', `/api/projects/${projectId}`, {
+            llcId: parseInt(pd.selectedExistingLlcId, 10),
+          });
         }
         
         // Save to localStorage as backup
@@ -1465,6 +1479,20 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
       };
     });
   }, []);
+
+  // Default seller: once the LLC list is in, a project that has no entity yet
+  // selects Dvele AZ, LLC (by name; its id differs per environment). A loaded
+  // project with an LLC, or a user who chose "new", is left alone.
+  const { data: llcList } = useQuery<{ id: number; name: string }[]>({ queryKey: ['/api/llcs'] });
+  useEffect(() => {
+    if (isLoadingDraft) return;
+    const pd = wizardState.projectData;
+    if (pd.llcOption !== 'existing' || pd.selectedExistingLlcId) return;
+    const seller = llcList?.find((llc) => isDefaultSellerLlc(llc.name));
+    if (seller) {
+      updateProjectData({ selectedExistingLlcId: String(seller.id), childLlcName: seller.name });
+    }
+  }, [llcList, isLoadingDraft, wizardState.projectData.llcOption, wizardState.projectData.selectedExistingLlcId, updateProjectData]);
 
   // Update unit
   const updateUnit = useCallback((unitId: number, updates: Partial<UnitSpec>) => {
@@ -1924,8 +1952,11 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
           storageFeePerDay: pd.storageFeePerDay || 15000,
           storageFreedays: pd.storageFreedays || 14,
           adminFeePercent: pd.adminFeePercent || 10,
+          // As in the autosave: the selected seller, or null so the server
+          // does not mint a stray LLC before this flow links the right one.
+          llcId: pd.llcOption === 'existing' && pd.selectedExistingLlcId ? parseInt(pd.selectedExistingLlcId, 10) : null,
         };
-        
+
         const projectResponse = await apiRequest('POST', '/api/projects', projectPayload);
         if (!projectResponse.ok) {
           throw new Error('Failed to create project');

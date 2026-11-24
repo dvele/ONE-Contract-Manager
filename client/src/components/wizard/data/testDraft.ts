@@ -1,4 +1,5 @@
 import { DELIVERY_MODEL_LABELS, type DeliveryModel } from "@shared/deliveryModel";
+import { DEFAULT_SELLER_LLC_NAME } from "@shared/seller";
 
 /**
  * "Load Test Draft" builds a real saved project, not just wizard form state.
@@ -14,7 +15,7 @@ import { DELIVERY_MODEL_LABELS, type DeliveryModel } from "@shared/deliveryModel
 export type RequestFn = (method: string, url: string, data?: unknown) => Promise<Response>;
 
 /** The seller every project selects for now (Decision 3 of the 2026 agreement plan). */
-export const TEST_DRAFT_SELLER = "Dvele AZ, LLC";
+export const TEST_DRAFT_SELLER = DEFAULT_SELLER_LLC_NAME;
 
 interface TestDraftProfile {
   buyerType: "end_customer" | "developer";
