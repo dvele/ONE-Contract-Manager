@@ -741,11 +741,21 @@ export function buildMasterEf2026SignatureBlock(
   const width = hasGc ? "31%" : "47%";
   const gap = hasGc ? "3.5%" : "6%";
 
-  function sigColumn(title: string, subtitle: string | null): string {
+  // Two rows, not one cell per party: the party names go in a header row and
+  // the lines in the row beneath, so a name that wraps, or the GC Affiliate's
+  // role line, makes every header cell taller together and the signature
+  // lines stay level across the columns.
+  function headerCell(title: string, subtitle: string | null): string {
     return `
-      <td style="width: ${width}; border: none; vertical-align: top; padding: 8pt;">
-        <div style="font-weight: bold; margin-bottom: ${subtitle ? "2pt" : "16pt"};">${title}</div>
-        ${subtitle ? `<div style="${labelStyle} margin-bottom: 14pt;">${subtitle}</div>` : ""}
+      <td style="width: ${width}; border: none; vertical-align: top; padding: 8pt 8pt 0 8pt;">
+        <div style="font-weight: bold;">${title}</div>
+        ${subtitle ? `<div style="${labelStyle} margin-top: 2pt;">${subtitle}</div>` : ""}
+      </td>`;
+  }
+
+  function linesCell(): string {
+    return `
+      <td style="width: ${width}; border: none; padding: 16pt 8pt 8pt 8pt;">
         ${signatureLine()}
         <div style="${labelStyle}">Signed</div>
         ${signatureLine("margin-top: 12pt; ")}
@@ -757,25 +767,25 @@ export function buildMasterEf2026SignatureBlock(
       </td>`;
   }
 
-  const columns = [
-    sigColumn((sellerName || "[SELLER]").toUpperCase(), null),
-    sigColumn(buyerName || "[BUYER]", null),
+  const parties: Array<[string, string | null]> = [
+    [(sellerName || "[SELLER]").toUpperCase(), null],
+    [buyerName || "[BUYER]", null],
   ];
   if (hasGc) {
-    columns.push(
-      sigColumn(
-        (gcAffiliateName || "[GC AFFILIATE]").toUpperCase(),
-        "GC Affiliate, solely as to on-site work"
-      )
-    );
+    parties.push([(gcAffiliateName || "[GC AFFILIATE]").toUpperCase(), "GC Affiliate, solely as to on-site work"]);
   }
   const spacer = `<td style="width: ${gap}; border: none;"></td>`;
+  const headerRow = parties.map(([title, subtitle]) => headerCell(title, subtitle)).join(spacer);
+  const linesRow = parties.map(() => linesCell()).join(spacer);
 
   return `
     <div class="signature-section" style="margin-top: 20pt; page-break-inside: avoid;">
       <table style="width: 100%; border-collapse: collapse; border: none; font-size: 10pt; font-family: Arial, sans-serif;">
         <tr>
-          ${columns.join(spacer)}
+          ${headerRow}
+        </tr>
+        <tr>
+          ${linesRow}
         </tr>
       </table>
     </div>`;
