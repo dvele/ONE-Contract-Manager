@@ -158,7 +158,7 @@ export const Step8ScheduleWarranty: React.FC = () => {
             </div>
             <div className="flex items-end">
               <div className="space-y-1">
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between gap-2 text-sm">
                   <span>Total Project Duration</span>
                   <span className="font-medium">{totalDays} days</span>
                 </div>
@@ -167,30 +167,32 @@ export const Step8ScheduleWarranty: React.FC = () => {
           </div>
           
           <div className="space-y-2 pt-2 border-t">
-            <div className="h-8 flex rounded-md overflow-hidden border">
-              <div 
-                className="bg-primary/70 dark:bg-primary/50 flex items-center justify-center text-xs text-primary-foreground font-medium"
+            {/* Three phases, three chart colours: the secondary and muted greys
+                they used to wear are a shade apart, which read as one segment. */}
+            <div className="h-8 flex rounded-md overflow-hidden border divide-x divide-background">
+              <div
+                className="bg-chart-1 flex items-center justify-center text-xs text-white dark:text-gray-900 font-medium"
                 style={{ width: `${designPercent}%` }}
               >
                 {designPercent > 15 && 'Design'}
               </div>
-              <div 
-                className="bg-secondary dark:bg-secondary/80 flex items-center justify-center text-xs text-secondary-foreground font-medium"
+              <div
+                className="bg-chart-2 flex items-center justify-center text-xs text-white dark:text-gray-900 font-medium"
                 style={{ width: `${mfgPercent}%` }}
               >
                 {mfgPercent > 15 && 'Manufacturing'}
               </div>
-              <div 
-                className="bg-muted dark:bg-muted/80 flex items-center justify-center text-xs text-muted-foreground font-medium"
+              <div
+                className="bg-chart-4 flex items-center justify-center text-xs text-white dark:text-gray-900 font-medium"
                 style={{ width: `${onsitePercent}%` }}
               >
                 {onsitePercent > 15 && 'On-Site'}
               </div>
             </div>
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Design: {projectData.designPhaseDays || 0}d</span>
-              <span>Manufacturing: {projectData.manufacturingDurationDays || 0}d</span>
-              <span>On-Site: {projectData.onsiteDurationDays || 0}d</span>
+              <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-sm bg-chart-1" aria-hidden="true" />Design: {projectData.designPhaseDays || 0}d</span>
+              <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-sm bg-chart-2" aria-hidden="true" />Manufacturing: {projectData.manufacturingDurationDays || 0}d</span>
+              <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-sm bg-chart-4" aria-hidden="true" />On-Site: {projectData.onsiteDurationDays || 0}d</span>
             </div>
           </div>
           
