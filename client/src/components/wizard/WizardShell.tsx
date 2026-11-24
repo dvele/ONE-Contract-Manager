@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -109,6 +110,17 @@ export const WizardShell: React.FC = () => {
     isLoadingDraft,
   } = useWizard();
 
+  // Each step is a long page, so a step change would otherwise land mid-page.
+  // Depending on the layout the scroller is the app's <main> or the window, so
+  // reset every scrolled ancestor and the window to the top.
+  const topRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    for (let el = topRef.current?.parentElement; el; el = el.parentElement) {
+      if (el.scrollTop > 0) el.scrollTop = 0;
+    }
+    window.scrollTo({ top: 0 });
+  }, [wizardState.currentStep]);
+
   // Show loading state while draft is being loaded
   if (isLoadingDraft) {
     return (
@@ -129,7 +141,7 @@ export const WizardShell: React.FC = () => {
   const CurrentIcon = currentStepInfo.icon;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div ref={topRef} className="mx-auto max-w-5xl space-y-6">
       {/* Progress Indicator */}
       <Card className="p-6">
         <div className="mb-4">
