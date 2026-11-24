@@ -10,6 +10,8 @@
 
 import { buildStyledTable, TABLE_STYLES, type StyledRow } from './tableStyles';
 import { billsOnsite, billsShipping, toDeliveryModel } from '../../shared/deliveryModel';
+import { splitCents } from '../../shared/money';
+import { AGREEMENT_MILESTONES } from '../../shared/agreementMilestones';
 
 export type ContractFilterType = 'ONE' | 'MANUFACTURING' | 'ONSITE' | 'MASTER_EF';
 
@@ -563,39 +565,13 @@ function repriceAgainst(schedule: PaymentMilestone[], base: number): PaymentMile
 }
 
 /** The agreement's four payments (A.5); each is a percentage of the base it splits. */
-export const AGREEMENT_MILESTONES = [
-  { name: "1st Payment", trigger: "Agreement Deposit", percentage: 10, due: "Upon execution of Exhibit A" },
-  { name: "2nd Payment", trigger: "Production Approved - Manufacturing starts", percentage: 40, due: "Upon Green Light Production Notice" },
-  { name: "3rd Payment", trigger: "Manufacturing - Final Module Started", percentage: 40, due: "Upon start of final module" },
-  { name: "4th Payment", trigger: "Modules Complete - Before pickup or transport", percentage: 10, due: "Dvele Quality certification complete" },
-];
+export { AGREEMENT_MILESTONES };
 
 /** A phase as the 2026 A.5 reads it: `phaseValue` excludes the design fee. */
 export type A5Phase2026 = A5Phase & {
   phaseValue: number;
   milestoneSource: 'stored' | 'default';
 };
-
-/**
- * Splits `total` cents in proportion to `weights`. Each share is floored, then
- * the leftover cents go one each to the largest fractional parts, so the shares
- * sum to `total` exactly.
- */
-function splitCents(total: number, weights: number[]): number[] {
-  const weightTotal = weights.reduce((sum, w) => sum + w, 0);
-  if (weights.length === 0 || weightTotal <= 0) return weights.map(() => 0);
-
-  const exact = weights.map((w) => (total * w) / weightTotal);
-  const shares = exact.map(Math.floor);
-  let residual = total - shares.reduce((sum, s) => sum + s, 0);
-  const byFraction = exact
-    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
-    .sort((a, b) => b.fraction - a.fraction);
-  for (let i = 0; i < byFraction.length && residual > 0; i++, residual--) {
-    shares[byFraction[i].index] += 1;
-  }
-  return shares;
-}
 
 /**
  * A.5 under the 2026 agreement: four payments over a price that already

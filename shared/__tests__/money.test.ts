@@ -1,5 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { centsToDollarsInput, dollarsInputToCents } from "../money";
+import { centsToDollarsInput, dollarsInputToCents, splitCents } from "../money";
+
+describe("splitCents", () => {
+  it("splits in proportion and sums to the total exactly", () => {
+    expect(splitCents(100, [1, 1, 1])).toEqual([34, 33, 33]);
+    // 1,139,327.78 and 360,672.22 exactly: floors, then the one leftover cent to the larger fraction.
+    expect(splitCents(1_500_000, [52_880_000, 16_740_000])).toEqual([1_139_328, 360_672]);
+    expect(splitCents(1_500_000, [52_880_000, 16_740_000]).reduce((a, b) => a + b, 0)).toBe(1_500_000);
+  });
+  it("gives every share zero when there is nothing to weight by", () => {
+    expect(splitCents(100, [])).toEqual([]);
+    expect(splitCents(100, [0, 0])).toEqual([0, 0]);
+  });
+  it("splits a phase base by milestone percentages the way A.5 prints them", () => {
+    // 10 / 40 / 40 / 10 of $8,204.00 — the Ziherle draft's single phase.
+    expect(splitCents(820_400, [10, 40, 40, 10])).toEqual([82_040, 328_160, 328_160, 82_040]);
+  });
+});
 
 describe("dollarsInputToCents", () => {
   it("stores the wizard's dollar amounts as cents", () => {

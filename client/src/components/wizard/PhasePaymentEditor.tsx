@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowDown, ArrowUp, Loader2, Plus, Receipt, Trash2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { splitCents } from "@shared/money";
+import { AGREEMENT_MILESTONES } from "@shared/agreementMilestones";
 
 interface Phase {
   id: number;
@@ -32,6 +34,14 @@ interface PhaseRollup {
 
 interface PricingSummary {
   phases?: PhaseRollup[];
+  breakdown?: { totalDesignFee: number };
+}
+
+/** What a phase's milestones split: its value plus its share of the design fee. */
+interface PhaseBase {
+  value: number;
+  feeShare: number;
+  base: number;
 }
 
 /** One editable row. `percentage` stays a string so a cleared field is empty
@@ -72,33 +82,18 @@ function hundredths(raw: string): number | null {
 }
 
 /**
- * Mirrors `priceSchedule` in server/services/pricingMath.ts: percentages to two
- * decimals, the rounding residual on the last row that is not retainage, and
- * amounts summing to the phase value exactly.
- *
- * Duplicated here rather than read back from the server because these are the
- * amounts for percentages the user has typed and not yet saved — there is
- * nothing to read. Keeping the rule identical is what stops the figure on
- * screen differing from the figure that reaches the contract.
+ * The same split Exhibit A.5 (2026) prints — `generateExhibitA5PaymentTableHtml`
+ * in server/lib/tableGenerators.ts — over the same base, so the figure on
+ * screen is the figure that reaches the contract. Computed here rather than
+ * read back from the server because these are the amounts for percentages the
+ * user has typed and not yet saved.
  */
-function deriveAmounts(phaseValue: number, rows: DraftRow[]): (number | null)[] {
+function deriveAmounts(base: number, rows: DraftRow[]): (number | null)[] {
   const parsed = rows.map((row) => hundredths(row.percentage));
-  if (phaseValue <= 0 || parsed.some((value) => value === null)) {
+  if (base <= 0 || parsed.some((value) => value === null)) {
     return rows.map(() => null);
   }
-
-  const amounts = parsed.map((value) => Math.round((phaseValue * (value as number)) / 10_000));
-
-  let residualIndex = rows.length - 1;
-  for (let i = rows.length - 1; i >= 0; i--) {
-    if (!/retainage/i.test(rows[i].name)) {
-      residualIndex = i;
-      break;
-    }
-  }
-  amounts[residualIndex] += phaseValue - amounts.reduce((sum, amount) => sum + amount, 0);
-
-  return amounts;
+  return splitCents(base, parsed as number[]);
 }
 
 let rowCounter = 0;
@@ -122,17 +117,25 @@ export const PhasePaymentEditor: React.FC<{ projectId: number }> = ({ projectId 
   const { data: stored } = useQuery<Record<string, StoredMilestone[]>>({ queryKey: milestonesKey });
   const { data: pricing } = useQuery<PricingSummary>({ queryKey: pricingKey });
 
-  const phaseValues = useMemo(() => {
-    const values = new Map<number, number>();
-    for (const rollup of pricing?.phases ?? []) values.set(rollup.phaseId, rollup.phaseValue);
-    return values;
+  // The 2026 agreement bills the design fee inside the phases, not on a row of
+  // its own: A.5 spreads it across phases in proportion to their value and each
+  // phase's milestones split value plus share. The server's phaseValue excludes
+  // the fee, so the card adds the same share back before splitting.
+  const phaseBases = useMemo(() => {
+    const rollups = pricing?.phases ?? [];
+    const shares = splitCents(pricing?.breakdown?.totalDesignFee ?? 0, rollups.map((p) => p.phaseValue));
+    const bases = new Map<number, PhaseBase>();
+    rollups.forEach((p, i) =>
+      bases.set(p.phaseId, { value: p.phaseValue, feeShare: shares[i], base: p.phaseValue + shares[i] }),
+    );
+    return bases;
   }, [pricing]);
 
   /**
-   * The schedule as the server currently resolves it — a phase's stored rows
-   * where it has them, the default template where it does not. Seeding the
-   * draft from this means the table opens showing what the contract would print
-   * today, rather than an empty grid the user must guess at.
+   * The schedule as Exhibit A.5 (2026) resolves it — a phase's stored rows
+   * where it has them, the agreement's four payments where it does not. Seeding
+   * the draft from this means the table opens showing what the contract would
+   * print today, rather than an empty grid the user must guess at.
    */
   const serverDraft = useMemo<Draft | null>(() => {
     if (stored === undefined || pricing === undefined || phases.length === 0) return null;
@@ -140,14 +143,13 @@ export const PhasePaymentEditor: React.FC<{ projectId: number }> = ({ projectId 
     const built: Draft = {};
     for (const phase of phases) {
       const storedRows = stored[String(phase.id)];
-      const rollup = pricing.phases?.find((p) => p.phaseId === phase.id);
       const source = storedRows?.length
         ? storedRows.map((row) => ({
             name: row.name,
             trigger: row.trigger ?? "",
             percentage: row.percentage === null ? "" : String(row.percentage),
           }))
-        : (rollup?.milestones ?? []).map((row) => ({
+        : AGREEMENT_MILESTONES.map((row) => ({
             name: row.name,
             trigger: row.trigger,
             percentage: String(row.percentage),
@@ -294,8 +296,8 @@ export const PhasePaymentEditor: React.FC<{ projectId: number }> = ({ projectId 
         ) : (
           phases.map((phase) => {
             const rows = rowsFor(phase.id);
-            const phaseValue = phaseValues.get(phase.id) ?? 0;
-            const amounts = deriveAmounts(phaseValue, rows);
+            const { value: phaseValue, feeShare, base } = phaseBases.get(phase.id) ?? { value: 0, feeShare: 0, base: 0 };
+            const amounts = deriveAmounts(base, rows);
             const parsed = rows.map((row) => hundredths(row.percentage));
             const totalHundredths = parsed.reduce<number>((sum, value) => sum + (value ?? 0), 0);
             const isComplete = parsed.every((value) => value !== null) && totalHundredths === REQUIRED_TOTAL_HUNDREDTHS;
@@ -315,8 +317,13 @@ export const PhasePaymentEditor: React.FC<{ projectId: number }> = ({ projectId 
                     <Badge variant="secondary">Phase {phase.phaseNumber}</Badge>
                     {phase.name && <span className="break-words">{phase.name}</span>}
                     <span className="text-muted-foreground tabular-nums">
-                      {formatCents(phaseValue)}
+                      {formatCents(base)}
                     </span>
+                    {feeShare > 0 && (
+                      <span className="text-xs text-muted-foreground tabular-nums" data-testid={`text-fee-share-${phase.id}`}>
+                        ({formatCents(phaseValue)} + {formatCents(feeShare)} design fee share)
+                      </span>
+                    )}
                   </h3>
                   <span className="text-xs text-muted-foreground">
                     {isStored(phase.id) ? "Saved for this phase" : "Default schedule, not yet saved"}
@@ -427,7 +434,7 @@ export const PhasePaymentEditor: React.FC<{ projectId: number }> = ({ projectId 
                           {(totalHundredths / 100).toFixed(2)}%
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {formatCents(phaseValue)}
+                          {formatCents(base)}
                         </TableCell>
                         <TableCell />
                       </TableRow>

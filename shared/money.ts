@@ -13,3 +13,25 @@ export function dollarsInputToCents(input: string | null | undefined): number | 
 export function centsToDollarsInput(cents: number | null | undefined): string {
   return cents == null ? "" : String(cents / 100);
 }
+
+/**
+ * Splits `total` cents in proportion to `weights`. Each share is floored, then
+ * the leftover cents go one each to the largest fractional parts, so the shares
+ * sum to `total` exactly. Exhibit A.5 (2026) and the wizard's Phase Payment
+ * Schedule card both split with this, so the card shows the contract's figures.
+ */
+export function splitCents(total: number, weights: number[]): number[] {
+  const weightTotal = weights.reduce((sum, w) => sum + w, 0);
+  if (weights.length === 0 || weightTotal <= 0) return weights.map(() => 0);
+
+  const exact = weights.map((w) => (total * w) / weightTotal);
+  const shares = exact.map(Math.floor);
+  let residual = total - shares.reduce((sum, s) => sum + s, 0);
+  const byFraction = exact
+    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
+    .sort((a, b) => b.fraction - a.fraction);
+  for (let i = 0; i < byFraction.length && residual > 0; i++, residual--) {
+    shares[byFraction[i].index] += 1;
+  }
+  return shares;
+}
