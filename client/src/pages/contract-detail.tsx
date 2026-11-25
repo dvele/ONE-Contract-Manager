@@ -293,8 +293,14 @@ export default function ContractDetail() {
   );
   const [isGenerating, setIsGenerating] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isExportingDoc, setIsExportingDoc] = useState(false);
 
   const contractId = parseInt(params.id || "0");
+
+  // The export button shows only where the server has a Drive key; it reports a boolean, never the key.
+  const { data: googleDocStatus } = useQuery<{ configured: boolean }>({
+    queryKey: ["/api/contracts/google-doc-export/status"],
+  });
 
   const { data: contract, isLoading: contractLoading } = useQuery<Contract>({
     queryKey: ["/api/contracts", contractId],
@@ -394,6 +400,39 @@ export default function ContractDetail() {
       setIsGenerating(false);
     }
   }, [contract, toast]);
+
+  // Same export Step 9 offers right after generation, for a contract opened
+  // later. The route stores the Doc link on the contract, so once it returns
+  // the refetched contract carries googleDocUrl and the View button appears.
+  const handleExportGoogleDoc = async () => {
+    if (!contract?.projectId) return;
+    setIsExportingDoc(true);
+    try {
+      const response = await apiRequest("POST", "/api/contracts/export-google-doc", {
+        contractType: getContractTypeForApi(contract.contractType),
+        projectId: contract.projectId,
+        // This contract's own template and clause snapshot, as for the PDF.
+        contractId: contract.id,
+      });
+      const { webViewLink } = await response.json();
+      await queryClient.invalidateQueries({ queryKey: ["/api/contracts", contractId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contracts"] });
+      toast({
+        title: "Exported to Google Docs",
+        description: "Use View Google Doc to open it.",
+      });
+      window.open(webViewLink, "_blank", "noopener");
+    } catch (error) {
+      console.error("Google Doc export error:", error);
+      toast({
+        title: "Export Failed",
+        description: error instanceof Error ? error.message : "Failed to export to Google Docs.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExportingDoc(false);
+    }
+  };
 
   const handleDownload = async () => {
     const blob = await generatePdf();
@@ -564,16 +603,25 @@ export default function ContractDetail() {
             <Eye className="mr-2 h-4 w-4" />
             {isGenerating ? "Generating..." : "View PDF"}
           </Button>
-          {/* Only once an export has happened: the contract stores the link,
-              so it survives the session that created it. */}
-          {contract?.googleDocUrl && (
+          {/* Export until the contract has a Doc; then the stored link, which
+              survives the session that created it. */}
+          {contract?.googleDocUrl ? (
             <Button variant="outline" asChild data-testid="link-view-google-doc">
               <a href={contract.googleDocUrl} target="_blank" rel="noreferrer">
                 <ExternalLink className="mr-2 h-4 w-4" />
                 View Google Doc
               </a>
             </Button>
-          )}
+          ) : googleDocStatus?.configured ? (
+            <Button
+              variant="outline"
+              onClick={handleExportGoogleDoc}
+              disabled={isExportingDoc || isGenerating || !contract?.projectId}
+              data-testid="button-export-google-doc">
+              <ExternalLink className="mr-2 h-4 w-4" />
+              {isExportingDoc ? "Exporting..." : "Export to Google Doc"}
+            </Button>
+          ) : null}
           <Button
             onClick={handleDownload}
             disabled={isGenerating || !contract?.projectId}
