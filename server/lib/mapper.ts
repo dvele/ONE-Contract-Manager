@@ -741,21 +741,19 @@ export function buildMasterEf2026SignatureBlock(
   const width = hasGc ? "31%" : "47%";
   const gap = hasGc ? "3.5%" : "6%";
 
-  // Two rows, not one cell per party: the party names go in a header row and
-  // the lines in the row beneath, so a name that wraps, or the GC Affiliate's
-  // role line, makes every header cell taller together and the signature
-  // lines stay level across the columns.
-  function headerCell(title: string, subtitle: string | null): string {
+  // One row, one cell per party. A Google Doc can stop a row from splitting
+  // but cannot keep two rows together, so a names row above a lines row could
+  // end one page and start the next. Alignment comes from the header instead:
+  // every column reserves a role line (the GC Affiliate's role, a blank for
+  // the others) and a minimum header height, so the signature lines start
+  // level unless a party name itself wraps.
+  function sigColumn(title: string, subtitle: string | null): string {
     return `
-      <td style="width: ${width}; border: none; vertical-align: top; padding: 8pt 8pt 0 8pt;">
-        <div style="font-weight: bold;">${title}</div>
-        ${subtitle ? `<div style="${labelStyle} margin-top: 2pt;">${subtitle}</div>` : ""}
-      </td>`;
-  }
-
-  function linesCell(): string {
-    return `
-      <td style="width: ${width}; border: none; padding: 16pt 8pt 8pt 8pt;">
+      <td style="width: ${width}; border: none; vertical-align: top; padding: 8pt;">
+        <div style="min-height: 48pt; margin-bottom: 12pt;">
+          <div style="font-weight: bold;">${title}</div>
+          <div style="${labelStyle} margin-top: 2pt;">${subtitle ?? "&nbsp;"}</div>
+        </div>
         ${signatureLine()}
         <div style="${labelStyle}">Signed</div>
         ${signatureLine("margin-top: 12pt; ")}
@@ -775,17 +773,14 @@ export function buildMasterEf2026SignatureBlock(
     parties.push([(gcAffiliateName || "[GC AFFILIATE]").toUpperCase(), "GC Affiliate, solely as to on-site work"]);
   }
   const spacer = `<td style="width: ${gap}; border: none;"></td>`;
-  const headerRow = parties.map(([title, subtitle]) => headerCell(title, subtitle)).join(spacer);
-  const linesRow = parties.map(() => linesCell()).join(spacer);
 
+  // break-before: avoid keeps the closing "In witness hereof" paragraph on the
+  // same page as the block in the PDF; the Doc export sets keepWithNext on it.
   return `
-    <div class="signature-section" style="margin-top: 20pt; page-break-inside: avoid;">
+    <div class="signature-section" style="margin-top: 20pt; page-break-inside: avoid; break-before: avoid-page; page-break-before: avoid;">
       <table style="width: 100%; border-collapse: collapse; border: none; font-size: 10pt; font-family: Arial, sans-serif;">
         <tr>
-          ${headerRow}
-        </tr>
-        <tr>
-          ${linesRow}
+          ${parties.map(([title, subtitle]) => sigColumn(title, subtitle)).join(spacer)}
         </tr>
       </table>
     </div>`;

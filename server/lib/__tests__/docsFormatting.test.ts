@@ -137,6 +137,38 @@ describe("keeping a signature block on one page", () => {
     expect(rowStyles(planDocumentFormatting([], [PRICING]))).toEqual([]);
   });
 
+  // The 2026 agreement's block labels its lines "Signed / Name / Title / Date"
+  // per party, with no "Signature" or "Name (Print)" anywhere in it.
+  const SIG_2026: DocTable = {
+    startIndex: 700,
+    rowCount: 1,
+    text: "DVELE AZ, LLC Anton Ziherle TEST CMOS CONTRACTOR GC Affiliate, solely as to on-site work Signed Name Title Date Signed Name Title Date Signed Name Title Date",
+  };
+
+  it("recognises the 2026 agreement's signature block", () => {
+    const rs = rowStyles(planDocumentFormatting([], [SIG_2026]));
+    expect(rs).toHaveLength(1);
+    expect(rs[0].updateTableRowStyle.tableStartLocation.index).toBe(700);
+  });
+
+  it("does not mistake a milestone table with a Date column for a signature block", () => {
+    const milestones: DocTable = {
+      startIndex: 800,
+      rowCount: 5,
+      text: "Milestone Deliverable Buyer Inputs Needed Review Period Target Date D-1 Kickoff",
+    };
+    expect(rowStyles(planDocumentFormatting([], [milestones]))).toEqual([]);
+  });
+
+  it("keeps the closing paragraph with the signature block beneath it", () => {
+    // A Docs paragraph ends exactly where the next element starts.
+    const witness: DocParagraph = { startIndex: 650, endIndex: 700, text: "In witness hereof, the Parties have executed this Agreement.\n" };
+    const other: DocParagraph = { startIndex: 600, endIndex: 650, text: "Some earlier clause.\n" };
+    const styles = planDocumentFormatting([other, witness], [SIG_2026]).filter((r: any) => r.updateParagraphStyle) as any[];
+    expect(styles.map((r) => r.updateParagraphStyle.range.startIndex)).toEqual([650]);
+    expect(styles[0].updateParagraphStyle.paragraphStyle).toEqual({ keepWithNext: true });
+  });
+
   it("applies row styles before the page breaks, which move indices", () => {
     const rs = planDocumentFormatting([para("a", 1), para("EXHIBIT B", 700)], [SIG]);
     const lastRowStyle = rs.map((r) => !!(r as any).updateTableRowStyle).lastIndexOf(true);

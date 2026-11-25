@@ -55,7 +55,10 @@ export interface DocTable {
  * be held together. Forcing it on A.5's payment schedule or B.1's plan set
  * index, which legitimately run past a page, would ask for the impossible.
  */
-const SIGNATURE_TABLE = /\bSignature\b[\s\S]*\bName \(Print\)/;
+const SIGNATURE_TABLE =
+  // The ONE agreement's block: "Signature", "Name (Print)", "Title", "Date".
+  // The 2026 agreement's block: "Signed", "Name", "Title", "Date" per party.
+  /\bSignature\b[\s\S]*\bName \(Print\)|\bSigned\b[\s\S]*\bName\b[\s\S]*\bTitle\b[\s\S]*\bDate\b/;
 
 /** Any line that titles an exhibit, cover or full form. */
 const EXHIBIT_TITLE = /^EXHIBIT\s+[A-G]\b/i;
@@ -75,8 +78,13 @@ export function planDocumentFormatting(
   paragraphs: DocParagraph[],
   tables: DocTable[] = [],
 ): unknown[] {
+  // The paragraph right before a signature table ("In witness hereof, …")
+  // belongs with it: a Docs paragraph ends where the next element starts.
+  const signatureTableStarts = new Set(
+    tables.filter((t) => SIGNATURE_TABLE.test(t.text)).map((t) => t.startIndex),
+  );
   const keepWithNext = paragraphs
-    .filter(isHeading)
+    .filter((p) => isHeading(p) || signatureTableStarts.has(p.endIndex))
     .map((p) => ({
       updateParagraphStyle: {
         range: { startIndex: p.startIndex, endIndex: p.endIndex },
