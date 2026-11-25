@@ -1999,35 +1999,15 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         // Update project with LLC link
         await apiRequest('PATCH', `/api/projects/${projectId}`, { llcId: linkedLlcId });
         
-        // Also create child_llcs record using existing LLC's data for backwards compatibility
-        // Fetch the existing LLC details first
+        // The llcId link above is what the contract reads (server/routes/helpers.ts
+        // resolves the LLC by id). The former "child_llcs" upsert keyed on the
+        // project's name is gone: it answered 404 for every project without an
+        // organization id and would have rewritten the shared seller's row.
         try {
-          const llcDetailsResponse = await apiRequest('GET', `/api/llcs/${linkedLlcId}`);
-          {
-            const existingLlc = await llcDetailsResponse.json();
-            // API returns snake_case - handle both snake_case and camelCase field names
-            const childLlcPayload = {
-              projectId,
-              legalName: existingLlc.name,
-              formationState: existingLlc.state_of_formation || existingLlc.stateOfFormation || 'Delaware',
-              entityType: 'LLC',
-              ein: existingLlc.ein_number || existingLlc.einNumber || null,
-              address: existingLlc.address || pd.siteAddress,
-              city: existingLlc.city || pd.siteCity,
-              state: existingLlc.state || pd.siteState,
-              zip: existingLlc.zip || pd.siteZip,
-            };
-            await apiRequest('POST', `/api/projects/${projectId}/child-llc`, childLlcPayload);
-            llcName = existingLlc.name;
-          }
-        } catch (e) {
-          console.error('Child LLC creation from existing LLC failed:', e);
-          // Continue with generation but warn user
-          toast({
-            title: "Warning",
-            description: "LLC data may be incomplete. Please verify contract details.",
-            variant: "destructive",
-          });
+          const existingLlc = await (await apiRequest('GET', `/api/llcs/${linkedLlcId}`)).json();
+          llcName = existingLlc.name || llcName;
+        } catch {
+          // The name only feeds the success toast.
         }
       } else if (pd.llcOption === 'new') {
         // Use provided name or auto-generate from site address / project name

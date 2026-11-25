@@ -338,9 +338,12 @@ router.post("/projects", async (req, res) => {
       console.log(`✅ LLC id: ${llcId} for "${llcName}"`);
     }
     
-    // Insert project with LLC reference
+    // Insert project with LLC reference. Stamp the organization: routes that
+    // filter on organization_id (contractor entities, the child-LLC upsert)
+    // could not see a project created without one.
     const [result] = await db.insert(projects).values({
       ...projectData,
+      organizationId: projectData.organizationId ?? req.organizationId,
       llcId
     }).returning();
     
