@@ -1589,6 +1589,8 @@ export const WizardProvider: React.FC<WizardProviderProps> = ({ children, loadPr
         if (!data.siteCity.trim()) errors.siteCity = 'City is required';
         if (!data.siteState.trim()) errors.siteState = 'State is required';
         if (!data.siteZip.trim()) errors.siteZip = 'ZIP code is required';
+        // Exhibit A.1's Jurisdiction row prints the county; a blank there is a hand-filled line.
+        if (!data.siteCounty.trim()) errors.siteCounty = 'County is required';
         // Billing address validation (if different from site)
         if (data.billingAddressDifferent) {
           if (!data.billingAddress.trim()) errors.billingAddress = 'Billing address is required';

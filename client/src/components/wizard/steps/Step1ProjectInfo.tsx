@@ -430,15 +430,19 @@ export const Step1ProjectInfo: React.FC = () => {
             
             <div className="space-y-2">
               <Label htmlFor="siteCounty">
-                County
+                County <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="siteCounty"
                 value={projectData.siteCounty}
                 onChange={(e) => updateProjectData({ siteCounty: e.target.value })}
                 placeholder="County"
+                className={validationErrors.siteCounty ? 'border-red-500' : ''}
                 data-testid="input-site-county"
               />
+              {validationErrors.siteCounty && (
+                <p className="text-sm text-red-500">{validationErrors.siteCounty}</p>
+              )}
             </div>
           </div>
 

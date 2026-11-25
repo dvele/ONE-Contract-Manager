@@ -165,6 +165,7 @@ export const Step9ReviewGenerate: React.FC = () => {
       "siteCity",
       "siteState",
       "siteZip",
+      "siteCounty",
       "childLlcName",
       "childLlcState",
       "designFee",
